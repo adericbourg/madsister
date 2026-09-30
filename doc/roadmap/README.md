@@ -12,7 +12,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 6. Stage the step's files, run the `ponytail:ponytail-review` skill on the staged diff (the commit hook blocks otherwise), apply the
    relevant findings, re-stage. Then commit with the `development-tools:commit` skill: `git commit -s -S`, **no Co-Authored-By** (user rule), one commit per step,
    and the tests/docs go in the same commit as the code they cover. Use the step's suggested message.
-7. `git push origin main`.
+7. `git push origin main`, then check CI (next section). **A red CI is priority #1: fix it before any other step.**
 
 ## Blocker policy
 - Time-box: 3 distinct fix attempts (not 3 retries of the same thing). Use Context7 for library docs before giving up.
@@ -38,8 +38,11 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 - Minimal code (no speculative abstractions). Mark a deliberate shortcut with a `ponytail:` comment naming its ceiling.
 - CI = GitHub Actions, one workflow per project: `.github/workflows/engine.yml` (M0-1), `.github/workflows/app.yml` (M1-1).
   CI runs fast tests only (no model weights). Every step keeps CI green: if it adds a system dependency or a new test command,
-  it updates the workflow in the same commit. Lint workflows with `uvx --from actionlint-py actionlint`. Don't use `gh`
-  (it's logged into another account), so CI results are checked by the user in the morning.
+  it updates the workflow in the same commit. Lint workflows with `uvx --from actionlint-py actionlint`. Pin actions to tags that exist
+  (e.g. `astral-sh/setup-uv` has no floating major tag: use the exact version).
+- Checking CI: don't use `gh` (logged into another account). The repo is public, so use the API:
+  `curl -s "https://api.github.com/repos/adericbourg/madsister/actions/runs?per_page=5"` (status/conclusion per run) and
+  `…/actions/runs/<id>/jobs` for the failing step. Logs need auth: reproduce the failing step locally instead.
 - Dev machine is macOS arm64 (the spec targets Linux first). Don't add Linux-only code paths in M0/M1.
 
 ## Status
@@ -102,4 +105,4 @@ after M0 (the model choices change M2/M4b/M6), and ask the user before starting 
 
 ## Morning hand-off
 When stopping (all tonight's steps done, or everything left is blocked), make sure these are up to date and pushed:
-this status table, `BLOCKERS.md`, and `m0-results.md` (from M0-14). Remind the user to check the GitHub Actions runs.
+this status table, `BLOCKERS.md`, and `m0-results.md` (from M0-14). CI must be green on the last commit.
