@@ -70,8 +70,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M1-2 | [m1-step2-song-model](m1-step2-song-model.md) | done | 9cabc31 |
 | M1-3 | [m1-step3-chord-parser](m1-step3-chord-parser.md) | done | 775c9d7 |
 | M1-4 | [m1-step4-chord-display](m1-step4-chord-display.md) | done | ba411b2 |
-| M1-5 | [m1-step5-transpose](m1-step5-transpose.md) | done | this |
-| M1-6 | [m1-step6-bar-slot-commands](m1-step6-bar-slot-commands.md) | todo | |
+| M1-5 | [m1-step5-transpose](m1-step5-transpose.md) | done | 18d1b11 |
+| M1-6 | [m1-step6-bar-slot-commands](m1-step6-bar-slot-commands.md) | done | this |
 | M1-7 | [m1-step7-section-commands](m1-step7-section-commands.md) | todo | |
 | M1-8 | [m1-step8-history](m1-step8-history.md) | todo | |
 | M1-9 | [m1-step9-grid-view](m1-step9-grid-view.md) | todo | |
