@@ -72,8 +72,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M1-4 | [m1-step4-chord-display](m1-step4-chord-display.md) | done | ba411b2 |
 | M1-5 | [m1-step5-transpose](m1-step5-transpose.md) | done | 18d1b11 |
 | M1-6 | [m1-step6-bar-slot-commands](m1-step6-bar-slot-commands.md) | done | 7b41a53 |
-| M1-7 | [m1-step7-section-commands](m1-step7-section-commands.md) | done | this |
-| M1-8 | [m1-step8-history](m1-step8-history.md) | todo | |
+| M1-7 | [m1-step7-section-commands](m1-step7-section-commands.md) | done | 096e12a |
+| M1-8 | [m1-step8-history](m1-step8-history.md) | done | this |
 | M1-9 | [m1-step9-grid-view](m1-step9-grid-view.md) | todo | |
 | M1-10 | [m1-step10-keyboard-editing](m1-step10-keyboard-editing.md) | todo | |
 | M1-11 | [m1-step11-file-io](m1-step11-file-io.md) | todo | |
