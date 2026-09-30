@@ -3,13 +3,17 @@ import sys
 import traceback
 from pathlib import Path
 
-from madsister_engine import events
+from madsister_engine import events, pipeline
 
 
 def _transcribe(args: argparse.Namespace) -> int:
     if not Path(args.audio).is_file():
         raise FileNotFoundError(f"audio file not found: {args.audio}")
-    raise NotImplementedError("transcribe is not implemented yet")
+    pipeline.transcribe(
+        args.audio, args.out, args.meter, not args.no_sections, args.beats, args.chords, args.separate, args.add_tau
+    )
+    events.result(str(Path(args.out).resolve()))
+    return 0
 
 
 def _not_implemented(args: argparse.Namespace) -> int:
@@ -26,6 +30,11 @@ def _parser() -> argparse.ArgumentParser:
     transcribe.add_argument("--out", required=True)
     transcribe.add_argument("--meter", type=int, choices=[3, 4])
     transcribe.add_argument("--no-sections", action="store_true")
+    # Bench-only options (M0-13), hidden until M4b replaces them with --mode.
+    transcribe.add_argument("--beats", choices=["auto", "allinone", "madmom"], default="auto", help=argparse.SUPPRESS)
+    transcribe.add_argument("--chords", choices=["auto", "btc", "cnnlstm"], default="auto", help=argparse.SUPPRESS)
+    transcribe.add_argument("--separate", action="store_true", help=argparse.SUPPRESS)
+    transcribe.add_argument("--add-tau", type=float, help=argparse.SUPPRESS)
     transcribe.set_defaults(func=_transcribe)
 
     fetch = sub.add_parser("fetch", help="download audio from a URL")

@@ -61,8 +61,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M0-7 | [m0-step7-chords-btc](m0-step7-chords-btc.md) | done | 6fdefd0 |
 | M0-8 | [m0-step8-chords-cnnlstm](m0-step8-chords-cnnlstm.md) | done | 0e3b5bc |
 | M0-9 | [m0-step9-demucs](m0-step9-demucs.md) | done | cf6cd7e |
-| M0-10 | [m0-step10-add-heuristic](m0-step10-add-heuristic.md) | done | this |
-| M0-11 | [m0-step11-transcribe-cli](m0-step11-transcribe-cli.md) | todo | |
+| M0-10 | [m0-step10-add-heuristic](m0-step10-add-heuristic.md) | done | 527a9b1 |
+| M0-11 | [m0-step11-transcribe-cli](m0-step11-transcribe-cli.md) | done | this |
 | M0-12 | [m0-step12-bench-guitarset](m0-step12-bench-guitarset.md) | todo | |
 | M0-13 | [m0-step13-bench-runner](m0-step13-bench-runner.md) | todo | |
 | M0-14 | [m0-step14-results-decisions](m0-step14-results-decisions.md) | todo | |

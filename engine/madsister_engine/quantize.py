@@ -4,6 +4,7 @@ import itertools
 import statistics
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from madsister_engine.song import Bar, ChordSlot, Meta, Meter, Section, Song
@@ -140,8 +141,12 @@ def build_song(
     downbeats: list[float],
     meter_beats: int,
     segments: list[tuple[float, float, str]] | None,
+    refine: Callable[[list[Bar]], list[Bar]] | None = None,
 ) -> Song:
+    """`refine` rewrites the simplified bars before sectioning (the add2/add4 step 5b)."""
     bars = simplify(bars_from_beats(beat_labels(chords, beats), beats, downbeats, meter_beats))
+    if refine:
+        bars = refine(bars)
     period = statistics.median(b - a for a, b in zip(beats, beats[1:]))
     return Song(
         meta=Meta(title=title, meter=Meter(meter_beats, 4), tempo_bpm=round(60 / period)),
