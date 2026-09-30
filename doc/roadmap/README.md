@@ -50,8 +50,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | Step | File | Status | Commit |
 |---|---|---|---|
 | M0-1 | [m0-step1-engine-scaffold](m0-step1-engine-scaffold.md) | done | 0a79b94 |
-| M0-2 | [m0-step2-song-model](m0-step2-song-model.md) | done | this |
-| M0-3 | [m0-step3-quantization](m0-step3-quantization.md) | todo | |
+| M0-2 | [m0-step2-song-model](m0-step2-song-model.md) | done | a59e235 |
+| M0-3 | [m0-step3-quantization](m0-step3-quantization.md) | done | this |
 | M0-4 | [m0-step4-decode](m0-step4-decode.md) | todo | |
 | M0-5 | [m0-step5-beats-madmom](m0-step5-beats-madmom.md) | todo | |
 | M0-6 | [m0-step6-beats-allinone](m0-step6-beats-allinone.md) | todo | |
