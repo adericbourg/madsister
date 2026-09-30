@@ -75,8 +75,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M1-7 | [m1-step7-section-commands](m1-step7-section-commands.md) | done | 096e12a |
 | M1-8 | [m1-step8-history](m1-step8-history.md) | done | 418e7ae |
 | M1-9 | [m1-step9-grid-view](m1-step9-grid-view.md) | done | fc28933 |
-| M1-10 | [m1-step10-keyboard-editing](m1-step10-keyboard-editing.md) | done | this |
-| M1-11 | [m1-step11-file-io](m1-step11-file-io.md) | todo | |
+| M1-10 | [m1-step10-keyboard-editing](m1-step10-keyboard-editing.md) | done | 62b481d |
+| M1-11 | [m1-step11-file-io](m1-step11-file-io.md) | done | this |
 | M1-12 | [m1-step12-settings-transpose-ui](m1-step12-settings-transpose-ui.md) | todo | |
 | M1-13 | [m1-step13-print](m1-step13-print.md) | todo | |
 | M2-1 | [m2-step1-rust-engine-bridge](m2-step1-rust-engine-bridge.md) | todo | |

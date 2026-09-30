@@ -48,6 +48,8 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["F2", "Rename the section"],
   ["Alt+↑ / Alt+↓", "Repeat the section one more / one less time"],
   ["Alt+Shift+↑ / Alt+Shift+↓", "Move the section up / down"],
+  ["Mod+N / Mod+O", "New song / open a file"],
+  ["Mod+S / Mod+Shift+S", "Save / save as"],
   ["?", "Show this help"],
 ];
 
