@@ -63,4 +63,5 @@ madmom = { git = "https://github.com/CPJKU/madmom", rev = "27f032e8947204902c675
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["../bench"]  # bench scripts are not part of the package
 markers = ["slow: needs model weights or real audio processing (not run in CI)"]

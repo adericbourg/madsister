@@ -13,3 +13,4 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | Chord-CNN-LSTM (music-x-lab, ISMIR'19) | Large-vocabulary chords with inversions (`chords-cnnlstm` group), repo cloned at setup | MIT | MIT (`cache_data/*.sdict` ship in the MIT-licensed repo) | https://github.com/music-x-lab/ISMIR2019-Large-Vocabulary-Chord-Recognition (pinned sha `481f4ce`) |
 | h5py, joblib, pretty_midi, pydub | Imported by Chord-CNN-LSTM's `mir` package (not used for inference) | BSD / BSD / MIT / MIT | — | PyPI |
 | mir_eval | Imported by BTC's feature code; chord/beat metrics | MIT | — | https://github.com/mir-evaluation/mir_eval |
+| GuitarSet (Xi et al., ISMIR 2018) | Proxy bench data (`bench/`), downloaded by `bench/fetch_guitarset.py`; not shipped | — | CC BY 4.0 (data) | https://zenodo.org/records/3371780 |

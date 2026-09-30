@@ -1,0 +1,24 @@
+{
+  "file_metadata": {"title": "00_Rock1-120-C_comp", "duration": 4.0, "jams_version": "0.3.1"},
+  "annotations": [
+    {"namespace": "beat_position", "annotation_metadata": {"data_source": ""}, "data": [
+      {"time": 0.0, "duration": 0.0, "value": {"position": 1, "beat_units": 4, "measure": 1, "num_beats": 4}, "confidence": null},
+      {"time": 0.5, "duration": 0.0, "value": {"position": 2, "beat_units": 4, "measure": 1, "num_beats": 4}, "confidence": null},
+      {"time": 1.0, "duration": 0.0, "value": {"position": 3, "beat_units": 4, "measure": 1, "num_beats": 4}, "confidence": null},
+      {"time": 1.5, "duration": 0.0, "value": {"position": 4, "beat_units": 4, "measure": 1, "num_beats": 4}, "confidence": null},
+      {"time": 2.0, "duration": 0.0, "value": {"position": 1, "beat_units": 4, "measure": 2, "num_beats": 4}, "confidence": null},
+      {"time": 2.5, "duration": 0.0, "value": {"position": 2, "beat_units": 4, "measure": 2, "num_beats": 4}, "confidence": null},
+      {"time": 3.0, "duration": 0.0, "value": {"position": 3, "beat_units": 4, "measure": 2, "num_beats": 4}, "confidence": null},
+      {"time": 3.5, "duration": 0.0, "value": {"position": 4, "beat_units": 4, "measure": 2, "num_beats": 4}, "confidence": null}
+    ]},
+    {"namespace": "chord", "annotation_metadata": {"data_source": ""}, "data": [
+      {"time": 0.0, "duration": 2.0, "value": "C:maj", "confidence": null},
+      {"time": 2.0, "duration": 2.0, "value": "G:7", "confidence": null}
+    ]},
+    {"namespace": "chord", "annotation_metadata": {"data_source": "Semi-automatic chord transcription with manual verification"}, "data": [
+      {"time": 0.0, "duration": 2.0, "value": "C:(1,5)/1", "confidence": null},
+      {"time": 2.0, "duration": 1.0, "value": "G:7(*5)/1", "confidence": null},
+      {"time": 3.0, "duration": 1.0, "value": "G:maj/5", "confidence": null}
+    ]}
+  ]
+}

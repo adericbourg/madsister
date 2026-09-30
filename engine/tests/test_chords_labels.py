@@ -28,6 +28,19 @@ def test_to_harte_of_cnnlstm_labels_keeps_bass_and_degrades_extended_qualities()
     assert to_harte("C:9/b7") == "C:7/b7"
 
 
+def test_to_harte_of_guitarset_performed_labels_strips_extensions_and_root_bass():
+    # Given GuitarSet performed-chord labels (full Harte: degree lists, `/1` bass, interval sets),
+    # When mapping, Then extensions are dropped, `/1` is no bass, and a set without a named quality is `maj`
+    assert to_harte("C#:maj/1") == "C#:maj"
+    assert to_harte("A:7(*5)/1") == "A:7"
+    assert to_harte("F:maj(#11)/b5") == "F:maj/b5"
+    assert to_harte("B:hdim7(11,*1)/4") == "B:hdim7/4"
+    assert to_harte("E:(1,5)/1") == "E:maj"
+    assert to_harte("D:maj(2)/1") == "D:add2"
+    assert to_harte("D:maj(11)/4") == "D:add4/4"
+    assert to_harte("D:sus4(b7)/1") == "D:7"
+
+
 def test_to_harte_of_unknown_quality_raises():
     # Given a quality outside the §4.1 set, When mapping, Then it doesn't survive
     with pytest.raises(ValueError):
