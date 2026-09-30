@@ -1,21 +1,29 @@
 import { describe, expect, test } from "vitest";
 import {
+  addSection,
+  copyBars,
   deleteBar,
+  deleteSection,
   duplicateBar,
   insertBar,
   mergeSlotWithNext,
+  moveSection,
+  pasteBars,
+  renameSection,
   resizeSlot,
   setChord,
+  setRepeat,
+  splitSection,
   splitSlot,
 } from "./commands";
-import { parseSong, type Song } from "./song";
+import { emptySong, parseSong, type Song } from "./song";
 
 const deepFreeze = <T>(value: T): T => {
   if (typeof value === "object" && value !== null) Object.values(value).forEach(deepFreeze);
   return Object.freeze(value);
 };
 
-// One 4/4 section: bar 0 = A:min 3 + E:7 1 (aligned to audio), bar 1 = C:maj 4.
+// 4/4. Verse: bar 0 = A:min 3 + E:7 1 (aligned to audio), bar 1 = C:maj 4. Chorus x2: G:maj 4, F:maj 4.
 const fixture = (): Song =>
   deepFreeze(
     parseSong({
@@ -30,6 +38,15 @@ const fixture = (): Song =>
             { startSec: 2, chords: [{ chord: "C:maj", beats: 4, confidence: 0.9 }] },
           ],
         },
+        {
+          id: "s2",
+          label: "Chorus",
+          repeat: 2,
+          bars: [
+            { startSec: 4, chords: [{ chord: "G:maj", beats: 4 }] },
+            { startSec: 6, chords: [{ chord: "F:maj", beats: 4 }] },
+          ],
+        },
       ],
     }),
   );
@@ -37,11 +54,14 @@ const fixture = (): Song =>
 const snapshot = fixture();
 
 // Every command must keep the file valid (beat sums) and leave the frozen input untouched.
-const check = (song: Song, result: Song) => {
+const checkSong = (song: Song, result: Song) => {
   expect(song).toEqual(snapshot);
   expect(() => parseSong(JSON.parse(JSON.stringify(result)))).not.toThrow();
-  return result.sections[0].bars;
+  return result;
 };
+const check = (song: Song, result: Song) => checkSong(song, result).sections[0].bars;
+const labels = (song: Song) => song.sections.map((s) => s.label);
+const chords = (song: Song, section: number) => song.sections[section].bars.map((b) => b.chords.map((s) => s.chord).join(" "));
 
 describe("setChord", () => {
   test("setChord_replacesTheChordAndClearsConfidence", () => {
@@ -161,5 +181,102 @@ describe("duplicateBar", () => {
     expect(bars.map((b) => b.startSec)).toEqual([0, undefined, 2]);
     expect(bars[1]).toEqual({ chords: song.sections[0].bars[0].chords });
     expect(bars[1]).not.toHaveProperty("startSec");
+  });
+});
+
+describe("section commands", () => {
+  test("addSection_insertsASectionWithOneEmptyBar", () => {
+    // Given
+    const song = fixture();
+
+    // When
+    const result = checkSong(song, addSection(song, 1, "Bridge"));
+
+    // Then
+    expect(labels(result)).toEqual(["Verse", "Bridge", "Chorus"]);
+    expect(result.sections[1].bars).toEqual([{ chords: [{ chord: "N", beats: 4 }] }]);
+    expect(result.sections[1].id).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  test("renameSection_moveSection_setRepeat_updateTheSections", () => {
+    // Given
+    const song = fixture();
+
+    // When
+    const renamed = checkSong(song, renameSection(song, 1, "Refrain"));
+    const moved = checkSong(song, moveSection(song, 0, 1));
+    const repeated = checkSong(song, setRepeat(song, 0, 3));
+    const unrepeated = checkSong(song, setRepeat(song, 1, 1));
+
+    // Then
+    expect(labels(renamed)).toEqual(["Verse", "Refrain"]);
+    expect(labels(moved)).toEqual(["Chorus", "Verse"]);
+    expect(moved.sections[1]).toBe(song.sections[0]);
+    expect(repeated.sections[0].repeat).toBe(3);
+    expect(unrepeated.sections[1]).not.toHaveProperty("repeat");
+  });
+
+  test("deleteSection_removesItAndLeavesAnEmptySongSectionWhenItWasTheLast", () => {
+    // Given
+    const song = fixture();
+
+    // When
+    const deleted = checkSong(song, deleteSection(song, 0));
+    const emptied = checkSong(song, deleteSection(deleted, 0));
+
+    // Then
+    expect(labels(deleted)).toEqual(["Chorus"]);
+    expect(labels(emptied)).toEqual(["Song"]);
+    expect(emptied.sections[0].bars).toEqual([{ chords: [{ chord: "N", beats: 4 }] }]);
+  });
+
+  test("splitSection_movesBarsFromTheRefOnwardToANewSectionRightAfter", () => {
+    // Given
+    const song = fixture();
+
+    // When
+    const atLast = checkSong(song, splitSection(song, { section: 0, bar: 1 }));
+    const atFirst = checkSong(song, splitSection(song, { section: 0, bar: 0 }));
+
+    // Then
+    expect(labels(atLast)).toEqual(["Verse", "Verse (2)", "Chorus"]);
+    expect(chords(atLast, 0)).toEqual(["A:min E:7"]);
+    expect(chords(atLast, 1)).toEqual(["C:maj"]);
+    expect(atLast.sections[1].id).not.toBe(song.sections[0].id);
+    expect(chords(atFirst, 0)).toEqual([]);
+    expect(chords(atFirst, 1)).toEqual(["A:min E:7", "C:maj"]);
+  });
+});
+
+describe("copyBars / pasteBars", () => {
+  test("pasteBars_ofTwoCopiedBars_insertsThemInOrderWithoutStartSec", () => {
+    // Given
+    const song = fixture();
+    const bars = copyBars(song, { section: 0, bar: 0 }, { section: 0, bar: 1 });
+
+    // When
+    const result = checkSong(song, pasteBars(song, { section: 1, bar: 1 }, bars, "after"));
+    const before = checkSong(song, pasteBars(song, { section: 1, bar: 0 }, bars, "before"));
+
+    // Then
+    expect(chords(result, 1)).toEqual(["G:maj", "F:maj", "A:min E:7", "C:maj"]);
+    expect(result.sections[1].bars.map((b) => b.startSec)).toEqual([4, 6, undefined, undefined]);
+    expect(result.sections[1].bars[2]).not.toHaveProperty("startSec");
+    expect(chords(before, 1)).toEqual(["A:min E:7", "C:maj", "G:maj", "F:maj"]);
+  });
+
+  test("pasteBars_whenBeatsDifferFromTheSongMeter_addsAMeterOverride", () => {
+    // Given a 3/4 target song and 4-beat bars
+    const song = fixture();
+    const target = emptySong({ beats: 3, unit: 4 });
+    const bars = copyBars(song, { section: 0, bar: 1 }, { section: 0, bar: 1 });
+
+    // When
+    const result = pasteBars(target, { section: 0, bar: 0 }, bars, "before");
+
+    // Then
+    expect(() => parseSong(JSON.parse(JSON.stringify(result)))).not.toThrow();
+    expect(result.sections[0].bars[0].meter).toEqual({ beats: 4, unit: 4 });
+    expect(result.sections[0].bars[1]).not.toHaveProperty("meter");
   });
 });

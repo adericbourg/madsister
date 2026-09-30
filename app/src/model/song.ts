@@ -133,12 +133,14 @@ export const parseSong = (json: unknown): Song => {
 // Absent optional fields are `undefined` on parsed objects; JSON.stringify omits them, like the engine does.
 export const serializeSong = (song: Song): string => JSON.stringify(song, null, 2);
 
+export const newSectionId = (): string => crypto.randomUUID().slice(0, 8);
+
 export const emptySong = (meter: SongMeter = { beats: 4, unit: 4 }): Song => ({
   version: 1,
   meta: { title: "Untitled", meter },
   sections: [
     {
-      id: crypto.randomUUID().slice(0, 8),
+      id: newSectionId(),
       label: "Verse",
       bars: Array.from({ length: 4 }, () => ({ chords: [{ chord: "N", beats: meter.beats }] })),
     },
