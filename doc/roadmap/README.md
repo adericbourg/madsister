@@ -46,7 +46,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 
 | Step | File | Status | Commit |
 |---|---|---|---|
-| M0-1 | [m0-step1-engine-scaffold](m0-step1-engine-scaffold.md) | todo | |
+| M0-1 | [m0-step1-engine-scaffold](m0-step1-engine-scaffold.md) | done | this |
 | M0-2 | [m0-step2-song-model](m0-step2-song-model.md) | todo | |
 | M0-3 | [m0-step3-quantization](m0-step3-quantization.md) | todo | |
 | M0-4 | [m0-step4-decode](m0-step4-decode.md) | todo | |

@@ -1,0 +1,24 @@
+name: engine
+
+on:
+  push:
+    branches: [main]
+    paths: ["engine/**", "bench/**", ".github/workflows/engine.yml"]
+  pull_request:
+    paths: ["engine/**", "bench/**", ".github/workflows/engine.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: uv sync --locked
+      # Slow tests need model weights (several GB): never in CI.
+      - run: uv run pytest -m "not slow"

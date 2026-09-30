@@ -1,0 +1,27 @@
+[project]
+name = "madsister-engine"
+version = "0.1.0"
+description = "madsister transcription engine: audio in, chord grid (Song JSON) out"
+authors = [
+    { name = "Alban Dericbourg", email = "alban@dericbourg.dev" }
+]
+license = "GPL-3.0-or-later"
+requires-python = ">=3.11,<3.12"
+dependencies = []
+
+[project.scripts]
+madsister-engine = "madsister_engine.cli:main"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: needs model weights or real audio processing (not run in CI)"]

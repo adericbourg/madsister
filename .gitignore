@@ -1,0 +1,14 @@
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Bench data (audio, downloaded annotations)
+bench/data/
+
+# App
+node_modules/
+dist/
+app/src-tauri/target/
