@@ -14,6 +14,9 @@ export const isDirty = (song: Song, savedSong: Song): boolean => song !== savedS
 
 export const confirmDiscard = (): Promise<boolean> => confirm("Discard unsaved changes?", { kind: "warning" });
 
+export const confirmDeleteSection = (label: string): Promise<boolean> =>
+  confirm(`Delete the section "${label}" and its chords?`, { kind: "warning" });
+
 export const pickOpenPath = async (): Promise<string | null> => open({ filters });
 
 export const pickSavePath = async (song: Song): Promise<string | null> =>

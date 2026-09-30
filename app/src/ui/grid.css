@@ -166,3 +166,26 @@
   text-align: left;
   font-weight: 400;
 }
+
+/* Toolbars sit outside .chart: small native controls, browser focus ring kept. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  max-width: 60rem;
+  margin: 0.5rem auto;
+  box-sizing: border-box;
+}
+
+.toolbar fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.field-error {
+  margin-left: 0.25rem;
+  color: #a64200;
+}

@@ -1,14 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { confirm } from "@tauri-apps/plugin-dialog";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { emptySong, type Song } from "../model/song";
 import { Editor } from "./Editor";
 import { useHistory } from "./useHistory";
 
+vi.mock("@tauri-apps/plugin-dialog", () => ({ confirm: vi.fn() }));
+
+afterEach(cleanup);
+
 let song: Song | undefined;
-const Harness = () => {
-  const [initial] = useState(emptySong);
+const Harness = ({ from = emptySong }: { from?: () => Song }) => {
+  const [initial] = useState(from);
   const history = useHistory(initial);
   song = history.song;
   return <Editor history={history} barsPerRow={4} style="fr" />;
@@ -69,4 +74,48 @@ test("Editor_whenTypingAChartByKeyboard_buildsTheSong", async () => {
   // When clicking a cell, Then it gets the cursor
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
   expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
+});
+
+test("Editor_whenUsingTheSectionControls_editsTheCursorSection", async () => {
+  // Given an empty intro (cursor there) and a verse with a chord
+  const user = userEvent.setup();
+  render(
+    <Harness
+      from={() => ({
+        version: 1,
+        meta: { title: "Song", meter: { beats: 4, unit: 4 } },
+        sections: [
+          { id: "i", label: "Intro", bars: [bar(["N", 4])] },
+          { id: "v", label: "Verse", bars: [bar(["C:maj", 4])] },
+        ],
+      })}
+    />,
+  );
+
+  // When renaming the intro, repeating it 3 times and moving it down
+  const name = screen.getByRole("textbox", { name: "Name" });
+  await user.clear(name);
+  await user.type(name, "Outro{Enter}");
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Repeat" }), { target: { value: "3" } });
+  await user.click(screen.getByRole("button", { name: "Move down" }));
+
+  // Then the order changes and the controls follow the moved section
+  expect(song?.sections.map((s) => [s.label, s.repeat])).toEqual([["Verse", undefined], ["Outro", 3]]);
+  expect(screen.getByRole("button", { name: "Move down" }).hasAttribute("disabled")).toBe(true);
+
+  // When deleting the outro (no chords), Then it goes without confirmation
+  await user.click(screen.getByRole("button", { name: "Delete section" }));
+  expect(confirm).not.toHaveBeenCalled();
+  expect(song?.sections.map((s) => s.label)).toEqual(["Verse"]);
+
+  // When deleting the verse (it has chords), declining then accepting the confirmation
+  vi.mocked(confirm).mockResolvedValueOnce(false);
+  await user.click(screen.getByRole("button", { name: "Delete section" }));
+  expect(confirm).toHaveBeenCalledTimes(1);
+  expect(song?.sections.map((s) => s.label)).toEqual(["Verse"]);
+  vi.mocked(confirm).mockResolvedValueOnce(true);
+  await user.click(screen.getByRole("button", { name: "Delete section" }));
+
+  // Then only the accepted deletion happens
+  await vi.waitFor(() => expect(song?.sections.map((s) => s.label)).toEqual(["Song"]));
 });

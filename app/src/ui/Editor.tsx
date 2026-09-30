@@ -1,9 +1,11 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { parseChord } from "../model/chord";
-import { renameSection, setChord, type BarRef, type SlotRef } from "../model/commands";
+import { addSection, deleteSection, moveSection, renameSection, setChord, setRepeat, type BarRef, type SlotRef } from "../model/commands";
 import type { DisplayStyle } from "../model/display";
-import type { Bar } from "../model/song";
+import type { Bar, Song } from "../model/song";
+import { confirmDeleteSection } from "./fileActions";
 import { Grid } from "./Grid";
+import { Field } from "./Toolbar";
 import { clampCursor, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
 import type { useHistory } from "./useHistory";
 
@@ -73,6 +75,19 @@ export const Editor = ({ history, barsPerRow, style }: Props) => {
     setDraft(null);
   };
 
+  // Mouse/labelled equivalents of the section shortcuts (F-ED-6), acting on the cursor's section.
+  const section = song.sections[cursor.section];
+  const editSection = (fn: (s: Song) => Song, to = cursor.section) => {
+    history.apply(fn);
+    setCursor({ section: to, bar: 0, slot: 0 });
+    setAnchor(null);
+  };
+  const removeSection = async () => {
+    const hasChords = section.bars.some((b) => b.chords.some((c) => c.chord !== "N"));
+    if (hasChords && !(await confirmDeleteSection(section.label))) return;
+    editSection((s) => deleteSection(s, cursor.section), Math.max(0, cursor.section - 1));
+  };
+
   const closeHelp = () => {
     setIsHelpOpen(false);
     helpOpener.current?.focus();
@@ -109,6 +124,44 @@ export const Editor = ({ history, barsPerRow, style }: Props) => {
 
   return (
     <>
+      <fieldset className="toolbar">
+        <legend>Section</legend>
+        <Field
+          key={section.id}
+          label="Name"
+          value={section.label}
+          check={(t) => (t === "" ? "a section needs a name" : null)}
+          onCommit={(label) => history.apply((s) => renameSection(s, cursor.section, label))}
+        />
+        <label>
+          Repeat{" "}
+          <input
+            type="number"
+            min={1}
+            value={section.repeat ?? 1}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isInteger(n) && n >= 1 && n !== (section.repeat ?? 1)) history.apply((s) => setRepeat(s, cursor.section, n));
+            }}
+          />
+        </label>
+        <button type="button" disabled={cursor.section === 0} onClick={() => editSection((s) => moveSection(s, cursor.section, cursor.section - 1), cursor.section - 1)}>
+          Move up
+        </button>
+        <button
+          type="button"
+          disabled={cursor.section === song.sections.length - 1}
+          onClick={() => editSection((s) => moveSection(s, cursor.section, cursor.section + 1), cursor.section + 1)}
+        >
+          Move down
+        </button>
+        <button type="button" onClick={() => editSection((s) => addSection(s, cursor.section + 1, "New section"), cursor.section + 1)}>
+          Add section
+        </button>
+        <button type="button" onClick={() => void removeSection()}>
+          Delete section
+        </button>
+      </fieldset>
       <Grid
         song={song}
         barsPerRow={barsPerRow}

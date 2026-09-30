@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { emptySong, type Song } from "./model/song";
+import { emptySong, type Song, type SongMeter } from "./model/song";
 import { Editor } from "./ui/Editor";
 import {
   confirmDiscard,
@@ -13,9 +13,12 @@ import {
   writeConfigJson,
   writeSong,
 } from "./ui/fileActions";
+import { parseSettings, Toolbar, type Settings } from "./ui/Toolbar";
 import { useHistory } from "./ui/useHistory";
 
 const RECENT = "recent.json";
+const SETTINGS = "settings.json";
+const METERS: Record<string, SongMeter> = { "3/4": { beats: 3, unit: 4 }, "4/4": { beats: 4, unit: 4 }, "6/8": { beats: 6, unit: 8 } };
 
 function App() {
   const [initial] = useState(emptySong);
@@ -25,12 +28,19 @@ function App() {
   const [path, setPath] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings>(() => parseSettings(null));
+  // ponytail: the meter is only chosen for new songs; changing it on an existing song would invalidate every bar.
+  const [newMeter, setNewMeter] = useState("4/4");
   const isSongDirty = isDirty(song, savedSong);
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
   const updateRecent = (next: string[]) => {
     setRecent(next);
     writeConfigJson(RECENT, next).catch(fail);
+  };
+  const changeSettings = (next: Settings) => {
+    setSettings(next);
+    writeConfigJson(SETTINGS, next).catch(fail);
   };
   const load = (next: Song, nextPath: string | null) => {
     history.reset(next);
@@ -41,7 +51,7 @@ function App() {
   const canDiscard = async () => !isSongDirty || (await confirmDiscard());
 
   const newSong = async () => {
-    if (await canDiscard()) load(emptySong(), null);
+    if (await canDiscard()) load(emptySong(METERS[newMeter]), null);
   };
   const openSong = async (from?: string) => {
     if (!(await canDiscard())) return;
@@ -75,6 +85,7 @@ function App() {
   const saveSong = () => (path === null ? saveAs() : saveTo(path));
 
   useEffect(() => {
+    readConfigJson(SETTINGS).then((json) => setSettings(parseSettings(json)));
     readConfigJson(RECENT).then((json) => Array.isArray(json) && setRecent(json.filter((p) => typeof p === "string")));
   }, []);
 
@@ -105,6 +116,14 @@ function App() {
   return (
     <main>
       <nav aria-label="File">
+        <label>
+          New song meter{" "}
+          <select value={newMeter} onChange={(e) => setNewMeter(e.target.value)}>
+            {Object.keys(METERS).map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+          </select>
+        </label>
         <button type="button" onClick={newSong}>
           New
         </button>
@@ -132,8 +151,9 @@ function App() {
           </details>
         )}
       </nav>
+      <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
       {error !== null && <p role="alert">{error}</p>}
-      <Editor history={history} barsPerRow={4} style="fr" />
+      <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} />
     </main>
   );
 }

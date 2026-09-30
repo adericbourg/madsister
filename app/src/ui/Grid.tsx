@@ -25,7 +25,9 @@ export const Grid = ({ song, barsPerRow, style, cursor, lowConfidenceThreshold =
   const gridRef = useRef<HTMLDivElement>(null);
   const isEditing = editor !== undefined;
   useEffect(() => {
-    if (!isEditing) gridRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus();
+    // Don't steal focus from the toolbar: only follow the cursor when focus is in the grid or nowhere.
+    const isFocusFree = document.activeElement === document.body || gridRef.current?.contains(document.activeElement);
+    if (!isEditing && isFocusFree) gridRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus();
   }, [tabStop.section, tabStop.bar, tabStop.slot, song, isEditing]);
   return (
     <article className="chart">

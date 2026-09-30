@@ -109,3 +109,59 @@ test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {
   expect(setTitle).toHaveBeenLastCalledWith("Untitled — madsister");
   vi.useRealTimers();
 });
+
+test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings", async () => {
+  // Given saved settings (international style, 2 bars per row) and Cmaj7 typed in the first slot
+  const user = userEvent.setup();
+  files["/config/settings.json"] = '{"style":"intl","barsPerRow":2}';
+  render(<App />);
+  await vi.waitFor(() => expect(screen.getAllByRole("row")).toHaveLength(2));
+  await user.keyboard("Cmaj7{Enter}");
+  const firstSlot = () => screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ });
+  expect(firstSlot().textContent).toBe("Cmaj7");
+
+  // When switching to the French style, Then the chord is re-rendered and the setting saved
+  await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
+  expect(firstSlot().textContent).toBe("C7M");
+  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2 });
+
+  // When transposing up twice with flats, then undoing once
+  await user.selectOptions(screen.getByRole("combobox", { name: "Spelling" }), "flat");
+  await user.click(screen.getByRole("button", { name: "+1 semitone" }));
+  await user.click(screen.getByRole("button", { name: "+1 semitone" }));
+  expect(firstSlot().textContent).toBe("D7M");
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "+1 semitone" }));
+  await user.click(firstSlot());
+  await user.keyboard("{Control>}z{/Control}");
+
+  // Then each click is one history entry
+  expect(firstSlot().textContent).toBe("Db7M");
+
+  // When filling the metadata, with an invalid key first
+  const key = screen.getByRole("textbox", { name: "Key" });
+  await user.type(key, "H{Enter}");
+  expect(screen.getByRole("alert").textContent).toMatch(/note/);
+  expect(key.getAttribute("aria-invalid")).toBe("true");
+  await user.clear(key);
+  await user.type(key, "Bbm{Enter}");
+  const title = screen.getByRole("textbox", { name: "Title" });
+  await user.clear(title);
+  await user.type(title, "Blues{Tab}");
+  await user.type(screen.getByRole("spinbutton", { name: "Tempo (BPM)" }), "96{Enter}");
+
+  // Then the chart header shows them and the error is gone
+  expect(screen.getByRole("heading", { name: "Blues" })).toBeDefined();
+  expect(screen.getByText("Bbm")).toBeDefined();
+  expect(screen.getByText("♩ = 96")).toBeDefined();
+  expect(screen.queryByRole("alert")).toBeNull();
+
+  // When starting a new 3/4 song and saving it
+  await user.selectOptions(screen.getByRole("combobox", { name: "New song meter" }), "3/4");
+  await user.click(screen.getByRole("button", { name: "New" }));
+  vi.mocked(save).mockResolvedValueOnce("/waltz.madsister.json");
+  await user.click(screen.getByRole("button", { name: "Save as…" }));
+
+  // Then the new song has that meter
+  await vi.waitFor(() => expect(files["/waltz.madsister.json"]).toBeDefined());
+  expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 3, unit: 4 });
+});
