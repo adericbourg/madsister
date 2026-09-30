@@ -58,8 +58,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M0-4 | [m0-step4-decode](m0-step4-decode.md) | done | 42eb59e |
 | M0-5 | [m0-step5-beats-madmom](m0-step5-beats-madmom.md) | done | b614ec1 |
 | M0-6 | [m0-step6-beats-allinone](m0-step6-beats-allinone.md) | done | 37a5d14 |
-| M0-7 | [m0-step7-chords-btc](m0-step7-chords-btc.md) | done | this |
-| M0-8 | [m0-step8-chords-cnnlstm](m0-step8-chords-cnnlstm.md) | todo | |
+| M0-7 | [m0-step7-chords-btc](m0-step7-chords-btc.md) | done | 6fdefd0 |
+| M0-8 | [m0-step8-chords-cnnlstm](m0-step8-chords-cnnlstm.md) | done | this |
 | M0-9 | [m0-step9-demucs](m0-step9-demucs.md) | todo | |
 | M0-10 | [m0-step10-add-heuristic](m0-step10-add-heuristic.md) | todo | |
 | M0-11 | [m0-step11-transcribe-cli](m0-step11-transcribe-cli.md) | todo | |

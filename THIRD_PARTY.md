@@ -10,4 +10,6 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | NATTEN (SHI-Labs) | Neighborhood attention ops used by all-in-one, built from source on macOS | MIT | — | https://github.com/SHI-Labs/NATTEN (0.17.4) |
 | Demucs / HTDemucs (Meta, adefossez) | Source separation run inside all-in-one | MIT | MIT per the repo license (the `adefossez/HTDemucs` model card states none) | https://github.com/adefossez/demucs, https://huggingface.co/adefossez/HTDemucs |
 | BTC (jayg996, ISMIR'19) | Large-vocabulary chords (`chords-btc` group), repo cloned at setup | MIT | MIT (`test/btc_model_large_voca.pt` ships in the MIT-licensed repo) | https://github.com/jayg996/BTC-ISMIR19 (pinned sha `2682317`) |
+| Chord-CNN-LSTM (music-x-lab, ISMIR'19) | Large-vocabulary chords with inversions (`chords-cnnlstm` group), repo cloned at setup | MIT | MIT (`cache_data/*.sdict` ship in the MIT-licensed repo) | https://github.com/music-x-lab/ISMIR2019-Large-Vocabulary-Chord-Recognition (pinned sha `481f4ce`) |
+| h5py, joblib, pretty_midi, pydub | Imported by Chord-CNN-LSTM's `mir` package (not used for inference) | BSD / BSD / MIT / MIT | — | PyPI |
 | mir_eval | Imported by BTC's feature code; chord/beat metrics | MIT | — | https://github.com/mir-evaluation/mir_eval |

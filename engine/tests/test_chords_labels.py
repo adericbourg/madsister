@@ -13,10 +13,25 @@ def test_to_harte_maps_btc_labels_to_canonical_harte():
     assert to_harte("A#:hdim7") == "A#:hdim7"
 
 
+def test_to_harte_of_cnnlstm_labels_keeps_bass_and_degrades_extended_qualities():
+    # Given Chord-CNN-LSTM `submission` dictionary names, When mapping,
+    # Then inversions are kept and qualities outside §4.1 fall back to the nearest one, bass included
+    assert to_harte("Eb:maj/3") == "Eb:maj/3"
+    assert to_harte("A:min/b3") == "A:min/b3"
+    assert to_harte("G:maj/b7") == "G:maj/b7"
+    assert to_harte("C:9") == "C:7"
+    assert to_harte("C:11") == "C:7"
+    assert to_harte("C:13") == "C:7"
+    assert to_harte("C:maj9") == "C:maj7"
+    assert to_harte("D:min9") == "D:min7"
+    assert to_harte("F#:sus4(b7)") == "F#:7"
+    assert to_harte("C:9/b7") == "C:7/b7"
+
+
 def test_to_harte_of_unknown_quality_raises():
     # Given a quality outside the §4.1 set, When mapping, Then it doesn't survive
     with pytest.raises(ValueError):
-        to_harte("C:maj9")
+        to_harte("C:maj13")
 
 
 def test_merge_frames_merges_equal_consecutive_labels_with_mean_confidence():

@@ -8,15 +8,20 @@ from madsister_engine.quantize import NO_CHORD, ChordSegment
 QUALITIES = {"maj", "min", "dim", "aug", "maj6", "min6", "7", "maj7", "min7", "minmaj7", "dim7", "hdim7", "sus2", "sus4"}
 
 
-def to_harte(btc_label: str) -> str:
-    """BTC writes major as a bare root and has an `X` (unknown chord) class; canonical Harte spells `maj` and has no `X`."""
-    if btc_label in ("N", "X"):
+# Extended qualities some models emit, mapped to the nearest §4.1 quality (the bass is kept).
+_DEGRADED = {"9": "7", "11": "7", "13": "7", "sus4(b7)": "7", "maj9": "maj7", "min9": "min7"}
+
+
+def to_harte(label: str) -> str:
+    """Model label -> canonical Harte: `X` -> `N`, bare root -> `maj`, extended qualities degraded, inversion kept."""
+    if label in ("N", "X"):
         return NO_CHORD
-    root, _, quality = btc_label.partition(":")
-    quality = quality or "maj"
+    root, _, quality = label.partition(":")
+    quality, slash, bass = (quality or "maj").partition("/")
+    quality = _DEGRADED.get(quality, quality)
     if quality not in QUALITIES:
-        raise ValueError(f"unsupported chord quality: {btc_label}")
-    return f"{root}:{quality}"
+        raise ValueError(f"unsupported chord quality: {label}")
+    return f"{root}:{quality}{slash}{bass}"
 
 
 def merge_frames(labels: list[str], confidences: list[float], frame_duration: float) -> list[ChordSegment]:

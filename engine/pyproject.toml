@@ -28,6 +28,14 @@ chords-btc = [
     "pyyaml",
     "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
 ]
+chords-cnnlstm = [
+    "h5py",  # the imports below are pulled in by upstream's `mir` package, not used for inference
+    "joblib",
+    "librosa",
+    "pretty-midi",
+    "pydub",
+    "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
+]
 beats-madmom = [
     "madmom",
 ]
