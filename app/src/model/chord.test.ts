@@ -26,6 +26,7 @@ const accepted: [string, string][] = [
   ["C7", "C:7"],
   ["CmM7", "C:minmaj7"],
   ["C-Δ", "C:minmaj7"],
+  ["Cm(maj7)", "C:minmaj7"],
   ["C6", "C:maj6"],
   ["Cm6", "C:min6"],
   ["Co7", "C:dim7"],

@@ -11,7 +11,7 @@ const ALIASES: Record<string, string> = {
   "7": "7",
   "7M": "maj7", maj7: "maj7", M7: "maj7", "Δ": "maj7", "Δ7": "maj7", ma7: "maj7",
   m7: "min7", min7: "min7", "-7": "min7",
-  m7M: "minmaj7", mM7: "minmaj7", mmaj7: "minmaj7", minmaj7: "minmaj7", "-Δ": "minmaj7",
+  m7M: "minmaj7", "m(maj7)": "minmaj7", mM7: "minmaj7", mmaj7: "minmaj7", minmaj7: "minmaj7", "-Δ": "minmaj7",
   "6": "maj6", m6: "min6", min6: "min6", "-6": "min6",
   "°7": "dim7", o7: "dim7", dim7: "dim7",
   m7b5: "hdim7", "ø": "hdim7", "ø7": "hdim7", "-7b5": "hdim7", hdim7: "hdim7",
@@ -20,11 +20,11 @@ const ALIASES: Record<string, string> = {
 
 export const QUALITIES: readonly string[] = [...new Set(Object.values(ALIASES))];
 
-const DEGREES = ["1", "b2", "2", "b3", "3", "4", "b5", "5", "b6", "6", "b7", "7"];
+export const DEGREES = ["1", "b2", "2", "b3", "3", "4", "b5", "5", "b6", "6", "b7", "7"];
 const NATURALS: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const NOTE = /^[A-G][#b]?$/;
 
-const semitone = (note: string): number =>
+export const semitone = (note: string): number =>
   NATURALS[note[0]] + (note[1] === "#" ? 1 : note[1] === "b" ? -1 : 0);
 
 export const parseChord = (input: string): ParseResult => {
