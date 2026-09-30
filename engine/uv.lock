@@ -633,7 +633,7 @@ requires-dist = [{ name = "numpy", specifier = ">=2.4.6" }]
 beats-allinone = [
     { name = "allin1" },
     { name = "madmom", git = "https://github.com/CPJKU/madmom?rev=27f032e8947204902c675e5e341a3faf5dc86dae" },
-    { name = "natten", marker = "sys_platform == 'darwin'", specifier = "==0.17.4" },
+    { name = "natten", marker = "sys_platform == 'darwin'", specifier = "==0.21.7" },
     { name = "torch", specifier = "==2.5.1" },
     { name = "torchaudio", specifier = "==2.5.1" },
 ]
@@ -771,13 +771,9 @@ wheels = [
 
 [[package]]
 name = "natten"
-version = "0.17.4"
+version = "0.21.7"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "torch" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9d/90/4440b9a19bd4966fda8f9e7f1470f62144428a75ac0a2b5e7facca1ea205/natten-0.17.4.tar.gz", hash = "sha256:9834385920d6ec0c7454c9fd7d9d681c7c24d261b158489b40b491787b6c7358", size = 10854271, upload-time = "2025-01-29T20:42:22.522Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c5/10/98fa5bc8e20937c757b5dbb2e7e949af38bc46aa92da804b0ceb07c90a86/natten-0.21.7.tar.gz", hash = "sha256:8417236b74db079b2d23899ec8f77514fb2dc73d4bbd6b346a45b6967fc05ffb", size = 2864595, upload-time = "2026-07-26T18:06:15.348Z" }
 
 [[package]]
 name = "networkx"
