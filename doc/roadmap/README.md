@@ -40,9 +40,12 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
   CI runs fast tests only (no model weights). Every step keeps CI green: if it adds a system dependency or a new test command,
   it updates the workflow in the same commit. Lint workflows with `uvx --from actionlint-py actionlint`. Pin actions to tags that exist
   (e.g. `astral-sh/setup-uv` has no floating major tag: use the exact version).
-- Checking CI: don't use `gh` (logged into another account). The repo is public, so use the API:
-  `curl -s "https://api.github.com/repos/adericbourg/madsister/actions/runs?per_page=5"` (status/conclusion per run) and
-  `…/actions/runs/<id>/jobs` for the failing step. Logs need auth: reproduce the failing step locally instead.
+- Checking CI: don't use `gh` (logged into another account). The unauthenticated REST API allows only **60 requests/hour**,
+  so never poll it in a loop. Poll the workflow badge instead (not rate-limited), every 60 s, for at most 10 min after the push:
+  `curl -s https://github.com/adericbourg/madsister/actions/workflows/<engine|app>.yml/badge.svg | grep -oE '>(passing|failing)<'`.
+  The badge shows the latest *completed* run on `main`: wait ≥ 3 min after the push before trusting it. Only when it's failing,
+  spend 2 API calls: `…/repos/adericbourg/madsister/actions/runs?per_page=3` then `…/actions/runs/<id>/jobs` for the failing step.
+  Logs need auth: reproduce the failing step locally.
 - Dev machine is macOS arm64 (the spec targets Linux first). Don't add Linux-only code paths in M0/M1.
 
 ## Status
