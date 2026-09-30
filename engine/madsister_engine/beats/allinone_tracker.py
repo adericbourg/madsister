@@ -4,9 +4,10 @@ import os
 import tempfile
 from pathlib import Path
 
-_models_dir = Path(os.environ.get("MADSISTER_MODELS_DIR", Path.home() / ".cache/madsister/models"))
+from madsister_engine.models import models_dir
+
 # Read at import time by huggingface_hub, here and in the Demucs subprocess: all-in-one and htdemucs weights.
-os.environ.setdefault("HF_HUB_CACHE", str(_models_dir / "huggingface"))
+os.environ.setdefault("HF_HUB_CACHE", str(models_dir() / "huggingface"))
 
 import allin1  # noqa: E402
 

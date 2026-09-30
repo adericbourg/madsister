@@ -9,3 +9,5 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | all-in-one / `allin1` (mir-aidj) | Beats, downbeats, sections (`beats-allinone` group) | MIT | MIT (Hugging Face model card `taejunkim/allinone`) | https://github.com/mir-aidj/all-in-one, https://huggingface.co/taejunkim/allinone |
 | NATTEN (SHI-Labs) | Neighborhood attention ops used by all-in-one, built from source on macOS | MIT | — | https://github.com/SHI-Labs/NATTEN (0.17.4) |
 | Demucs / HTDemucs (Meta, adefossez) | Source separation run inside all-in-one | MIT | MIT per the repo license (the `adefossez/HTDemucs` model card states none) | https://github.com/adefossez/demucs, https://huggingface.co/adefossez/HTDemucs |
+| BTC (jayg996, ISMIR'19) | Large-vocabulary chords (`chords-btc` group), repo cloned at setup | MIT | MIT (`test/btc_model_large_voca.pt` ships in the MIT-licensed repo) | https://github.com/jayg996/BTC-ISMIR19 (pinned sha `2682317`) |
+| mir_eval | Imported by BTC's feature code; chord/beat metrics | MIT | — | https://github.com/mir-evaluation/mir_eval |

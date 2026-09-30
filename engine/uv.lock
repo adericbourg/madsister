@@ -575,6 +575,12 @@ beats-allinone = [
 beats-madmom = [
     { name = "madmom" },
 ]
+chords-btc = [
+    { name = "librosa" },
+    { name = "mir-eval" },
+    { name = "pyyaml" },
+    { name = "torch" },
+]
 dev = [
     { name = "pytest" },
 ]
@@ -591,6 +597,12 @@ beats-allinone = [
     { name = "torchaudio", specifier = "==2.5.1" },
 ]
 beats-madmom = [{ name = "madmom", git = "https://github.com/CPJKU/madmom?rev=27f032e8947204902c675e5e341a3faf5dc86dae" }]
+chords-btc = [
+    { name = "librosa" },
+    { name = "mir-eval" },
+    { name = "pyyaml" },
+    { name = "torch", specifier = "==2.5.1" },
+]
 dev = [{ name = "pytest" }]
 
 [[package]]
@@ -651,6 +663,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/23/14/cfda3fe61ce4c0f50a9f707ae02b46cb53211732b2cd4522bf06272848f4/mido-1.3.3.tar.gz", hash = "sha256:1aecb30b7f282404f17e43768cbf74a6a31bf22b3b783bdd117a1ce9d22cb74c", size = 124288, upload-time = "2024-10-25T15:05:21.847Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/28/45deb15c11859d2f10702b32e71de9328a9fa494f989626916db39a9617f/mido-1.3.3-py3-none-any.whl", hash = "sha256:01033c9b10b049e4436fca2762194ca839b09a4334091dd3c34e7f4ae674fd8a", size = 54614, upload-time = "2024-10-25T15:05:20.349Z" },
+]
+
+[[package]]
+name = "mir-eval"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "decorator" },
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/28/db/3bf39fc9ab0fb757f297f9a0da7207e823688291f9e61bb67b44fa17bc2f/mir_eval-0.8.2.tar.gz", hash = "sha256:141a3e1193276889fc32e911547e73dcb3e829ee8cfea60f7bbcd633c0792569", size = 117649, upload-time = "2025-02-25T18:09:57.505Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/5a/69ce896a32ebc8c75deae00b1fba9837567405fa6ef37b377f2e85b856ae/mir_eval-0.8.2-py3-none-any.whl", hash = "sha256:114cda33d8e17408c170598e0b36ed0d71ff4a2fee8eaf9e165b58ecf1c87170", size = 102794, upload-time = "2025-02-25T18:09:56.012Z" },
 ]
 
 [[package]]

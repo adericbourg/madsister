@@ -22,6 +22,12 @@ beats-allinone = [
     "torch==2.5.1",
     "torchaudio==2.5.1",
 ]
+chords-btc = [
+    "librosa",
+    "mir-eval",  # imported by BTC's feature code
+    "pyyaml",
+    "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
+]
 beats-madmom = [
     "madmom",
 ]
