@@ -50,9 +50,11 @@ group installed (`uv sync` with all the `--group`s: a single `--group` removes t
   `separate.json` + `harmonic.wav`, `beats-<tracker>.json`, `chords-<model>-<mix|stem>.json`), each with its wall time.
   Combinations reuse them, and a combination's time is the sum of its components (what one `transcribe` call costs,
   model loading included, Python imports excluded). Delete the folder after changing an adapter.
-- Metrics: **edits needed** per 100 reference slots (primary; definition in `edits_needed`), mir_eval chord WCSR
+- Metrics: **edits needed** per 100 reference slots (primary; definition in `edits_needed`), the same with the bass ignored
+  (root + quality only; GuitarSet annotates many inversions), mir_eval chord WCSR
   (`majmin`, `sevenths`, `tetrads`) of the quantized grid against the `.lab`, downbeat F-measure, and `add*` counts at
-  slot level for the τ sweep (predicted, false positives, precision, recall).
+  slot level for the τ sweep (predicted, false positives, precision, recall). A tracker that finds < 2 beats yields no grid:
+  scored as every slot to re-enter.
 - The full GuitarSet run takes about 1.5 h on an M-series Mac (all-in-one: ~1 s per second of audio).
 
 ## User songs (later)

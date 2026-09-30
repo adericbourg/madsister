@@ -17,15 +17,15 @@ from madsister_engine.decode import decode
 from madsister_engine.quantize import ChordSegment, build_song
 from madsister_engine.song import Song, write
 
-# option -> (dependency group, module that only that group installs, adapter module). `auto` = first installed, in order.
-# ponytail: fixed preference order until M0-14 picks the defaults from the bench.
+# option -> (dependency group, module that only that group installs, adapter module). `auto` = first installed, in order:
+# madmom + cnnlstm, the fewest edits on the M0 bench (provisional, GuitarSet proxy: doc/roadmap/m0-results.md).
 _BEATS = {
-    "allinone": ("beats-allinone", "allin1", "madsister_engine.beats.allinone_tracker"),
     "madmom": ("beats-madmom", "madmom", "madsister_engine.beats.madmom_tracker"),
+    "allinone": ("beats-allinone", "allin1", "madsister_engine.beats.allinone_tracker"),
 }
 _CHORDS = {
-    "btc": ("chords-btc", "mir_eval", "madsister_engine.chords.btc"),
     "cnnlstm": ("chords-cnnlstm", "pydub", "madsister_engine.chords.cnnlstm"),
+    "btc": ("chords-btc", "mir_eval", "madsister_engine.chords.btc"),
 }
 _SEPARATE = {"demucs": ("separate", "demucs", "madsister_engine.separate")}
 

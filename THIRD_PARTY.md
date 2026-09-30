@@ -13,4 +13,10 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | Chord-CNN-LSTM (music-x-lab, ISMIR'19) | Large-vocabulary chords with inversions (`chords-cnnlstm` group), repo cloned at setup | MIT | MIT (`cache_data/*.sdict` ship in the MIT-licensed repo) | https://github.com/music-x-lab/ISMIR2019-Large-Vocabulary-Chord-Recognition (pinned sha `481f4ce`) |
 | h5py, joblib, pretty_midi, pydub | Imported by Chord-CNN-LSTM's `mir` package (not used for inference) | BSD / BSD / MIT / MIT | — | PyPI |
 | mir_eval | Imported by BTC's feature code; chord/beat metrics | MIT | — | https://github.com/mir-evaluation/mir_eval |
+| PyTorch, torchaudio | Inference for every model group (pinned 2.5.1, see `doc/roadmap/BLOCKERS.md`) | BSD-3-Clause | — | https://github.com/pytorch/pytorch, https://github.com/pytorch/audio |
+| NumPy | Core dependency | BSD-3-Clause | — | https://numpy.org |
+| librosa | Audio features for BTC and Chord-CNN-LSTM, chroma for the add2/add4 heuristic | ISC | — | https://github.com/librosa/librosa |
+| PyYAML | BTC's config loading | MIT | — | https://github.com/yaml/pyyaml |
+| FFmpeg | Decoding (called as an external program on `PATH`, not bundled) | LGPL-2.1+ (GPL-2+ for some builds) | — | https://ffmpeg.org |
+| pytest | Tests only (`dev` group), not shipped | MIT | — | https://github.com/pytest-dev/pytest |
 | GuitarSet (Xi et al., ISMIR 2018) | Proxy bench data (`bench/`), downloaded by `bench/fetch_guitarset.py`; not shipped | — | CC BY 4.0 (data) | https://zenodo.org/records/3371780 |

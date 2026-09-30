@@ -24,7 +24,8 @@ def _stages(lines):
 
 @pytest.fixture
 def fakes(monkeypatch):
-    """all-in-one (writing to fd 1) and BTC replaced by fixed outputs matching the synthetic clip; every group reported installed."""
+    """The default tracker (writing to fd 1, as all-in-one does) and chord model replaced by fixed outputs matching the synthetic
+    clip; every group reported installed."""
     calls = {}
 
     def track(wav, meter=None):
@@ -36,8 +37,8 @@ def fakes(monkeypatch):
         calls["recognize"] = wav
         return [ChordSegment(2.0 * i, 2.0 * i + 2, label, 0.9) for i, label in enumerate(PROGRESSION)]
 
-    monkeypatch.setitem(sys.modules, "madsister_engine.beats.allinone_tracker", types.SimpleNamespace(track=track))
-    monkeypatch.setitem(sys.modules, "madsister_engine.chords.btc", types.SimpleNamespace(recognize=recognize))
+    monkeypatch.setitem(sys.modules, "madsister_engine.beats.madmom_tracker", types.SimpleNamespace(track=track))
+    monkeypatch.setitem(sys.modules, "madsister_engine.chords.cnnlstm", types.SimpleNamespace(recognize=recognize))
     monkeypatch.setattr(pipeline, "_installed", lambda module: True)
     return calls
 
@@ -100,7 +101,7 @@ def test_main_when_adapter_fails_or_group_missing_emits_error_and_exits_1(fakes,
     def recognize(wav):
         raise RuntimeError("boom")
 
-    monkeypatch.setitem(sys.modules, "madsister_engine.chords.btc", types.SimpleNamespace(recognize=recognize))
+    monkeypatch.setitem(sys.modules, "madsister_engine.chords.cnnlstm", types.SimpleNamespace(recognize=recognize))
     wav = str(make_wav())
 
     # When

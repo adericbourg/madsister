@@ -29,7 +29,7 @@ from madsister_engine.song import to_json
 BENCH = Path(__file__).parent
 DATASET = "guitarset"  # ponytail: the only reference set so far; add a --dataset option with the user's songs
 REFS, AUDIO = BENCH / "data" / DATASET / "refs", BENCH / "data" / DATASET / "audio"
-FIELDS = ["file", "combo", "edits", "ref_slots", "majmin", "sevenths", "tetrads", "downbeat_f", "sec"]
+FIELDS = ["file", "combo", "edits", "edits_no_bass", "ref_slots", "majmin", "sevenths", "tetrads", "downbeat_f", "sec"]
 FIELDS += ["add_pred", "add_pred_ok", "add_ref", "add_ref_found"]
 Slot = tuple[float, float, str]  # start, end, Harte chord
 
@@ -61,13 +61,14 @@ def _same(a: str, b: str) -> bool:
     return add_heuristic._pitch_class(root_a) == add_heuristic._pitch_class(root_b) and rest_a == rest_b
 
 
-def edits_needed(ref: list[Slot], est: list[Slot], ref_beats: list[float]) -> int:
+def edits_needed(ref: list[Slot], est: list[Slot], ref_beats: list[float], ignore_bass: bool = False) -> int:
     """Edits needed (spec §7, primary metric): the number of reference slots the user must fix in the predicted grid.
 
     Each reference beat is looked up in the prediction at its middle (half-way to the next beat, so tracker jitter under
     half a beat doesn't count). A reference slot needs one edit unless all its beats fall in the same predicted slot and
     that slot's chord is the same (exact Harte after `to_harte`, the root compared as a pitch class). So a wrong chord,
     a slot split differently, a shifted bar line or a missing bar each cost one edit per reference slot touched.
+    `ignore_bass` compares root + quality only (`C:maj/5` = `C:maj`): GuitarSet annotates many inversions models miss.
     """
     period = statistics.median(b - a for a, b in zip(ref_beats, ref_beats[1:]))
     middles = [(a + b) / 2 for a, b in zip(ref_beats, ref_beats[1:] + [ref_beats[-1] + period])]
@@ -75,7 +76,7 @@ def edits_needed(ref: list[Slot], est: list[Slot], ref_beats: list[float]) -> in
     for start, end, chord in ref:
         hits = {_at(est, t) for t in middles if start <= t < end}
         i = hits.pop() if len(hits) == 1 else None
-        edits += i is None or not _same(est[i][2], chord)
+        edits += i is None or not _same(*(c.split("/")[0] if ignore_bass else c for c in (est[i][2], chord)))
     return edits
 
 
@@ -97,23 +98,26 @@ def _mir_eval_label(label: str) -> str:
     return label.replace(":add2", ":maj(2)").replace(":add4", ":maj(4)")  # the §4 extension in plain Harte
 
 
-def evaluate(ref_id: str, song: dict, beat_result: BeatResult) -> dict:
+def evaluate(ref_id: str, song: dict | None, beat_result: BeatResult) -> dict:
     import mir_eval  # chords-btc group: not in the CI environment
     import numpy as np
 
     ref_beats = json.loads((REFS / f"{ref_id}.beats.json").read_text())
     ref = timed_slots(json.loads((REFS / f"{ref_id}.madsister.json").read_text()), ref_beats["beats"])
-    est = timed_slots(song, beat_result.beats)
+    est = timed_slots(song, beat_result.beats) if song else []
     ref_intervals, ref_labels = mir_eval.io.load_labeled_intervals(str(REFS / f"{ref_id}.lab"))
-    scores = mir_eval.chord.evaluate(
-        ref_intervals,
-        [_mir_eval_label(label) for label in ref_labels],
-        np.array([(start, end) for start, end, _ in est]),
-        [_mir_eval_label(chord) for _, _, chord in est],
-    )
+    scores = dict.fromkeys(("majmin", "sevenths", "tetrads"), 0.0)
+    if est:
+        scores = mir_eval.chord.evaluate(
+            ref_intervals,
+            [_mir_eval_label(label) for label in ref_labels],
+            np.array([(start, end) for start, end, _ in est]),
+            [_mir_eval_label(chord) for _, _, chord in est],
+        )
     downbeat_f = mir_eval.beat.f_measure(np.array(ref_beats["downbeats"]), np.array(beat_result.downbeats))
     return {
         "edits": edits_needed(ref, est, ref_beats["beats"]),
+        "edits_no_bass": edits_needed(ref, est, ref_beats["beats"], ignore_bass=True),
         "ref_slots": len(ref),
         **{key: round(scores[key], 4) for key in ("majmin", "sevenths", "tetrads")},
         "downbeat_f": round(downbeat_f, 4),
@@ -168,7 +172,8 @@ def run_take(ref_id: str, combos: list[tuple], done: set) -> list[dict]:
         start = time.perf_counter()
         beat_result = BeatResult(**beat_part["value"])
         segments = [ChordSegment(*s) for s in chord_part["value"]]
-        song = to_json(pipeline.to_song(ref_id, beat_result, segments, None, False, chroma, tau))
+        # < 2 beats (all-in-one on one take): no grid, scored as every slot to re-enter
+        song = to_json(pipeline.to_song(ref_id, beat_result, segments, None, False, chroma, tau)) if len(beat_result.beats) > 1 else None
         sec = sum(p["sec"] for p in parts) + time.perf_counter() - start
         rows.append({"file": ref_id, "combo": name, **evaluate(ref_id, song, beat_result), "sec": round(sec, 2)})
     return rows
@@ -177,8 +182,8 @@ def run_take(ref_id: str, combos: list[tuple], done: set) -> list[dict]:
 def table(rows: list[dict]) -> str:
     """Mean per combination. Edits per 100 reference slots and add precision/recall are pooled over files."""
     lines = [
-        "| combo | files | edits /100 slots | majmin | sevenths | tetrads | downbeat F | time (s) | add pred (FP) | add P | add R |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| combo | files | edits /100 slots | edits, bass ignored | majmin | sevenths | tetrads | downbeat F | time (s) | add pred (FP) | add P | add R |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for combo, group in itertools.groupby(sorted(rows, key=lambda r: r["combo"]), key=lambda r: r["combo"]):
         group = list(group)
@@ -194,7 +199,8 @@ def table(rows: list[dict]) -> str:
 
         pred, fp = int(total("add_pred")), int(total("add_pred") - total("add_pred_ok"))
         lines.append(
-            f"| {combo} | {len(group)} | {100 * total('edits') / total('ref_slots'):.1f} | {mean('majmin')} "
+            f"| {combo} | {len(group)} | {100 * total('edits') / total('ref_slots'):.1f} "
+            f"| {100 * total('edits_no_bass') / total('ref_slots'):.1f} | {mean('majmin')} "
             f"| {mean('sevenths')} | {mean('tetrads')} | {mean('downbeat_f')} | {total('sec') / len(group):.1f} "
             f"| {pred} ({fp}) | {ratio('add_pred_ok', 'add_pred')} | {ratio('add_ref_found', 'add_ref')} |"
         )

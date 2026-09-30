@@ -12,6 +12,8 @@ D7, §3.2, F-IN-7, NF-2.
 M0-14 (and the user's own bench run), M0-11.
 
 ## Tasks
+- M0-14 (provisional, GuitarSet) concluded **single mode**: Demucs gained 0.1 edit/100 ([m0-results](m0-results.md)). Unless the user's
+  bench shows a gain, this applies.
 - A `PRESETS = {"fast": {...}, "accurate": {...}}` dict in `pipeline.py` from the recorded M0 results. If M0 concluded "single mode",
   skip M4b entirely and mark its steps `done (not needed)`.
 - `--mode` default `fast`. The hidden bench flags override the preset.

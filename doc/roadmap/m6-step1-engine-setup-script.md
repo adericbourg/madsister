@@ -12,6 +12,8 @@ D4, D5, NF-1, NF-6, §11.4.
 M0-14, M4b.
 
 ## Tasks
+- Groups the default needs (M0-14, provisional): `beats-madmom` + `chords-cnnlstm` only. No `beats-allinone` (so no NATTEN
+  build), `chords-btc` or `separate`, unless the user's decisions on all-in-one (sections) and `accurate` bring them back.
 - `madsister-engine setup`: fetches every model/repo/weight the chosen presets need into `models_dir()`, with progress events; idempotent.
   Afterwards the engine must run with the network disabled (test by setting `HF_HUB_OFFLINE=1`/`TORCH_HOME` and no proxy).
 - Decide the packaged engine shape: `uv` bundled + `uv sync --frozen` into the app data dir at first launch (smallest package), vs.

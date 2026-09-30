@@ -40,10 +40,10 @@ Playback exists only to **verify** the transcription (hear it, see a cursor on t
 | Component | Task | License (code / weights) | Notes |
 |---|---|---|---|
 | **madmom** (CPJKU) | Beats, downbeats (DBN), major/minor chords (CNN+CRF), key | BSD / CC BY-NC-SA 4.0 | Reference beat/downbeat tracker. PyPI release 0.16.1 dates from 2018 and is broken on modern Python/NumPy, so it MUST be installed from git `main`. Its chord model is major/minor only, so it is **not usable for chords** here. |
-| **BTC** (Bi-directional Transformer for Chords, ISMIR'19, `jayg996/BTC-ISMIR19`) | Chords | MIT | Two vocabularies: majmin (25 classes) or large (170 classes = 12 roots × 14 qualities + N + X). Used by ChordMiniApp. VERIFY weight availability. |
+| **BTC** (Bi-directional Transformer for Chords, ISMIR'19, `jayg996/BTC-ISMIR19`) | Chords | MIT | Two vocabularies: majmin (25 classes) or large (170 classes = 12 roots × 14 qualities + N + X). Used by ChordMiniApp. Large-vocabulary weights ship in the repo (`test/btc_model_large_voca.pt`, MIT) ([M0 results](roadmap/m0-results.md)). No inversions. |
 | **Chord-CNN-LSTM** (`music-x-lab/ISMIR2019-Large-Vocabulary-Chord-Recognition`) | Chords, large vocab incl. inversions | MIT | Configurable chord dictionary (`data/*_chord_list.txt`). Pretrained models in repo. Used by ChordMiniApp. Little maintenance. |
-| **ChordFormer** (2025, arXiv 2502.11840) | Chords, large vocab | VERIFY | Conformer-based. Reports +2% frame-wise and +6% class-wise accuracy over prior SOTA. Code availability and weights VERIFY. |
-| **all-in-one** (`mir-aidj/all-in-one`) | Beats, downbeats, tempo, **section boundaries + labels** | MIT / VERIFY | Labels: intro, verse, chorus, bridge, inst, solo, break, outro. Uses Demucs internally. Best candidate for structure detection. |
+| **ChordFormer** (2025, arXiv 2502.11840) | Chords, large vocab | none (no license file) | Conformer-based. Reports +2% frame-wise and +6% class-wise accuracy over prior SOTA. Official code + 5 checkpoints at [`mwaseemrandhawa/ChordFormer`](https://github.com/mwaseemrandhawa/ChordFormer), built on the Chord-CNN-LSTM codebase, but unlicensed: not usable as is ([M0 results](roadmap/m0-results.md)). |
+| **all-in-one** (`mir-aidj/all-in-one`) | Beats, downbeats, tempo, **section boundaries + labels** | MIT / MIT ([model card](https://huggingface.co/taejunkim/allinone)) | Labels: intro, verse, chorus, bridge, inst, solo, break, outro. Uses Demucs internally. Best candidate for structure detection. |
 | **Beat-Transformer** | Beats, downbeats | MIT | Alternative to madmom. Used by ChordMiniApp. |
 | **Demucs** (htdemucs) | Source separation | MIT | Optional pre-processing (e.g. remove drums/vocals before chord recognition). Evaluate in M0. |
 | **Chordino / NNLS-Chroma** (Vamp plugin) | Chords, rule-based | GPL | Non-ML baseline, fast. Useful as a sanity comparison only. |
@@ -192,7 +192,7 @@ Rules:
 | Q7 | 7 / 7M / m7 / m7M | `7` `maj7` `min7` `minmaj7` | `C7` `C7M` `Cm7` `Cm7M` | yes |
 | Q8 | 6 / m6 | `maj6` `min6` | `C6` `Cm6` | yes |
 | Q9 | dim7 / m7b5 | `dim7` `hdim7` | `C°7` `Cm7b5` | yes |
-| Q10 | slash chords / inversions | `/3`, `/5`, `/b7` | `C/E` | model-dependent (VERIFY) |
+| Q10 | slash chords / inversions | `/3`, `/5`, `/b7` | `C/E` | model-dependent: Chord-CNN-LSTM yes (`/3 /5 /b7 /2`, rarely emitted), BTC no ([M0 results](roadmap/m0-results.md)) |
 | Q11 | no chord | `N` | `N.C.` | yes |
 
 ## 5. Functional requirements
@@ -282,6 +282,15 @@ Each milestone is usable on its own.
 | **M4b** Modes | D7, F-IN-7: `--mode` in the engine and a mode picker in the UI. | Both modes run on `bench/`. `accurate` scores measurably better than `fast` in "edits needed", or it is dropped. |
 | **M5** Sources | F-IN-2 (yt-dlp), F-IN-3 (mic). F-ST-1 if not done in M2. | URL and recording both yield a grid. |
 | **M6** Packaging | Linux AppImage/deb with engine setup. Then macOS. | Installs on a clean machine with one command/package. |
+
+### 8.1 M0 results (provisional — proxy bench, GuitarSet)
+Measured on 72 GuitarSet solo-guitar takes, not on the user's songs; the user's bench (§7) confirms or overturns it. Details: [M0 results](roadmap/m0-results.md).
+- **Default pipeline:** madmom (beats) + Chord-CNN-LSTM (chords), no Demucs, add2/add4 heuristic off. Fewest edits
+  (65.7 per 100 slots) among the combos meeting NF-2: 19 s measured for a 4-min file.
+- **D7 candidates:** `fast` = the default. No `accurate` candidate: the best combo regardless of time (+ Demucs) is 0.1 edit/100
+  better, which is not measurable → single mode unless the user's band-mix songs show a Demucs gain.
+- **D6:** undecided — needs the user's bench with ≥ 3 add2/add4 songs (GuitarSet: precision ≤ 1.1 % at every τ in 0.3–0.7).
+- all-in-one is in no preset (6–7 min per 4-min song, lower downbeat F); only section detection (F-ST-1) still depends on it.
 
 ## 9. Testing
 - Engine: pytest. Unit tests on quantization (§3.3 steps 4–6) with synthetic frame labels. One end-to-end test

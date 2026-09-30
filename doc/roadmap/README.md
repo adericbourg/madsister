@@ -64,8 +64,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M0-10 | [m0-step10-add-heuristic](m0-step10-add-heuristic.md) | done | 527a9b1 |
 | M0-11 | [m0-step11-transcribe-cli](m0-step11-transcribe-cli.md) | done | 91c127f |
 | M0-12 | [m0-step12-bench-guitarset](m0-step12-bench-guitarset.md) | done | 4963df1 |
-| M0-13 | [m0-step13-bench-runner](m0-step13-bench-runner.md) | done | this |
-| M0-14 | [m0-step14-results-decisions](m0-step14-results-decisions.md) | todo | |
+| M0-13 | [m0-step13-bench-runner](m0-step13-bench-runner.md) | done | 0e75b99 |
+| M0-14 | [m0-step14-results-decisions](m0-step14-results-decisions.md) | done | this |
 | M1-1 | [m1-step1-app-scaffold](m1-step1-app-scaffold.md) | todo | |
 | M1-2 | [m1-step2-song-model](m1-step2-song-model.md) | todo | |
 | M1-3 | [m1-step3-chord-parser](m1-step3-chord-parser.md) | todo | |
