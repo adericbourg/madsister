@@ -15,6 +15,9 @@ dependencies = [
 madsister-engine = "madsister_engine.cli:main"
 
 [dependency-groups]
+beats-madmom = [
+    "madmom",
+]
 dev = ["pytest"]
 
 [build-system]
@@ -23,6 +26,9 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = ""
+
+[tool.uv.sources]
+madmom = { git = "https://github.com/CPJKU/madmom", rev = "27f032e8947204902c675e5e341a3faf5dc86dae" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
