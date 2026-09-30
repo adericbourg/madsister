@@ -620,6 +620,11 @@ chords-cnnlstm = [
 dev = [
     { name = "pytest" },
 ]
+separate = [
+    { name = "demucs", version = "4.0.1", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
+    { name = "demucs", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
+    { name = "torch" },
+]
 
 [package.metadata]
 requires-dist = [{ name = "numpy", specifier = ">=2.4.6" }]
@@ -648,6 +653,10 @@ chords-cnnlstm = [
     { name = "torch", specifier = "==2.5.1" },
 ]
 dev = [{ name = "pytest" }]
+separate = [
+    { name = "demucs" },
+    { name = "torch", specifier = "==2.5.1" },
+]
 
 [[package]]
 name = "markupsafe"
