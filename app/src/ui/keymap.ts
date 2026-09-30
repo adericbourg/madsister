@@ -1,0 +1,180 @@
+// Key → command mapping for the grid (spec F-ED-3..7), pure so it's testable without the DOM.
+import {
+  addSection,
+  copyBars,
+  deleteBar,
+  deleteSection,
+  duplicateBar,
+  insertBar,
+  mergeSlotWithNext,
+  moveSection,
+  pasteBars,
+  resizeSlot,
+  setRepeat,
+  splitSection,
+  splitSlot,
+  type BarRef,
+  type SlotRef,
+} from "../model/commands";
+import type { Bar, Song } from "../model/song";
+
+export type KeyInput = { key: string; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean };
+export type EditorState = { song: Song; cursor: SlotRef; anchor: BarRef | null; clipboard: readonly Bar[]; barsPerRow: number };
+export type Command =
+  | { kind: "move"; cursor: SlotRef; anchor: BarRef | null }
+  | { kind: "edit"; song: Song; cursor: SlotRef }
+  | { kind: "copy"; bars: Bar[] }
+  | { kind: "type"; text: string }
+  | { kind: "rename" | "undo" | "redo" | "help" };
+
+export const MOD_LABEL = /Mac|iP/.test(navigator.platform) ? "⌘" : "Ctrl";
+
+export const SHORTCUTS: readonly [keys: string, what: string][] = [
+  ["← → ↑ ↓", "Move between slots and rows"],
+  ["Home / End", "First / last slot of the section"],
+  ["Type a chord, Enter or Tab", "Set the chord and go to the next slot (Escape cancels)"],
+  ["/", "Split the slot"],
+  ["Backspace", "Merge the slot with the previous one"],
+  ["Alt+← / Alt+→", "Shrink / grow the slot by one beat"],
+  ["Mod+Enter / Mod+Shift+Enter", "Insert a bar after / before"],
+  ["Mod+Backspace", "Delete the bar"],
+  ["Mod+D", "Duplicate the bar"],
+  ["Shift+← / Shift+→", "Select bars"],
+  ["Mod+C / Mod+V", "Copy the selected bars / paste after the cursor bar"],
+  ["Mod+Z / Mod+Shift+Z", "Undo / redo"],
+  ["Mod+K", "Split the section at the cursor bar"],
+  ["Mod+Shift+K", "Add a section after this one"],
+  ["Mod+Shift+Backspace", "Delete the section"],
+  ["F2", "Rename the section"],
+  ["Alt+↑ / Alt+↓", "Repeat the section one more / one less time"],
+  ["Alt+Shift+↑ / Alt+Shift+↓", "Move the section up / down"],
+  ["?", "Show this help"],
+];
+
+export const clampCursor = (song: Song, { section: s, bar: b, slot }: SlotRef): SlotRef => {
+  const section = Math.min(s, song.sections.length - 1);
+  const bars = song.sections[section].bars;
+  if (bars.length === 0) return { section, bar: 0, slot: 0 };
+  const bar = Math.min(b, bars.length - 1);
+  return { section, bar, slot: Math.min(slot, bars[bar].chords.length - 1) };
+};
+
+// Every cursor position in reading order; an empty section has one, on its "No bars yet" placeholder.
+const positions = (song: Song): SlotRef[] =>
+  song.sections.flatMap((section, s) =>
+    section.bars.length === 0
+      ? [{ section: s, bar: 0, slot: 0 }]
+      : section.bars.flatMap((bar, b) => bar.chords.map((_, slot) => ({ section: s, bar: b, slot }))),
+  );
+
+export const nextSlot = (song: Song, cursor: SlotRef, step: 1 | -1): SlotRef => {
+  const all = positions(song);
+  const i = all.findIndex((p) => p.section === cursor.section && p.bar === cursor.bar && p.slot === cursor.slot);
+  return all[i + step] ?? cursor;
+};
+
+const nextRow = (song: Song, cursor: SlotRef, barsPerRow: number, step: 1 | -1): SlotRef => {
+  const rows = song.sections.flatMap((section, s) =>
+    Array.from({ length: Math.max(1, Math.ceil(section.bars.length / barsPerRow)) }, (_, r) => ({ section: s, start: r * barsPerRow })),
+  );
+  const i = rows.findIndex((r) => r.section === cursor.section && cursor.bar >= r.start && cursor.bar < r.start + barsPerRow);
+  const target = rows[i + step];
+  return target ? clampCursor(song, { ...cursor, section: target.section, bar: target.start + cursor.bar - rows[i].start }) : cursor;
+};
+
+/** The selected bar range: anchor..cursor, or just the cursor bar. */
+export const selectedBars = ({ cursor, anchor }: Pick<EditorState, "cursor" | "anchor">) => {
+  const from = anchor?.bar ?? cursor.bar;
+  return { section: cursor.section, from: Math.min(from, cursor.bar), to: Math.max(from, cursor.bar) };
+};
+
+const commandFor = (e: KeyInput, state: EditorState): Command | null => {
+  const { song, cursor, anchor, clipboard } = state;
+  const bar: BarRef = { section: cursor.section, bar: cursor.bar };
+  const section = cursor.section;
+  const move = (to: SlotRef): Command => ({ kind: "move", cursor: to, anchor: null });
+  const edit = (fn: (s: Song) => Song, to: SlotRef = cursor): Command => {
+    const next = fn(song);
+    return { kind: "edit", song: next, cursor: clampCursor(next, to) };
+  };
+  const isUp = e.key === "ArrowUp";
+
+  // Either modifier is accepted as Mod; the help shows the platform's one.
+  if (e.metaKey || e.ctrlKey) {
+    switch (e.key.toLowerCase()) {
+      case "z":
+        return { kind: e.shiftKey ? "redo" : "undo" };
+      case "enter":
+        return e.shiftKey
+          ? edit((s) => insertBar(s, bar, "before"), { ...bar, slot: 0 })
+          : edit((s) => insertBar(s, bar, "after"), { ...bar, bar: bar.bar + 1, slot: 0 });
+      case "backspace":
+        return e.shiftKey ? edit((s) => deleteSection(s, section)) : edit((s) => deleteBar(s, bar));
+      case "d":
+        return edit((s) => duplicateBar(s, bar));
+      case "k":
+        return edit(
+          (s) => (e.shiftKey ? addSection(s, section + 1, "New section") : splitSection(s, bar)),
+          { section: section + 1, bar: 0, slot: 0 },
+        );
+      case "c": {
+        const range = selectedBars(state);
+        return { kind: "copy", bars: copyBars(song, { section, bar: range.from }, { section, bar: range.to }) };
+      }
+      case "v":
+        return clipboard.length > 0 ? edit((s) => pasteBars(s, bar, clipboard, "after")) : null;
+    }
+    return null;
+  }
+  if (e.altKey) {
+    switch (e.key) {
+      case "ArrowLeft":
+      case "ArrowRight":
+        return edit((s) => resizeSlot(s, cursor, e.key === "ArrowRight" ? 1 : -1));
+      case "ArrowUp":
+      case "ArrowDown": {
+        if (!e.shiftKey) return edit((s) => setRepeat(s, section, (s.sections[section].repeat ?? 1) + (isUp ? 1 : -1)));
+        const to = section + (isUp ? -1 : 1);
+        return edit((s) => moveSection(s, section, to), { ...cursor, section: to });
+      }
+    }
+    return null;
+  }
+  if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+    const b = cursor.bar + (e.key === "ArrowRight" ? 1 : -1);
+    if (b < 0 || b >= song.sections[section].bars.length) return null;
+    return { kind: "move", cursor: { section, bar: b, slot: 0 }, anchor: anchor ?? bar };
+  }
+  switch (e.key) {
+    case "ArrowLeft":
+    case "ArrowRight":
+      return move(nextSlot(song, cursor, e.key === "ArrowRight" ? 1 : -1));
+    case "ArrowUp":
+    case "ArrowDown":
+      return move(nextRow(song, cursor, state.barsPerRow, isUp ? -1 : 1));
+    case "Home":
+    case "End": {
+      const inSection = positions(song).filter((p) => p.section === section);
+      return move(inSection[e.key === "Home" ? 0 : inSection.length - 1]);
+    }
+    case "/":
+      return edit((s) => splitSlot(s, cursor));
+    case "Backspace":
+      return edit((s) => mergeSlotWithNext(s, { ...cursor, slot: cursor.slot - 1 }), { ...cursor, slot: cursor.slot - 1 });
+    case "?":
+      return { kind: "help" };
+    case "F2":
+      return { kind: "rename" };
+  }
+  const isPrintable = e.key.length === 1 && e.key.trim() !== "";
+  return isPrintable && song.sections[section].bars.length > 0 ? { kind: "type", text: e.key } : null;
+};
+
+/** Commands throw on impossible edits (e.g. merging the first slot): the key then does nothing. */
+export const keyToCommand = (e: KeyInput, state: EditorState): Command | null => {
+  try {
+    return commandFor(e, state);
+  } catch {
+    return null;
+  }
+};

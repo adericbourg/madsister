@@ -1,7 +1,10 @@
+import type { ReactNode } from "react";
 import type { SlotRef } from "../model/commands";
 import type { DisplayStyle } from "../model/display";
 import type { Section } from "../model/song";
 import { BarCell } from "./BarCell";
+
+export type Selection = { section: number; from: number; to: number } | undefined;
 
 type Props = {
   section: Section;
@@ -10,6 +13,9 @@ type Props = {
   style: DisplayStyle;
   tabStop: SlotRef;
   lowConfidenceThreshold: number;
+  selection: Selection;
+  editor: ReactNode;
+  onCellClick?: (ref: SlotRef) => void;
 };
 
 export const SectionBlock = ({ section, index, barsPerRow, ...cell }: Props) => {
@@ -30,7 +36,9 @@ export const SectionBlock = ({ section, index, barsPerRow, ...cell }: Props) => 
       ))}
       {rows.length === 0 && (
         <div role="row" className="bar-row">
-          <div role="gridcell" className="section-empty">No bars yet</div>
+          <div role="gridcell" className="section-empty" tabIndex={cell.tabStop.section === index ? 0 : -1}>
+            {cell.tabStop.section === index && cell.editor !== undefined ? cell.editor : "No bars yet"}
+          </div>
         </div>
       )}
     </div>

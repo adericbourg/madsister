@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { emptySong } from "./model/song";
-import { Grid } from "./ui/Grid";
+import { Editor } from "./ui/Editor";
+import { useHistory } from "./ui/useHistory";
 
 function App() {
-  const [song] = useState(emptySong);
+  const [initial] = useState(emptySong);
+  const history = useHistory(initial);
   return (
     <main>
-      <Grid song={song} barsPerRow={4} style="fr" cursor={null} />
+      <Editor history={history} barsPerRow={4} style="fr" />
     </main>
   );
 }

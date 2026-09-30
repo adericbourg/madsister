@@ -1,7 +1,8 @@
+import { useEffect, useRef, type KeyboardEventHandler, type ReactNode } from "react";
 import type { SlotRef } from "../model/commands";
 import { displayChord, type DisplayStyle } from "../model/display";
 import type { Song } from "../model/song";
-import { SectionBlock } from "./SectionBlock";
+import { SectionBlock, type Selection } from "./SectionBlock";
 import "./grid.css";
 
 type Props = {
@@ -10,12 +11,22 @@ type Props = {
   style: DisplayStyle;
   cursor: SlotRef | null;
   lowConfidenceThreshold?: number;
+  selection?: Selection;
+  /** Rendered in the cursor cell instead of its chord (inline input). */
+  editor?: ReactNode;
+  onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
+  onCellClick?: (ref: SlotRef) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, cursor, lowConfidenceThreshold = 0.5 }: Props) => {
+export const Grid = ({ song, barsPerRow, style, cursor, lowConfidenceThreshold = 0.5, selection, editor, onKeyDown, onCellClick }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
+  const gridRef = useRef<HTMLDivElement>(null);
+  const isEditing = editor !== undefined;
+  useEffect(() => {
+    if (!isEditing) gridRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus();
+  }, [tabStop.section, tabStop.bar, tabStop.slot, song, isEditing]);
   return (
     <article className="chart">
       <header className="chart-header">
@@ -30,7 +41,7 @@ export const Grid = ({ song, barsPerRow, style, cursor, lowConfidenceThreshold =
           {tempoBpm !== undefined && <span>♩ = {tempoBpm}</span>}
         </p>
       </header>
-      <div role="grid" aria-label={`${title} chord chart`} className="grid">
+      <div role="grid" aria-label={`${title} chord chart`} className="grid" ref={gridRef} onKeyDown={onKeyDown}>
         {song.sections.map((section, i) => (
           <SectionBlock
             key={section.id}
@@ -40,6 +51,9 @@ export const Grid = ({ song, barsPerRow, style, cursor, lowConfidenceThreshold =
             style={style}
             tabStop={tabStop}
             lowConfidenceThreshold={lowConfidenceThreshold}
+            selection={selection}
+            editor={editor}
+            onCellClick={onCellClick}
           />
         ))}
       </div>

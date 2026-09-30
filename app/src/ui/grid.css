@@ -6,6 +6,7 @@
   --hairline: #999;
   --focus: #1d4ed8; /* 6.7:1 on paper */
   --doubt: #a64200; /* 6.3:1 on paper */
+  --selection: #dbeafe; /* ink stays 17:1 on it */
   color-scheme: light;
   color: var(--ink);
   background: var(--paper);
@@ -105,4 +106,63 @@
   color: var(--muted);
   font-style: italic;
   border-right: 2px solid var(--ink);
+}
+
+.bar.is-selected {
+  background: var(--selection);
+}
+
+.slot.is-editing {
+  position: relative;
+  overflow: visible;
+}
+
+.slot-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 4ch;
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+}
+
+.slot-input[aria-invalid="true"] {
+  border: 2px solid var(--doubt);
+}
+
+.slot-error {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1;
+  width: max-content;
+  max-width: 20rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+  white-space: normal;
+  color: var(--doubt);
+  background: var(--paper);
+  border: 1px solid var(--doubt);
+}
+
+/* The help overlay sits outside .chart, so it spells its colours out. */
+.help {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 1rem 1.5rem;
+  color: #000;
+  background: #fff;
+  border: 2px solid #000;
+}
+
+.help th {
+  padding-right: 1rem;
+  text-align: left;
+  font-weight: 400;
 }
