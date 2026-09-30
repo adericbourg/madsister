@@ -34,6 +34,27 @@ extension is kept (`F:maj(#11)/b5` → `F:maj/b5`).
 **Limits:** solo acoustic guitar (no band mix, no vocals), jazzy voicings and extension-derived basses, very few
 add chords (14 add2/add4 segments), no sections, 4/4 only, short excerpts (22–46 s).
 
+## Running the benchmark
+
+```sh
+uv run --project engine python bench/run.py --add-tau 0.3,0.4,0.5,0.6,0.7
+```
+
+Every installed combination (beat tracker × chord model × Demucs no/yes, each also with every `--add-tau` value) runs on
+every take. Quick runs: `--limit 2` (first takes), `--combos madmom+btc,allinone+cnnlstm+demucs`. It needs every model
+group installed (`uv sync` with all the `--group`s: a single `--group` removes the others) and `mir_eval` (`chords-btc`).
+
+- Output: `bench/results/<date>-guitarset.csv` (one row per take × combination) and `.md` (the table: mean per
+  combination, also printed). `--out` sets the CSV path. Rows already in the CSV are skipped: rerun to resume.
+- Cache: `bench/data/cache/guitarset/<id>/` holds each expensive output once per take (`decode.json` + `decoded.wav`,
+  `separate.json` + `harmonic.wav`, `beats-<tracker>.json`, `chords-<model>-<mix|stem>.json`), each with its wall time.
+  Combinations reuse them, and a combination's time is the sum of its components (what one `transcribe` call costs,
+  model loading included, Python imports excluded). Delete the folder after changing an adapter.
+- Metrics: **edits needed** per 100 reference slots (primary; definition in `edits_needed`), mir_eval chord WCSR
+  (`majmin`, `sevenths`, `tetrads`) of the quantized grid against the `.lab`, downbeat F-measure, and `add*` counts at
+  slot level for the τ sweep (predicted, false positives, precision, recall).
+- The full GuitarSet run takes about 1.5 h on an M-series Mac (all-in-one: ~1 s per second of audio).
+
 ## User songs (later)
 
 The user's own songs go in `bench/data/user/`: `<id>.<ext>` (audio) + `<id>.madsister.json` (hand-annotated reference

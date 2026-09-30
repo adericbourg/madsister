@@ -76,6 +76,33 @@ def beats_per_bar(beats: list[float], downbeats: list[float]) -> int:
     return round(statistics.median(b - a for a, b in zip(starts, starts[1:])))
 
 
+def to_song(
+    title: str,
+    beat_result: BeatResult,
+    segments: list[ChordSegment],
+    meter: int | None,
+    has_sections: bool,
+    chroma: tuple | None = None,
+    add_tau: float | None = None,
+) -> Song:
+    """Quantization (§3.3 steps 4-6, with 5b when `add_tau` is set): model outputs -> Song. `chroma` = `add_heuristic.chroma`."""
+    refine = None
+    if add_tau is not None:
+        features, times = chroma
+        refine = functools.partial(
+            add_heuristic.refine_add, chroma=features, chroma_times=times, beats=beat_result.beats, tau=add_tau
+        )
+    return build_song(
+        title,
+        segments,
+        beat_result.beats,
+        beat_result.downbeats,
+        meter or beats_per_bar(beat_result.beats, beat_result.downbeats),
+        beat_result.segments if has_sections else None,
+        refine,
+    )
+
+
 def transcribe(
     audio: str | Path,
     out: str | Path,
@@ -106,21 +133,8 @@ def transcribe(
             segments = recognizer.recognize(harmonic)
 
         events.progress("quantize", 90)
-        refine = None
-        if add_tau is not None:
-            chroma, times = add_heuristic.chroma(harmonic)
-            refine = functools.partial(
-                add_heuristic.refine_add, chroma=chroma, chroma_times=times, beats=beat_result.beats, tau=add_tau
-            )
-        song = build_song(
-            Path(audio).stem,
-            segments,
-            beat_result.beats,
-            beat_result.downbeats,
-            meter or beats_per_bar(beat_result.beats, beat_result.downbeats),
-            beat_result.segments if has_sections else None,
-            refine,
-        )
+        chroma = add_heuristic.chroma(harmonic) if add_tau is not None else None
+        song = to_song(Path(audio).stem, beat_result, segments, meter, has_sections, chroma, add_tau)
 
     events.progress("write", 100)
     write(song, Path(out))
