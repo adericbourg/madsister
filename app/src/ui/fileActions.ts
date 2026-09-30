@@ -27,6 +27,9 @@ export const readSong = async (path: string): Promise<Song> => parseSong(JSON.pa
 
 export const writeSong = (path: string, song: Song): Promise<void> => writeTextFile(path, serializeSong(song));
 
+/** On macOS, Tauri replaces window.print with its webview print command (needs core:webview:allow-print). */
+export const printSong = (): void => window.print();
+
 export const setWindowTitle = (title: string): Promise<void> => getCurrentWindow().setTitle(title);
 
 /** Reads `<appConfigDir>/<name>` as JSON; null when it's missing or unreadable (first run). */

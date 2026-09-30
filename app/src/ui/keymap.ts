@@ -25,7 +25,7 @@ export type Command =
   | { kind: "edit"; song: Song; cursor: SlotRef }
   | { kind: "copy"; bars: Bar[] }
   | { kind: "type"; text: string }
-  | { kind: "rename" | "undo" | "redo" | "help" };
+  | { kind: "rename" | "undo" | "redo" | "help" | "refused" };
 
 export const MOD_LABEL = /Mac|iP/.test(navigator.platform) ? "⌘" : "Ctrl";
 
@@ -50,6 +50,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["Alt+Shift+↑ / Alt+Shift+↓", "Move the section up / down"],
   ["Mod+N / Mod+O", "New song / open a file"],
   ["Mod+S / Mod+Shift+S", "Save / save as"],
+  ["Mod+P", "Print"],
   ["?", "Show this help"],
 ];
 
@@ -172,11 +173,11 @@ const commandFor = (e: KeyInput, state: EditorState): Command | null => {
   return isPrintable && song.sections[section].bars.length > 0 ? { kind: "type", text: e.key } : null;
 };
 
-/** Commands throw on impossible edits (e.g. merging the first slot): the key then does nothing. */
+/** Commands throw on impossible edits (e.g. merging the first slot): the key is then refused. */
 export const keyToCommand = (e: KeyInput, state: EditorState): Command | null => {
   try {
     return commandFor(e, state);
   } catch {
-    return null;
+    return { kind: "refused" };
   }
 };

@@ -74,6 +74,12 @@ test("Editor_whenTypingAChartByKeyboard_buildsTheSong", async () => {
   // When clicking a cell, Then it gets the cursor
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
   expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
+
+  // When merging its first slot with the previous one (impossible), Then the refusal is announced politely
+  await user.keyboard("{Backspace}");
+  expect(screen.getByRole("status").textContent).toBe("Not possible here");
+  await user.keyboard("{ArrowRight}");
+  expect(screen.getByRole("status").textContent).toBe("");
 });
 
 test("Editor_whenUsingTheSectionControls_editsTheCursorSection", async () => {

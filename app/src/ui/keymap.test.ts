@@ -138,10 +138,10 @@ test("keyToCommand_ofEditShortcuts_appliesTheCommandAndPlacesTheCursor", () => {
   expect(edit(key("ArrowDown", { alt: true }), state(at(1, 0)))).toEqual({ kind: "edit", song: setRepeat(song, 1, 1), cursor: at(1, 0) });
   expect(edit(key("ArrowDown", { alt: true, shift: true }))).toEqual({ kind: "edit", song: moveSection(song, 0, 1), cursor: at(1, 1, 1) });
 
-  // And impossible edits do nothing instead of throwing
-  expect(edit(key("Backspace"), state(at(0, 1, 0)))).toBeNull();
-  expect(edit(key("ArrowUp", { alt: true, shift: true }), state(at(0, 0)))).toBeNull();
-  expect(edit(key("k", { mod: true }), state(at(2, 0)))).toBeNull();
+  // And impossible edits are refused instead of throwing
+  expect(edit(key("Backspace"), state(at(0, 1, 0)))).toEqual({ kind: "refused" });
+  expect(edit(key("ArrowUp", { alt: true, shift: true }), state(at(0, 0)))).toEqual({ kind: "refused" });
+  expect(edit(key("k", { mod: true }), state(at(2, 0)))).toEqual({ kind: "refused" });
 });
 
 test("keyToCommand_ofOtherKeys_returnsTheMatchingAction", () => {

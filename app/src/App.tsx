@@ -6,6 +6,7 @@ import {
   isDirty,
   pickOpenPath,
   pickSavePath,
+  printSong,
   pushRecent,
   readConfigJson,
   readSong,
@@ -100,11 +101,11 @@ function App() {
     return () => clearTimeout(timer);
   });
 
-  // Re-bound on every render so the handler sees the current song; the grid lets Mod+N/O/S bubble up.
+  // Re-bound on every render so the handler sees the current song; the grid lets Mod+N/O/P/S bubble up.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
-      const action = { n: newSong, o: () => openSong(), s: e.shiftKey ? saveAs : saveSong }[e.key.toLowerCase()];
+      const action = { n: newSong, o: () => openSong(), p: printSong, s: e.shiftKey ? saveAs : saveSong }[e.key.toLowerCase()];
       if (action === undefined) return;
       e.preventDefault();
       void action();
@@ -135,6 +136,9 @@ function App() {
         </button>
         <button type="button" onClick={saveAs}>
           Save as…
+        </button>
+        <button type="button" onClick={printSong}>
+          Print…
         </button>
         {recent.length > 0 && (
           <details>

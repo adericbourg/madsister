@@ -3,9 +3,9 @@
   --ink: #000;
   --paper: #fff;
   --muted: #555; /* 7.5:1 on paper */
-  --hairline: #999;
-  --focus: #1d4ed8; /* 6.7:1 on paper */
-  --doubt: #a64200; /* 6.3:1 on paper */
+  --hairline: #767676; /* 4.5:1 on paper, 3.7:1 on selection */
+  --focus: #1d4ed8; /* 6.7:1 on paper, 5.5:1 on selection */
+  --doubt: #a64200; /* 6.2:1 on paper */
   --selection: #dbeafe; /* ink stays 17:1 on it */
   color-scheme: light;
   color: var(--ink);
@@ -188,4 +188,51 @@
 .field-error {
   margin-left: 0.25rem;
   color: #a64200;
+}
+
+/* Screen-reader-only text (the grid's live region). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* F-EX-1: the chart alone on one A4 page, without the editing UI (cursor, selection, low-confidence flags). */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  nav,
+  .toolbar,
+  [role="alert"],
+  .help {
+    display: none;
+  }
+
+  .chart {
+    max-width: none;
+    padding: 0;
+  }
+
+  .section {
+    break-inside: avoid;
+  }
+
+  .slot:focus-visible {
+    outline: none;
+  }
+
+  .bar.is-selected {
+    background: none;
+  }
+
+  .slot.is-low-confidence {
+    color: inherit;
+    text-decoration: none;
+  }
 }

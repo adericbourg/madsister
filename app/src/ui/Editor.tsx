@@ -20,6 +20,7 @@ export const Editor = ({ history, barsPerRow, style }: Props) => {
   const [clipboard, setClipboard] = useState<readonly Bar[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [notice, setNotice] = useState("");
   const helpOpener = useRef<HTMLElement | null>(null);
   // Undo/redo and structural edits can leave the cursor dangling: always read it clamped.
   const cursor = clampCursor(song, rawCursor);
@@ -28,6 +29,7 @@ export const Editor = ({ history, barsPerRow, style }: Props) => {
     const command = keyToCommand(e, { song, cursor, anchor, clipboard, barsPerRow });
     if (command === null) return;
     e.preventDefault();
+    setNotice(command.kind === "refused" ? "Not possible here" : "");
     switch (command.kind) {
       case "move":
         setCursor(command.cursor);
@@ -176,6 +178,9 @@ export const Editor = ({ history, barsPerRow, style }: Props) => {
           setDraft(null);
         }}
       />
+      <p role="status" className="visually-hidden">
+        {notice}
+      </p>
       {isHelpOpen && (
         <div role="dialog" aria-modal="true" aria-labelledby="help-title" className="help" onKeyDown={(e) => e.key === "Escape" && closeHelp()}>
           <h2 id="help-title">Keyboard shortcuts</h2>

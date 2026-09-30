@@ -165,3 +165,39 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   await vi.waitFor(() => expect(files["/waltz.madsister.json"]).toBeDefined());
   expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 3, unit: 4 });
 });
+
+test("App_whenPrinting_printsFromTheButtonAndModP", async () => {
+  // Given the app
+  const user = userEvent.setup();
+  const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
+  render(<App />);
+
+  // When clicking Print, then pressing Mod+P from the grid
+  await user.click(screen.getByRole("button", { name: "Print…" }));
+  await user.click(screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ }));
+  await user.keyboard("{Meta>}p{/Meta}");
+
+  // Then the chart is printed twice
+  expect(print).toHaveBeenCalledTimes(2);
+  print.mockRestore();
+});
+
+test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () => {
+  // Given the app, with a recent file so that every control is present
+  const user = userEvent.setup();
+  files["/config/recent.json"] = '["/blues.madsister.json"]';
+  render(<App />);
+  await screen.findByText("Recent");
+
+  // When tabbing forward past the end
+  const reached = new Set<Element | null>();
+  for (let i = 0; i < 40; i++) {
+    await user.tab();
+    reached.add(document.activeElement);
+  }
+
+  // Then every enabled control and the grid's single tab stop were focused
+  const controls = document.querySelectorAll('button:not([disabled]), input, select, summary, [tabindex="0"]');
+  expect(controls.length).toBeGreaterThan(15);
+  for (const control of controls) expect(reached).toContain(control);
+});
