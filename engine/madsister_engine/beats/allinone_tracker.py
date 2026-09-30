@@ -1,0 +1,25 @@
+"""all-in-one beat, downbeat and section tracker (spec §2.1). Needs the `beats-allinone` dependency group."""
+
+import os
+import tempfile
+from pathlib import Path
+
+_models_dir = Path(os.environ.get("MADSISTER_MODELS_DIR", Path.home() / ".cache/madsister/models"))
+# Read at import time by huggingface_hub, here and in the Demucs subprocess: all-in-one and htdemucs weights.
+os.environ.setdefault("HF_HUB_CACHE", str(_models_dir / "huggingface"))
+
+import allin1  # noqa: E402
+
+from madsister_engine.beats import BeatResult  # noqa: E402
+
+
+def track(wav_path: str | Path, meter: int | None = None) -> BeatResult:
+    """all-in-one has no meter input: a forced `meter` is ignored and the detected downbeats are kept."""
+    # Demucs stems and spectrograms are per-song byproducts: keep them out of the cwd, allin1 deletes them afterwards.
+    with tempfile.TemporaryDirectory() as tmp:
+        result = allin1.analyze(Path(wav_path), demix_dir=Path(tmp, "demix"), spec_dir=Path(tmp, "spec"))
+    return BeatResult(
+        beats=[float(t) for t in result.beats],
+        downbeats=[float(t) for t in result.downbeats],
+        segments=[(float(s.start), float(s.end), s.label) for s in result.segments],
+    )

@@ -15,6 +15,13 @@ dependencies = [
 madsister-engine = "madsister_engine.cli:main"
 
 [dependency-groups]
+beats-allinone = [
+    "allin1",
+    "madmom",
+    "natten==0.17.4; sys_platform == 'darwin'",  # last release with the legacy ops allin1 1.1.0 calls
+    "torch==2.5.1",
+    "torchaudio==2.5.1",
+]
 beats-madmom = [
     "madmom",
 ]
@@ -26,6 +33,12 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = ""
+
+[tool.uv.extra-build-dependencies]
+natten = ["torch==2.5.1", "cmake", "setuptools"]
+
+[tool.uv.extra-build-variables]
+natten = { CXXFLAGS = "-Wno-invalid-specialization" }  # torch 2.5 headers vs recent clang
 
 [tool.uv.sources]
 madmom = { git = "https://github.com/CPJKU/madmom", rev = "27f032e8947204902c675e5e341a3faf5dc86dae" }
