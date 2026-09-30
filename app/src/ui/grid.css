@@ -1,0 +1,108 @@
+/* A paper chord chart: black ink on white, one serif family, boxed rehearsal marks for sections. */
+.chart {
+  --ink: #000;
+  --paper: #fff;
+  --muted: #555; /* 7.5:1 on paper */
+  --hairline: #999;
+  --focus: #1d4ed8; /* 6.7:1 on paper */
+  --doubt: #a64200; /* 6.3:1 on paper */
+  color-scheme: light;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.chart-header {
+  margin-bottom: 2rem;
+}
+
+.chart-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.chart-artist {
+  margin: 0.25rem 0 0;
+  font-style: italic;
+  text-align: center;
+}
+
+.chart-facts {
+  display: flex;
+  justify-content: space-between;
+  margin: 1rem 0 0;
+}
+
+.section {
+  margin-bottom: 1.75rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.section-label {
+  border: 2px solid var(--ink);
+  padding: 0.05rem 0.4rem;
+  font-weight: 700;
+}
+
+.section-repeat {
+  font-weight: 700;
+}
+
+.bar-row {
+  display: grid;
+  border-left: 2px solid var(--ink);
+}
+
+.bar-row + .bar-row {
+  margin-top: 0.5rem;
+}
+
+.bar {
+  display: flex;
+  min-height: 3rem;
+  border-right: 2px solid var(--ink);
+}
+
+.slot {
+  flex-basis: 0;
+  min-width: 0;
+  padding: 0.6rem 0.5rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slot + .slot {
+  border-left: 1px dotted var(--hairline);
+}
+
+.slot:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.slot.is-low-confidence {
+  color: var(--doubt);
+  text-decoration: underline dotted 2px;
+  text-underline-offset: 0.2em;
+}
+
+.section-empty {
+  padding: 0.6rem 0.5rem;
+  color: var(--muted);
+  font-style: italic;
+  border-right: 2px solid var(--ink);
+}

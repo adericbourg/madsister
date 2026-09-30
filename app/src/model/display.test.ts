@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseChord, QUALITIES } from "./chord";
-import { displayChord } from "./display";
+import { displayChord, speakChord } from "./display";
 
 // [harte, fr, intl]
 const rows: [string, string, string][] = [
@@ -56,5 +56,17 @@ describe("displayChord", () => {
     // Given / When / Then
     expect(parseChord(fr)).toEqual({ ok: true, harte });
     expect(parseChord(intl)).toEqual({ ok: true, harte });
+  });
+});
+
+describe("speakChord", () => {
+  test("speakChord_ofHarte_spellsItForScreenReaders", () => {
+    // Given / When / Then
+    expect(speakChord("A:min7")).toBe("A minor 7");
+    expect(speakChord("Bb:maj7/3")).toBe("B flat major 7 over D");
+    expect(speakChord("F#:hdim7")).toBe("F sharp half-diminished 7");
+    expect(speakChord("C:maj")).toBe("C");
+    expect(speakChord("N")).toBe("no chord");
+    expect(speakChord("%")).toBe("repeat previous bar");
   });
 });

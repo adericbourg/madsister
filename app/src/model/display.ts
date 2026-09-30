@@ -28,3 +28,22 @@ export const displayChord = (harte: string, style: DisplayStyle): string => {
   const isFlat = root[1] === "b" || bass.startsWith("b");
   return `${chord}/${noteName(semitone(root) + DEGREES.indexOf(bass), isFlat)}`;
 };
+
+const SPOKEN: Record<string, string> = {
+  maj: "", min: " minor", aug: " augmented", dim: " diminished", sus2: " suspended 2", sus4: " suspended 4",
+  add2: " add 2", add4: " add 4", "7": " 7", maj7: " major 7", min7: " minor 7", minmaj7: " minor major 7",
+  maj6: " 6", min6: " minor 6", dim7: " diminished 7", hdim7: " half-diminished 7",
+  "9": " 9", maj9: " major 9", min9: " minor 9", "11": " 11", "13": " 13",
+};
+
+const speakNote = (note: string): string => note[0] + (note[1] === "#" ? " sharp" : note[1] === "b" ? " flat" : "");
+
+/** Spells a chord for screen readers, e.g. "Bb:maj7/3" → "B flat major 7 over D". */
+export const speakChord = (harte: string): string => {
+  if (harte === "N") return "no chord";
+  if (harte === "%") return "repeat previous bar";
+  const parsed = parseHarte(harte);
+  if (!parsed) return harte;
+  const [, bass] = displayChord(harte, "intl").split("/");
+  return speakNote(parsed.root) + SPOKEN[parsed.quality] + (bass === undefined ? "" : ` over ${speakNote(bass)}`);
+};

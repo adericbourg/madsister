@@ -1,7 +1,12 @@
+import { useState } from "react";
+import { emptySong } from "./model/song";
+import { Grid } from "./ui/Grid";
+
 function App() {
+  const [song] = useState(emptySong);
   return (
     <main>
-      <h1>madsister</h1>
+      <Grid song={song} barsPerRow={4} style="fr" cursor={null} />
     </main>
   );
 }
