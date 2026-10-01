@@ -92,9 +92,9 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M4-1 | [m4-step1-chordpro-grid](m4-step1-chordpro-grid.md) | todo | |
 | M4-2 | [m4-step2-musicxml](m4-step2-musicxml.md) | todo | |
 | M4-3 | [m4-step3-midi](m4-step3-midi.md) | todo | |
-| M4b-1 | [m4b-step1-engine-mode-presets](m4b-step1-engine-mode-presets.md) | todo | |
-| M4b-2 | [m4b-step2-bench-modes](m4b-step2-bench-modes.md) | todo | |
-| M4b-3 | [m4b-step3-mode-picker-ui](m4b-step3-mode-picker-ui.md) | todo | |
+| M4b-1 | [m4b-step1-engine-mode-presets](m4b-step1-engine-mode-presets.md) | skipped (D7, user 2026-10-01) | |
+| M4b-2 | [m4b-step2-bench-modes](m4b-step2-bench-modes.md) | skipped (D7, user 2026-10-01) | |
+| M4b-3 | [m4b-step3-mode-picker-ui](m4b-step3-mode-picker-ui.md) | skipped (D7, user 2026-10-01) | |
 | M5-1 | [m5-step1-engine-fetch](m5-step1-engine-fetch.md) | todo | |
 | M5-2 | [m5-step2-engine-record](m5-step2-engine-record.md) | todo | |
 | M5-3 | [m5-step3-sources-ui](m5-step3-sources-ui.md) | todo | |
@@ -105,6 +105,17 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 
 Scope of the first unattended run (2026-09-30 night): M0 + M1. M2–M6 are written at a coarser level. Revise them
 after M0 (the model choices change M2/M4b/M6), and ask the user before starting them.
+
+Second unattended run (2026-10-01): M2, M3, M4, M5, M6, one agent per step, same protocol. User decisions:
+- **all-in-one stays as a slow opt-in** for section detection (off by default; the default combo is madmom + CNN-LSTM).
+  torch stays pinned to 2.5.1 (accepted, see BLOCKERS.md).
+- **M4b is skipped**: M0 found no slower combo measurably better (D7 → single mode). Revisit after the user's own bench.
+- **M6 releases**: Linux (deb + AppImage) + macOS arm64 (unsigned .dmg). Version from tag `vX.Y.Z` (semver, injected at build
+  time); every `main` build publishes a snapshot pre-release `<last tag or 0.0.0>-snapshot.<run number>`, only the latest
+  snapshot is kept; tagged releases are kept.
+- Coarse steps: each agent refines its step file (in the same commit) before implementing. Steps needing hardware or a desktop
+  session (microphone, audio playback, printing) get automated tests + a "check by hand" list in the step file.
+- Engine model dependencies (torch, torchaudio, natten, madmom, allin1, demucs, librosa…) aren't covered by CI: test them locally.
 
 ## Morning hand-off
 When stopping (all tonight's steps done, or everything left is blocked), make sure these are up to date and pushed:

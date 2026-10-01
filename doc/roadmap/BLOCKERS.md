@@ -9,7 +9,7 @@ Append-only log. Format per entry:
 - Decision needed: <question for the user>
 ```
 
-## Decision: torch 2.5.1 pin vs security advisories (2026-09-30)
+## Decision: torch 2.5.1 pin vs security advisories (2026-09-30) — RESOLVED 2026-10-01
 - Symptom: GitHub's Dependabot security-update runs ("uv in /engine for torch - Update") fail on every push. They are not
   our CI (the `engine` workflow is green); they come from Dependabot security updates enabled in the repo settings.
 - Cause: the `beats-allinone` and `chords-btc` groups pin `torch==2.5.1`, because all-in-one needs `natten==0.17.4`
@@ -19,3 +19,5 @@ Append-only log. Format per entry:
 - Not tried: bumping torch would likely break the NATTEN 0.17.4 build and therefore all-in-one (M0-6).
 - Decision needed: accept the pin for the M0 spike (and dismiss the Dependabot alert), or drop/replace all-in-one if M0-14
   shows it isn't worth it (it's also the slowest tracker: ~30 s for a 16 s clip).
+- Resolution (user, 2026-10-01): keep all-in-one as a slow opt-in for section detection, so the torch 2.5.1 pin and
+  its Dependabot alerts are accepted for now.
