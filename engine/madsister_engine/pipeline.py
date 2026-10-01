@@ -28,6 +28,8 @@ _CHORDS = {
     "btc": ("chords-btc", "mir_eval", "madsister_engine.chords.btc"),
 }
 _SEPARATE = {"demucs": ("separate", "demucs", "madsister_engine.separate")}
+# --meter -> (tracker beats per bar, Song meter unit). 6/8 is tracked at the dotted-quarter pulse (spec §3.2).
+METERS = {"3": (3, 4), "4": (4, 4), "6/8": (2, 8)}
 
 
 @dataclass(frozen=True)
@@ -80,7 +82,7 @@ def to_song(
     title: str,
     beat_result: BeatResult,
     segments: list[ChordSegment],
-    meter: int | None,
+    meter: str | None,
     has_sections: bool,
     chroma: tuple | None = None,
     add_tau: float | None = None,
@@ -92,21 +94,23 @@ def to_song(
         refine = functools.partial(
             add_heuristic.refine_add, chroma=features, chroma_times=times, beats=beat_result.beats, tau=add_tau
         )
+    meter_beats, unit = METERS[meter] if meter else (beats_per_bar(beat_result.beats, beat_result.downbeats), 4)
     return build_song(
         title,
         segments,
         beat_result.beats,
         beat_result.downbeats,
-        meter or beats_per_bar(beat_result.beats, beat_result.downbeats),
+        meter_beats,
         beat_result.segments if has_sections else None,
         refine,
+        unit,
     )
 
 
 def transcribe(
     audio: str | Path,
     out: str | Path,
-    meter: int | None,
+    meter: str | None,
     has_sections: bool,
     beats: str = "auto",
     chords: str = "auto",
@@ -127,7 +131,7 @@ def transcribe(
                 harmonic = separator.harmonic_stem(wav, Path(tmp))
         events.progress("beats", 40)
         with _stdout_to_stderr():
-            beat_result = tracker.track(wav, meter)
+            beat_result = tracker.track(wav, METERS[meter][0] if meter else None)
         events.progress("chords", 70)
         with _stdout_to_stderr():
             segments = recognizer.recognize(harmonic)

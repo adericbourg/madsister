@@ -19,14 +19,14 @@ test("transcribe_invokesTheCommandAndForwardsChannelEvents", async () => {
   const events: EngineEvent[] = [];
 
   // When transcribing, then the backend sends an event on the channel
-  const jobId = await transcribe("/a.mp3", "/a.madsister.json", 3, true, (event) => events.push(event));
+  const jobId = await transcribe("/a.mp3", "/a.madsister.json", "6/8", true, (event) => events.push(event));
   const [command, args] = vi.mocked(invoke).mock.calls[0] as [string, { onEvent: Channel<EngineEvent> }];
   args.onEvent.onmessage({ type: "progress", stage: "beats", pct: 40 });
 
   // Then the command gets the paths, meter and sections flag, and the event reaches the callback
   expect(jobId).toBe(42);
   expect(command).toBe("transcribe");
-  expect(args).toMatchObject({ audioPath: "/a.mp3", outPath: "/a.madsister.json", meter: 3, sections: true });
+  expect(args).toMatchObject({ audioPath: "/a.mp3", outPath: "/a.madsister.json", meter: "6/8", sections: true });
   expect(events).toEqual([{ type: "progress", stage: "beats", pct: 40 }]);
 });
 

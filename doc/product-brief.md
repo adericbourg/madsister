@@ -120,7 +120,7 @@ madsister/
 
 ### 3.2 Engine CLI contract
 ```
-madsister-engine transcribe <audio_path> --out <song.json> [--meter 4|3] [--no-sections] [--mode fast|accurate]
+madsister-engine transcribe <audio_path> --out <song.json> [--meter 4|3|6/8] [--no-sections] [--mode fast|accurate]
 madsister-engine fetch <url> --out-dir <dir>          # yt-dlp → audio file path
 madsister-engine record --out <file.wav>              # stops on SIGINT / stdin "stop"
 ```
@@ -131,6 +131,7 @@ stdout: one JSON object per line:
 {"type":"error","message":"…"}
 ```
 Exit code 0 on success, non-zero on error (with an `error` line emitted first).
+`--meter 6/8`: the trackers run at the dotted-quarter pulse (2 beats per bar); the Song is written in eighths (`meta.meter` 6/8, slot beats ×3, `tempoBpm` = dotted-quarter BPM).
 
 ### 3.3 Transcription pipeline
 1. Decode to mono 44.1 kHz WAV (ffmpeg).

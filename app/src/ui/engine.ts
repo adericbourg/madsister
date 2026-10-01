@@ -8,11 +8,14 @@ export type EngineEvent =
   | { type: "error"; message: string; stderr: string }
   | { type: "cancelled" };
 
+/** A forced meter, as `madsister-engine transcribe --meter` takes it; null = auto. */
+export type ForcedMeter = "3" | "4" | "6/8";
+
 /** Starts a transcription and returns its job id. Rejects when the engine can't be started. `sections`: all-in-one (slow). */
 export const transcribe = (
   audioPath: string,
   outPath: string,
-  meter: 3 | 4 | null,
+  meter: ForcedMeter | null,
   sections: boolean,
   onEvent: (event: EngineEvent) => void,
 ): Promise<number> => {

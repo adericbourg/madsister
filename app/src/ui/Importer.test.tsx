@@ -33,16 +33,17 @@ beforeEach(() => {
 });
 
 test("Importer_whenDroppingAnAudioFile_showsProgressThenReportsTheResult", async () => {
-  // Given the importer with "Detect sections" checked
+  // Given the importer with "Detect sections" checked and the meter forced to 6/8
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
   await user.click(screen.getByRole("checkbox", { name: /Detect sections \(slow/ }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "Meter" }), "6/8");
 
   // When dropping an mp3
   await dropFile("/music/song.mp3");
 
-  // Then the engine starts on it, writing next to it, with all-in-one
-  expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", null, true, expect.any(Function));
+  // Then the engine starts on it, writing next to it, with that meter and all-in-one
+  expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", "6/8", true, expect.any(Function));
   expect(screen.getByRole("status").textContent).toBe("Starting…");
   expect(screen.getByRole("button", { name: "Import audio…" })).toHaveProperty("disabled", true);
 

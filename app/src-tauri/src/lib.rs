@@ -10,7 +10,7 @@ fn transcribe(
     jobs: State<Jobs>,
     audio_path: String,
     out_path: String,
-    meter: Option<u8>,
+    meter: Option<String>,
     sections: bool,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {

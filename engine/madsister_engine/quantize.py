@@ -142,13 +142,27 @@ def build_song(
     meter_beats: int,
     segments: list[tuple[float, float, str]] | None,
     refine: Callable[[list[Bar]], list[Bar]] | None = None,
+    unit: int = 4,
 ) -> Song:
-    """`refine` rewrites the simplified bars before sectioning (the add2/add4 step 5b)."""
+    """`refine` rewrites the simplified bars before sectioning (the add2/add4 step 5b).
+
+    `unit=8`: compound meter, each tracker beat is a dotted quarter written as 3 eighths (6/8 = 2 tracker beats per bar).
+    """
     bars = simplify(bars_from_beats(beat_labels(chords, beats), beats, downbeats, meter_beats))
     if refine:
         bars = refine(bars)
+    if unit == 8:
+        bars = [
+            replace(
+                bar,
+                chords=[replace(slot, beats=slot.beats * 3) for slot in bar.chords],
+                meter=bar.meter and Meter(bar.meter.beats * 3, 8),
+            )
+            for bar in bars
+        ]
+        meter_beats *= 3
     period = statistics.median(b - a for a, b in zip(beats, beats[1:]))
     return Song(
-        meta=Meta(title=title, meter=Meter(meter_beats, 4), tempo_bpm=round(60 / period)),
+        meta=Meta(title=title, meter=Meter(meter_beats, unit), tempo_bpm=round(60 / period)),
         sections=sections_from_segments(bars, segments),
     )

@@ -28,7 +28,7 @@ def _parser() -> argparse.ArgumentParser:
     transcribe = sub.add_parser("transcribe", help="audio file -> Song JSON")
     transcribe.add_argument("audio")
     transcribe.add_argument("--out", required=True)
-    transcribe.add_argument("--meter", type=int, choices=[3, 4])
+    transcribe.add_argument("--meter", choices=pipeline.METERS)
     transcribe.add_argument("--no-sections", action="store_true")
     # Bench-only options (M0-13), hidden until M4b replaces them with --mode.
     transcribe.add_argument("--beats", choices=["auto", "allinone", "madmom"], default="auto", help=argparse.SUPPRESS)

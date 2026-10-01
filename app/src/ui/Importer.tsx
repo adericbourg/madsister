@@ -1,7 +1,7 @@
 // Audio import (spec F-IN-1, F-IN-4, NF-4): dialog or drag & drop → engine job with progress and cancel.
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useRef, useState } from "react";
-import { cancel, transcribe, type EngineEvent } from "./engine";
+import { cancel, transcribe, type EngineEvent, type ForcedMeter } from "./engine";
 import { AUDIO_EXTENSIONS, canWrite, pickAudioPath } from "./fileActions";
 
 type Job = { id: number | null; stage: string; pct: number };
@@ -11,6 +11,7 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
   const [job, setJob] = useState<Job | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [shouldDetectSections, setShouldDetectSections] = useState(false);
+  const [meter, setMeter] = useState<ForcedMeter | null>(null);
 
   const start = async (audioPath: string) => {
     setFailure(null);
@@ -32,7 +33,7 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
     };
     setJob({ id: null, stage: "Starting…", pct: 0 });
     try {
-      const id = await transcribe(audioPath, outPath, null, shouldDetectSections, onEvent);
+      const id = await transcribe(audioPath, outPath, meter, shouldDetectSections, onEvent);
       setJob((j) => j && { ...j, id });
     } catch (e) {
       setJob(null);
@@ -60,6 +61,15 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
       <button type="button" onClick={importAudio} disabled={job !== null}>
         Import audio…
       </button>{" "}
+      <label>
+        Meter{" "}
+        <select value={meter ?? ""} onChange={(e) => setMeter((e.target.value || null) as ForcedMeter | null)}>
+          <option value="">Auto</option>
+          <option value="4">4/4</option>
+          <option value="3">3/4</option>
+          <option value="6/8">6/8</option>
+        </select>
+      </label>{" "}
       <label>
         <input type="checkbox" checked={shouldDetectSections} onChange={(e) => setShouldDetectSections(e.target.checked)} /> Detect
         sections (slow: ≈ 6 min for a 4-min song, instead of ≈ 20 s)

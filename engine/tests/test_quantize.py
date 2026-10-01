@@ -114,3 +114,17 @@ def test_build_song_composes_the_pipeline():
     assert song.meta.title == "my song"
     assert song.meta.tempo_bpm == 120
     assert [_chords(b) for b in song.sections[0].bars] == [[("C:maj", 4)], [("N", 4)]]
+
+
+def test_build_song_of_compound_unit_writes_tracker_beats_as_three_eighths():
+    # Given 6/8 tracked as 2 dotted-quarter beats per bar, with a 4-beat bar at the end
+    chords = [ChordSegment(0.0, 2.0, "C:maj", 0.9), ChordSegment(2.0, 4.0, "G:maj", 0.9)]
+
+    # When
+    song = build_song("jig", chords, BEATS_8, [0.0, 1.0, 2.0], meter_beats=2, segments=None, unit=8)
+
+    # Then the song is 6/8, slots count eighths and the long bar keeps an override in eighths
+    bars = song.sections[0].bars
+    assert song.meta.meter == Meter(6, 8)
+    assert [_chords(b) for b in bars] == [[("C:maj", 6)], [("C:maj", 6)], [("G:maj", 12)]]
+    assert [b.meter for b in bars] == [None, None, Meter(12, 8)]

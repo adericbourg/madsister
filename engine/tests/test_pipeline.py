@@ -31,7 +31,7 @@ def fakes(monkeypatch):
     def track(wav, meter=None):
         calls["track"] = (wav, meter)
         os.write(1, b"model chatter\n")  # as allin1's Demucs subprocess does
-        return BeatResult(BEATS, BEATS[::4], [(0.0, 8.0, "verse"), (8.0, 16.0, "chorus")])
+        return BeatResult(BEATS, BEATS[:: meter or 4], [(0.0, 8.0, "verse"), (8.0, 16.0, "chorus")])
 
     def recognize(wav):
         calls["recognize"] = wav
@@ -70,6 +70,16 @@ def test_main_of_transcribe_emits_stages_in_order_and_writes_song(fakes, make_wa
     assert code == 0
     assert [s["label"] for s in json.loads(out.read_text())["sections"]] == ["Song"]
     assert fakes["track"][1] == 3
+
+    # When 6/8 is forced
+    code = cli.main(["transcribe", str(wav), "--out", str(out), "--meter", "6/8"])
+
+    # Then the tracker gets 2 dotted-quarter beats per bar and the Song counts eighths
+    song = json.loads(out.read_text())
+    assert code == 0
+    assert fakes["track"][1] == 2
+    assert song["meta"]["meter"] == {"beats": 6, "unit": 8}
+    assert {slot["beats"] for s in song["sections"] for bar in s["bars"] for slot in bar["chords"]} == {6}
 
 
 def test_main_of_transcribe_with_separate_and_add_tau_uses_harmonic_stem(fakes, make_wav, tmp_path, capfd, monkeypatch):
