@@ -60,6 +60,14 @@ natten = { CXXFLAGS = "-Wno-invalid-specialization" }  # torch 2.5 headers vs re
 
 [tool.uv.sources]
 madmom = { git = "https://github.com/CPJKU/madmom", rev = "27f032e8947204902c675e5e341a3faf5dc86dae" }
+# PyPI's Linux torch is the CUDA build (~2.5 GB with its nvidia-* deps): CPU-only on Linux, PyPI on macOS.
+torch = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+torchaudio = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
