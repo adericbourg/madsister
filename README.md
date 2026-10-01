@@ -79,3 +79,15 @@ On first launch (and after each update) the packaged app installs its engine int
 `src-tauri/setup-engine.sh`, then downloads the models. Without the madmom wheel the release workflow bundles, that first
 launch builds madmom from git: it needs git and a C compiler. The deb depends on ffmpeg, the GStreamer plugins and
 `libportaudio2`; the AppImage bundles GStreamer but needs ffmpeg and `libportaudio2` on the system.
+
+### Releases
+
+`.github/workflows/release.yml` builds the Linux deb and AppImage (on Ubuntu 22.04, with the madmom wheel and the `uv`
+sidecar), installs the deb in a clean `ubuntu:24.04` container to set up its engine and transcribe a clip, then publishes:
+
+- every push to `main`: a pre-release `v<last vX.Y.Z tag or 0.0.0>-snapshot.<run number>`; the previous snapshot (release and
+  tag) is deleted once the new one is published, so only the latest is kept;
+- a pushed tag `vX.Y.Z`: the release `X.Y.Z`, kept. The version comes from the tag (injected with `tauri build --config`),
+  so `tauri.conf.json` and `Cargo.toml` aren't bumped.
+
+Releases are on the [releases page](https://github.com/adericbourg/madsister/releases).

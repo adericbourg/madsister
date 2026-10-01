@@ -1,0 +1,162 @@
+name: release
+
+# Every push to main publishes a snapshot pre-release `v<last tag or 0.0.0>-snapshot.<run number>` (only the latest is kept);
+# a `vX.Y.Z` tag publishes a release that is kept. It doesn't wait for the `app`/`engine` workflows: the clean-install
+# check below gates the publication, and a later push replaces a bad snapshot.
+on:
+  push:
+    branches: [main]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }} # a newer snapshot supersedes this one
+
+env:
+  UV_VERSION: 0.12.21 # the uv bundled as the app's sidecar, also used to build the madmom wheel
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the tags
+      - id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version=${GITHUB_REF_NAME#v}
+          else
+            last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || echo v0.0.0)
+            version=${last#v}-snapshot.$GITHUB_RUN_NUMBER
+          fi
+          if ! echo "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-snapshot\.[0-9]+)?$'; then
+            echo "::error::not a semver version: $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # One job per platform; a macOS job (M6-3) would build its .dmg the same way and upload a `macos` artifact.
+  linux:
+    needs: version
+    runs-on: ubuntu-22.04 # the oldest glibc the deb and the AppImage then run on
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tag upstream
+        with:
+          version: ${{ env.UV_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      # Tauri's packages (https://v2.tauri.app/start/prerequisites/#linux), patchelf for the AppImage, and the GStreamer
+      # plugins the AppImage bundles (bundleMediaFramework).
+      - run: >-
+          sudo apt-get update && sudo apt-get install -y
+          libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
+      - name: Build the madmom wheel (first launch then needs no git nor C compiler)
+        run: |
+          rev=$(sed -n 's/^madmom = .*rev = "\([0-9a-f]*\)".*/\1/p' engine/pyproject.toml)
+          git clone --quiet https://github.com/CPJKU/madmom "$RUNNER_TEMP/madmom"
+          git -C "$RUNNER_TEMP/madmom" checkout --quiet "$rev"
+          git -C "$RUNNER_TEMP/madmom" submodule update --init --quiet # the model weights
+          uv build --wheel --python 3.11 --out-dir engine/wheels "$RUNNER_TEMP/madmom"
+      - name: Download the uv sidecar
+        run: |
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          mkdir -p app/src-tauri/binaries
+          curl -fsSL "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.tar.gz" |
+            tar -xzO "uv-$triple/uv" > "app/src-tauri/binaries/madsister-uv-$triple"
+          chmod +x "app/src-tauri/binaries/madsister-uv-$triple"
+      - run: pnpm install --frozen-lockfile
+        working-directory: app
+      - name: Build the deb and the AppImage
+        working-directory: app
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: >-
+          pnpm tauri build --bundles deb,appimage --config src-tauri/tauri.bundle.conf.json
+          --config "{\"version\":\"$VERSION\",\"bundle\":{\"resources\":{\"../../engine/wheels/\":\"engine/wheels/\"}}}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux
+          if-no-files-found: error
+          path: |
+            app/src-tauri/target/release/bundle/deb/*.deb
+            app/src-tauri/target/release/bundle/appimage/*.AppImage
+
+  # M6 "done when" on Linux: the deb installs on a clean system and its engine sets up and transcribes, with no compiler.
+  linux-clean-install:
+    needs: [version, linux]
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7 # setup-engine.sh, the script the app runs on first launch
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux
+      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ./deb/madsister_*.deb
+      - name: Set up the engine as a user, then transcribe a synthetic C major clip
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          useradd --create-home user
+          cp app/src-tauri/setup-engine.sh /tmp/ # readable by the user
+          project=$(dirname "$(dpkg -L madsister | grep '/engine/pyproject.toml$')")
+          su user -c "sh -eu" <<EOF
+          cd
+          env=\$HOME/.local/share/dev.dericbourg.madsister/engine-env
+          start=\$(date +%s)
+          sh /tmp/setup-engine.sh /usr/bin/madsister-uv $project "\$env" $VERSION
+          echo "setup: \$((\$(date +%s) - start)) s, env: \$(du -sh "\$env" | cut -f1)"
+          ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
+          start=\$(date +%s)
+          "\$env/bin/madsister-engine" transcribe c.wav --out c.madsister.json
+          echo "transcribe: \$((\$(date +%s) - start)) s"
+          grep -q '"chord": "C:maj"' c.madsister.json
+          EOF
+
+  publish:
+    needs: [version, linux, linux-clean-install]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        run: |
+          notes="For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see THIRD_PARTY.md).
+          Linux: \`sudo apt install ./madsister_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
+          The first launch downloads the engine (Python, its libraries and the models), once."
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            gh release create "$GITHUB_REF_NAME" dist/*/* --verify-tag --title "madsister $VERSION" --notes "$notes"
+          else
+            tag=v$VERSION
+            gh release create "$tag" dist/*/* --prerelease --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
+            # Only the latest snapshot is kept: the previous ones go once this one is published.
+            gh release list --limit 100 --json tagName --jq '.[].tagName | select(contains("-snapshot."))' |
+              while read -r old; do
+                if [ "$old" != "$tag" ]; then gh release delete "$old" --cleanup-tag --yes; fi
+              done
+          fi
