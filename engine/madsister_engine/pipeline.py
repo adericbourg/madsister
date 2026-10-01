@@ -1,7 +1,9 @@
 """The §3.3 transcription pipeline: audio file -> Song JSON, with progress events."""
 
 import contextlib
+import dataclasses
 import functools
+import hashlib
 import importlib
 import importlib.util
 import os
@@ -15,7 +17,7 @@ from madsister_engine import add_heuristic, events
 from madsister_engine.beats import BeatResult
 from madsister_engine.decode import decode
 from madsister_engine.quantize import ChordSegment, build_song
-from madsister_engine.song import Song, write
+from madsister_engine.song import Audio, Song, write
 
 # option -> (dependency group, module that only that group installs, adapter module). `auto` = first installed, in order:
 # madmom + cnnlstm, the fewest edits on the M0 bench (provisional, GuitarSet proxy: doc/roadmap/m0-results.md).
@@ -142,6 +144,9 @@ def transcribe(
         chroma = add_heuristic.chroma(harmonic) if add_tau is not None else None
         song = to_song(Path(audio).stem, beat_result, segments, meter, has_sections, chroma, add_tau)
 
+    with open(audio, "rb") as f:
+        sha256 = hashlib.file_digest(f, "sha256").hexdigest()
+    song = dataclasses.replace(song, audio=Audio(str(Path(audio).resolve()), sha256))
     events.progress("write", 100)
     write(song, Path(out))
     return Transcription(song, beat_result, segments)

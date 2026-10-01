@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -9,6 +10,7 @@ import { transcribe } from "./ui/engine";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn() }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn() }));
 const drop = vi.hoisted(() => ({ handler: (_: { payload: unknown }) => {} }));
 vi.mock("@tauri-apps/api/webview", () => ({
@@ -118,6 +120,47 @@ test("App_whenImportingAudio_loadsTheResultAndKeepsItOnError", async () => {
   // Then the error is shown and the song is kept
   expect(screen.getByRole("alert").textContent).toContain("boom");
   expect(screen.getByRole("heading", { name: "Blues" })).toBeDefined();
+});
+
+test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAudio", async () => {
+  // Given a song whose audio is missing, and the hashes of the audio files that exist
+  const user = userEvent.setup();
+  const hashes: Record<string, string> = { "/music/changed.mp3": "new", "/music/found.mp3": "abc" };
+  vi.mocked(invoke).mockImplementation(async (_, args) => hashes[(args as { path: string }).path] ?? null);
+  files["/blues.madsister.json"] = serializeSong({ ...song, audio: { path: "/music/blues.mp3", sha256: "abc" } });
+  files["/changed.madsister.json"] = serializeSong({ ...song, audio: { path: "/music/changed.mp3", sha256: "old" } });
+  render(<App />);
+
+  // When opening the song
+  vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
+  await user.click(screen.getByRole("button", { name: "Open…" }));
+
+  // Then the song is shown, with a notice that the audio is missing
+  expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
+  expect(await screen.findByText("Audio file not found: /music/blues.mp3")).toBeDefined();
+
+  // When locating the audio
+  vi.mocked(open).mockResolvedValueOnce("/music/found.mp3");
+  await user.click(screen.getByRole("button", { name: "Locate audio…" }));
+
+  // Then the notice goes away, and the new path and hash are saved
+  await vi.waitFor(() => expect(screen.queryByText(/Audio file/)).toBeNull());
+  vi.mocked(save).mockResolvedValueOnce("/blues2.madsister.json");
+  await user.click(screen.getByRole("button", { name: "Save as…" }));
+  await vi.waitFor(() => expect(files["/blues2.madsister.json"]).toBeDefined());
+  expect(JSON.parse(files["/blues2.madsister.json"]).audio).toEqual({ path: "/music/found.mp3", sha256: "abc" });
+
+  // When undoing, Then the old path is back with its notice (locating is one history entry)
+  await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
+  await user.keyboard("{Control>}z{/Control}");
+  expect(await screen.findByText("Audio file not found: /music/blues.mp3")).toBeDefined();
+
+  // When opening a song whose audio has changed since transcription
+  vi.mocked(open).mockResolvedValueOnce("/changed.madsister.json");
+  await user.click(screen.getByRole("button", { name: "Open…" }));
+
+  // Then the notice says so
+  expect(await screen.findByText("Audio file has changed since the transcription: /music/changed.mp3")).toBeDefined();
 });
 
 test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {

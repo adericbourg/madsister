@@ -86,7 +86,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M2-3 | [m2-step3-meter-force](m2-step3-meter-force.md) | done | 12029a7 |
 | M2-4 | [m2-step4-confidence-flags](m2-step4-confidence-flags.md) | done | e337c10 |
 | M2-5 | [m2-step5-bar-meter-override](m2-step5-bar-meter-override.md) | done | 17e5bd8 |
-| M2-6 | [m2-step6-audio-ref-and-perf](m2-step6-audio-ref-and-perf.md) | todo | |
+| M2-6 | [m2-step6-audio-ref-and-perf](m2-step6-audio-ref-and-perf.md) | done | this |
 | M2-7 | [m2-step7-developer-docs](m2-step7-developer-docs.md) | todo | |
 | M3-1 | [m3-step1-playback-cursor](m3-step1-playback-cursor.md) | todo | |
 | M3-2 | [m3-step2-click-seek](m3-step2-click-seek.md) | todo | |

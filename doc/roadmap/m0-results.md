@@ -35,7 +35,12 @@ Real CLI calls (`madsister-engine transcribe`, default combo, imports and uv sta
 **19 s for a 4 min 16 s file** (8 takes concatenated). NF-2 (< 2 min) holds with a wide margin for madmom-based combos; every
 all-in-one combo misses it (~6–7 min for 4 min of audio, on a fast CPU).
 
-## Observations
+### NF-2 on a 4-min mp3 (M2-6)
+`madsister-engine transcribe` (default combo, via `uv run --no-sync`), 2026-10-01, same machine: a 240 s mp3 (192 kb/s, 8
+GuitarSet takes concatenated with ffmpeg, cut at 4 min) → **20.4 s** wall time, 99 bars. Per stage, from the progress events:
+start-up + imports 0.5 s, decode 0.3 s, beats (madmom) 12.3 s, chords (CNN-LSTM) 7.2 s, quantize + hash + write 0.1 s.
+NF-2 (< 2 min) holds, ~6× under the limit.
+
 - **Bar phase dominates the edits.** For madmom+cnnlstm, the 46 takes with downbeat F ≥ 0.5 need 49 edits/100 (38 bass ignored);
   the 26 takes with downbeat F < 0.5 need 94/100 (92 bass ignored), although their chord accuracy is similar (majmin 0.885 vs 0.951).
   A shifted bar line costs one edit per slot. The M3 phase/tempo fixes (F-PB-3/4) matter more than the choice of chord model.
@@ -44,7 +49,7 @@ all-in-one combo misses it (~6–7 min for 4 min of audio, on a fast CPU).
 - **Tempo octave / meter errors** (median beat period vs reference): madmom 50/72 right, 9 double tempo, 13 at ~2/3 or ~3/2
   (swing/shuffle takes, e.g. `SS1-68`, `SS2-88`, `SS3-84`, where the tracker locks on the triplet grid). all-in-one 45/72 right,
   7 half, 3 double, 16 at ~2/3 or ~3/2, and **one failure**: 1 beat on `00_SS2-107-Ab_comp` (scored as a full failure: every slot
-  to re-enter). `transcribe` crashes on that case (`StatisticsError` in `build_song`): M2 should turn it into a clear error.
+  to re-enter). `transcribe` crashed on that case (`StatisticsError` in `build_song`); since M2-6 it reports `could not find beats in this audio`.
 - **Demucs changes nothing** on solo guitar (±0.1 edit, +10 s per take, ~+70 s per 4-min song). Expected: nothing to remove.
   It may matter on band mixes: the user's bench decides.
 - **CNN-LSTM beats BTC** by ~2 edits/100 and ~0.02 majmin with either tracker, at the same cost.

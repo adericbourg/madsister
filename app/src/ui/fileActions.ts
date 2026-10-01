@@ -1,4 +1,5 @@
 // Tauri file access (spec F-ED-10), kept out of model/. Pure helpers are exported for tests.
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { appConfigDir, join } from "@tauri-apps/api/path";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
@@ -20,6 +21,9 @@ export const confirmDeleteSection = (label: string): Promise<boolean> =>
 export const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "ogg"];
 
 export const pickAudioPath = async (): Promise<string | null> => open({ filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }] });
+
+/** The file's sha256 (hashed in Rust: no fs scope needed for audio files), or null when it can't be read. */
+export const audioSha256 = (path: string): Promise<string | null> => invoke("audio_sha256", { path });
 
 /** True when there's no file at `path` yet, or the user agrees to overwrite it. */
 export const canWrite = async (path: string): Promise<boolean> =>

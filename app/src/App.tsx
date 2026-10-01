@@ -4,9 +4,11 @@ import { emptySong, type Song, type SongMeter } from "./model/song";
 import { Editor } from "./ui/Editor";
 import { Importer } from "./ui/Importer";
 import {
+  audioSha256,
   confirmDiscard,
   exportSong,
   isDirty,
+  pickAudioPath,
   pickOpenPath,
   pickSavePath,
   printSong,
@@ -35,6 +37,7 @@ function App() {
   const [settings, setSettings] = useState<Settings>(() => parseSettings(null));
   // ponytail: the meter is only chosen for new songs; changing it on an existing song would invalidate every bar.
   const [newMeter, setNewMeter] = useState("4/4");
+  const [audioNotice, setAudioNotice] = useState<string | null>(null);
   const isSongDirty = isDirty(song, savedSong);
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
@@ -87,6 +90,28 @@ function App() {
     if (p !== null) await saveTo(p);
   };
   const saveSong = () => (path === null ? saveAs() : saveTo(path));
+  const locateAudio = async () => {
+    const p = await pickAudioPath();
+    if (p === null) return;
+    const sha256 = await audioSha256(p);
+    if (sha256 === null) fail(new Error(`Can't read ${p}`));
+    else history.apply((s) => ({ ...s, audio: { ...s.audio, path: p, sha256 } }));
+  };
+
+  // Checked after the song is shown, and again whenever the reference changes (locate, undo).
+  useEffect(() => {
+    setAudioNotice(null);
+    const audio = song.audio;
+    if (audio === undefined) return;
+    let isCurrent = true;
+    void audioSha256(audio.path).then((sha256) => {
+      if (!isCurrent || sha256 === audio.sha256) return;
+      setAudioNotice(sha256 === null ? `Audio file not found: ${audio.path}` : `Audio file has changed since the transcription: ${audio.path}`);
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [song.audio]);
 
   useEffect(() => {
     readConfigJson(SETTINGS).then((json) => setSettings(parseSettings(json)));
@@ -167,6 +192,14 @@ function App() {
       <Importer onResult={(p) => void openSong(p)} />
       <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
       {error !== null && <p role="alert">{error}</p>}
+      {audioNotice !== null && (
+        <p role="status">
+          <span>{audioNotice}</span>{" "}
+          <button type="button" onClick={locateAudio}>
+            Locate audio…
+          </button>
+        </p>
+      )}
       <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} lowConfidenceThreshold={settings.lowConfidenceThreshold} />
     </main>
   );
