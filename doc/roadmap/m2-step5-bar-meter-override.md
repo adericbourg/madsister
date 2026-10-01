@@ -15,6 +15,7 @@ M1-6, M1-10.
 - Command `setBarMeter(song, barRef, meter | null)`: resizes the bar's slots to the new beat count (truncate from the end, or extend the
   last slot); `null` or a meter equal to the song's removes the override.
 - UI: shortcut + a small control in the bar's context; the bar shows its meter (e.g. `2/4`) when overridden, also in print.
+  The user often has 2-beat break bars (see `BACKLOG.md`): "make this bar 2 beats" must be a single shortcut.
 
 ## Tests
 - Command tests (shrink, grow, reset); render shows the meter label.

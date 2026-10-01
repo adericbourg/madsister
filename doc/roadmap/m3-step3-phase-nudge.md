@@ -18,6 +18,8 @@ M3-1.
   shifted boundary. Meter overrides and bars without `startSec`: define the behaviour explicitly (probably: refuse with a message if the song
   has overrides — `ponytail:` comment).
 - Toolbar buttons "Phase −1 / +1 beat".
+- Also offer the shift **from the cursor bar onward** (not only the whole song): after an undetected 2-beat break bar the
+  phase is wrong only from that point (see `BACKLOG.md`).
 
 ## Tests
 - A song whose chords change on beat 2 of every bar → +1/−1 fixes it; round-trip −1 then +1 returns the original.
