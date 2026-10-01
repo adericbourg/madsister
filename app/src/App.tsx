@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { emptySong, type Song, type SongMeter } from "./model/song";
 import { Editor } from "./ui/Editor";
+import { Importer } from "./ui/Importer";
 import {
   confirmDiscard,
   isDirty,
@@ -155,6 +156,7 @@ function App() {
           </details>
         )}
       </nav>
+      <Importer onResult={(p) => void openSong(p)} />
       <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
       {error !== null && <p role="alert">{error}</p>}
       <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} />

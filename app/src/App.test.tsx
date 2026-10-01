@@ -1,13 +1,24 @@
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { serializeSong, type Song } from "./model/song";
+import { transcribe } from "./ui/engine";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn(), confirm: vi.fn() }));
-vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), mkdir: vi.fn() }));
+vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn() }));
+vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn() }));
+const drop = vi.hoisted(() => ({ handler: (_: { payload: unknown }) => {} }));
+vi.mock("@tauri-apps/api/webview", () => ({
+  getCurrentWebview: () => ({
+    onDragDropEvent: async (handler: typeof drop.handler) => {
+      drop.handler = handler;
+      return () => {};
+    },
+  }),
+}));
 const setTitle = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ setTitle }) }));
 vi.mock("@tauri-apps/api/path", () => ({ appConfigDir: async () => "/config", join: async (...p: string[]) => p.join("/") }));
@@ -33,6 +44,8 @@ beforeEach(() => {
     files[String(path)] = String(text);
   });
   vi.mocked(confirm).mockResolvedValue(true);
+  vi.mocked(exists).mockResolvedValue(false);
+  vi.mocked(transcribe).mockResolvedValue(42);
 });
 
 test("App_rendersAnEmptySongGrid", () => {
@@ -81,6 +94,30 @@ test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
 
   // Then an empty song replaces the loaded one
   expect(await screen.findByRole("heading", { name: "Untitled" })).toBeDefined();
+});
+
+test("App_whenImportingAudio_loadsTheResultAndKeepsItOnError", async () => {
+  // Given the app, and the song the engine will write
+  render(<App />);
+  files["/music/blues.madsister.json"] = serializeSong(song);
+  const engineSays = (event: Parameters<Parameters<typeof transcribe>[4]>[0]) =>
+    act(() => vi.mocked(transcribe).mock.lastCall![4](event));
+
+  // When dropping the mp3 and the engine reports its result
+  await act(() => drop.handler({ payload: { type: "drop", paths: ["/music/blues.mp3"] } }));
+  await engineSays({ type: "result", path: "/music/blues.madsister.json" });
+
+  // Then the song is loaded and listed as recent
+  expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
+  expect(screen.getByRole("button", { name: "/music/blues.madsister.json" })).toBeDefined();
+
+  // When a second import fails
+  await act(() => drop.handler({ payload: { type: "drop", paths: ["/music/other.mp3"] } }));
+  await engineSays({ type: "error", message: "boom", stderr: "" });
+
+  // Then the error is shown and the song is kept
+  expect(screen.getByRole("alert").textContent).toContain("boom");
+  expect(screen.getByRole("heading", { name: "Blues" })).toBeDefined();
 });
 
 test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {

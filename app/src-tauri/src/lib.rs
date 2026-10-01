@@ -11,13 +11,13 @@ fn transcribe(
     audio_path: String,
     out_path: String,
     meter: Option<u8>,
+    sections: bool,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
     let mut argv = engine::engine_command();
-    argv.extend(["transcribe".into(), audio_path, "--out".into(), out_path]);
-    if let Some(meter) = meter {
-        argv.extend(["--meter".into(), meter.to_string()]);
-    }
+    argv.extend(engine::transcribe_args(
+        audio_path, out_path, meter, sections,
+    ));
     jobs.spawn(&argv, move |event| {
         let _ = on_event.send(event); // the window is gone: nothing to tell
     })

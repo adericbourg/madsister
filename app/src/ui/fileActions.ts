@@ -2,7 +2,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { appConfigDir, join } from "@tauri-apps/api/path";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
-import { mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { exists, mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { parseSong, serializeSong, type Song } from "../model/song";
 
 // ponytail: "json" rather than "madsister.json", macOS dialogs don't handle multi-dot extensions.
@@ -16,6 +16,14 @@ export const confirmDiscard = (): Promise<boolean> => confirm("Discard unsaved c
 
 export const confirmDeleteSection = (label: string): Promise<boolean> =>
   confirm(`Delete the section "${label}" and its chords?`, { kind: "warning" });
+
+export const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "ogg"];
+
+export const pickAudioPath = async (): Promise<string | null> => open({ filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }] });
+
+/** True when there's no file at `path` yet, or the user agrees to overwrite it. */
+export const canWrite = async (path: string): Promise<boolean> =>
+  !(await exists(path)) || confirm(`${path} already exists. Overwrite it?`, { kind: "warning" });
 
 export const pickOpenPath = async (): Promise<string | null> => open({ filters });
 

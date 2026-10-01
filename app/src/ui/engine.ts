@@ -8,16 +8,17 @@ export type EngineEvent =
   | { type: "error"; message: string; stderr: string }
   | { type: "cancelled" };
 
-/** Starts a transcription and returns its job id. Rejects when the engine can't be started. */
+/** Starts a transcription and returns its job id. Rejects when the engine can't be started. `sections`: all-in-one (slow). */
 export const transcribe = (
   audioPath: string,
   outPath: string,
   meter: 3 | 4 | null,
+  sections: boolean,
   onEvent: (event: EngineEvent) => void,
 ): Promise<number> => {
   const channel = new Channel<EngineEvent>();
   channel.onmessage = onEvent;
-  return invoke<number>("transcribe", { audioPath, outPath, meter, onEvent: channel });
+  return invoke<number>("transcribe", { audioPath, outPath, meter, sections, onEvent: channel });
 };
 
 export const cancel = (jobId: number): Promise<void> => invoke("cancel", { jobId });

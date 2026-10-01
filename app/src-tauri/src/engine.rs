@@ -51,6 +51,23 @@ pub fn engine_command() -> Vec<String> {
     }
 }
 
+/// `transcribe` arguments after the engine command. `sections`: all-in-one beats + sections (slow opt-in, ~18× madmom).
+pub fn transcribe_args(
+    audio_path: String,
+    out_path: String,
+    meter: Option<u8>,
+    sections: bool,
+) -> Vec<String> {
+    let mut args = vec!["transcribe".into(), audio_path, "--out".into(), out_path];
+    if let Some(meter) = meter {
+        args.extend(["--meter".into(), meter.to_string()]);
+    }
+    if sections {
+        args.extend(["--beats".into(), "allinone".into()]);
+    }
+    args
+}
+
 const TAIL_LINES: usize = 20;
 
 fn push_bounded(tail: &mut VecDeque<String>, line: String) {
@@ -167,6 +184,19 @@ mod tests {
                 message: "boom".into(),
                 stderr: String::new()
             }
+        );
+    }
+
+    #[test]
+    fn transcribe_args_adds_meter_and_allinone_only_when_asked() {
+        // Given / When / Then
+        let args = |meter, sections| {
+            transcribe_args("/a.mp3".into(), "/a.json".into(), meter, sections).join(" ")
+        };
+        assert_eq!(args(None, false), "transcribe /a.mp3 --out /a.json");
+        assert_eq!(
+            args(Some(3), true),
+            "transcribe /a.mp3 --out /a.json --meter 3 --beats allinone"
         );
     }
 

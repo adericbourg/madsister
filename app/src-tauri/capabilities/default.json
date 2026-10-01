@@ -21,6 +21,10 @@
       "allow": [{ "path": "$APPCONFIG/*" }, { "path": "$HOME/**/*.madsister.json" }]
     },
     {
+      "identifier": "fs:allow-exists",
+      "allow": [{ "path": "$HOME/**/*.madsister.json" }]
+    },
+    {
       "identifier": "fs:allow-mkdir",
       "allow": [{ "path": "$APPCONFIG" }]
     }
