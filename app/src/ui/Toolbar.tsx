@@ -5,12 +5,18 @@ import { transposeSong, type Spelling } from "../model/transpose";
 import type { useHistory } from "./useHistory";
 
 /** User preferences (spec F-ED-1, F-DS-1), stored in `<appConfigDir>/settings.json`, not in the song. */
-export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8 };
+export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number };
+
+const isThreshold = (v: unknown): v is number => typeof v === "number" && v >= 0 && v <= 1;
 
 /** Anything missing or invalid falls back to the default. */
 export const parseSettings = (json: unknown): Settings => {
   const raw = (typeof json === "object" && json !== null ? json : {}) as Record<string, unknown>;
-  return { style: raw.style === "intl" ? "intl" : "fr", barsPerRow: raw.barsPerRow === 2 || raw.barsPerRow === 8 ? raw.barsPerRow : 4 };
+  return {
+    style: raw.style === "intl" ? "intl" : "fr",
+    barsPerRow: raw.barsPerRow === 2 || raw.barsPerRow === 8 ? raw.barsPerRow : 4,
+    lowConfidenceThreshold: isThreshold(raw.lowConfidenceThreshold) ? raw.lowConfidenceThreshold : 0.5,
+  };
 };
 
 type FieldProps = {
@@ -85,6 +91,20 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
             <option>4</option>
             <option>8</option>
           </select>
+        </label>
+        <label>
+          Review chords below confidence{" "}
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={settings.lowConfidenceThreshold}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (e.target.value !== "" && isThreshold(n)) onSettingsChange({ ...settings, lowConfidenceThreshold: n });
+            }}
+          />
         </label>
       </fieldset>
       <fieldset>

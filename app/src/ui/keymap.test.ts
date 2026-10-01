@@ -38,6 +38,7 @@ const state = (cursor: SlotRef, more: Partial<EditorState> = {}): EditorState =>
   anchor: null,
   clipboard: [],
   barsPerRow: 2,
+  lowConfidenceThreshold: 0.5,
   ...more,
 });
 
@@ -80,6 +81,39 @@ test("keyToCommand_ofNavigationKeys_movesTheCursor", () => {
 
   // And a plain move clears the bar selection
   expect(keyToCommand(key("ArrowRight"), state(at(0, 0), { anchor: { section: 0, bar: 0 } }))).toMatchObject({ anchor: null });
+});
+
+test("keyToCommand_ofF8_jumpsToTheNextOrPreviousLowConfidenceSlotWrappingAround", () => {
+  // Given low-confidence slots at Verse bar 2 slot 2 (0.2) and Chorus bar 1 (0.4), and a confident one (0.5) at Verse bar 1
+  const verse = song.sections[0];
+  const flagged: Song = {
+    ...song,
+    sections: [
+      {
+        ...verse,
+        bars: [
+          { chords: [{ chord: "C:maj", beats: 4, confidence: 0.5 }] },
+          { chords: [{ chord: "F:maj", beats: 2 }, { chord: "G:maj", beats: 2, confidence: 0.2 }] },
+          verse.bars[2],
+        ],
+      },
+      { ...song.sections[1], bars: [{ chords: [{ chord: "N", beats: 4, confidence: 0.4 }] }] },
+      song.sections[2],
+    ],
+  };
+  const f8 = (cursor: SlotRef, shift = false, threshold = 0.5) =>
+    moveTo(state(cursor, { song: flagged, lowConfidenceThreshold: threshold }), key("F8", { shift }));
+
+  // Then F8 goes forward, Shift+F8 backward, both wrapping around the song
+  expect(f8(at(0, 0))).toEqual(at(0, 1, 1));
+  expect(f8(at(0, 1, 1))).toEqual(at(1, 0));
+  expect(f8(at(2, 0))).toEqual(at(0, 1, 1));
+  expect(f8(at(0, 1, 1), true)).toEqual(at(1, 0));
+  expect(f8(at(1, 0), true)).toEqual(at(0, 1, 1));
+
+  // And the threshold decides what is flagged; with nothing flagged, the key is refused
+  expect(f8(at(1, 0), false, 0.3)).toEqual(at(0, 1, 1));
+  expect(f8(at(0, 0), false, 0.1)).toEqual({ kind: "refused" });
 });
 
 test("keyToCommand_ofShiftArrows_extendsTheBarSelectionWithinTheSection", () => {

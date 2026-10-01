@@ -249,7 +249,7 @@ describe("section commands", () => {
 });
 
 describe("copyBars / pasteBars", () => {
-  test("pasteBars_ofTwoCopiedBars_insertsThemInOrderWithoutStartSec", () => {
+  test("pasteBars_ofTwoCopiedBars_insertsThemInOrderWithoutStartSecOrConfidence", () => {
     // Given
     const song = fixture();
     const bars = copyBars(song, { section: 0, bar: 0 }, { section: 0, bar: 1 });
@@ -262,6 +262,8 @@ describe("copyBars / pasteBars", () => {
     expect(chords(result, 1)).toEqual(["G:maj", "F:maj", "A:min E:7", "C:maj"]);
     expect(result.sections[1].bars.map((b) => b.startSec)).toEqual([4, 6, undefined, undefined]);
     expect(result.sections[1].bars[2]).not.toHaveProperty("startSec");
+    // A pasted chord is the user's decision: it is no longer flagged as low-confidence
+    expect(result.sections[1].bars[2].chords[0]).not.toHaveProperty("confidence");
     expect(chords(before, 1)).toEqual(["A:min E:7", "C:maj", "G:maj", "F:maj"]);
   });
 

@@ -19,7 +19,14 @@ import {
 import type { Bar, Song } from "../model/song";
 
 export type KeyInput = { key: string; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean };
-export type EditorState = { song: Song; cursor: SlotRef; anchor: BarRef | null; clipboard: readonly Bar[]; barsPerRow: number };
+export type EditorState = {
+  song: Song;
+  cursor: SlotRef;
+  anchor: BarRef | null;
+  clipboard: readonly Bar[];
+  barsPerRow: number;
+  lowConfidenceThreshold: number;
+};
 export type Command =
   | { kind: "move"; cursor: SlotRef; anchor: BarRef | null }
   | { kind: "edit"; song: Song; cursor: SlotRef }
@@ -33,6 +40,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["← → ↑ ↓", "Move between slots and rows"],
   ["Home / End", "First / last slot of the section"],
   ["Type a chord, Enter or Tab", "Set the chord and go to the next slot (Escape cancels)"],
+  ["F8 / Shift+F8", "Next / previous low-confidence chord"],
   ["/", "Split the slot"],
   ["Backspace", "Merge the slot with the previous one"],
   ["Alt+← / Alt+→", "Shrink / grow the slot by one beat"],
@@ -69,6 +77,21 @@ const positions = (song: Song): SlotRef[] =>
       ? [{ section: s, bar: 0, slot: 0 }]
       : section.bars.flatMap((bar, b) => bar.chords.map((_, slot) => ({ section: s, bar: b, slot }))),
   );
+
+const isFlagged = (song: Song, { section, bar, slot }: SlotRef, threshold: number) => {
+  const confidence = song.sections[section].bars[bar]?.chords[slot].confidence;
+  return confidence !== undefined && confidence < threshold;
+};
+
+/** Number of slots whose engine confidence is below the threshold (spec F-ED-8). */
+export const countFlagged = (song: Song, threshold: number): number => positions(song).filter((p) => isFlagged(song, p, threshold)).length;
+
+/** The next (or previous) flagged slot after the cursor, wrapping around the song. */
+const nextFlagged = (song: Song, cursor: SlotRef, threshold: number, step: 1 | -1): SlotRef | undefined => {
+  const all = step === 1 ? positions(song) : positions(song).reverse();
+  const i = all.findIndex((p) => p.section === cursor.section && p.bar === cursor.bar && p.slot === cursor.slot);
+  return [...all.slice(i + 1), ...all.slice(0, i + 1)].find((p) => isFlagged(song, p, threshold));
+};
 
 export const nextSlot = (song: Song, cursor: SlotRef, step: 1 | -1): SlotRef => {
   const all = positions(song);
@@ -168,6 +191,11 @@ const commandFor = (e: KeyInput, state: EditorState): Command | null => {
       return { kind: "help" };
     case "F2":
       return { kind: "rename" };
+    case "F8": {
+      const target = nextFlagged(song, cursor, state.lowConfidenceThreshold, e.shiftKey ? -1 : 1);
+      if (target === undefined) throw new Error("no low-confidence chord"); // refused
+      return move(target);
+    }
   }
   const isPrintable = e.key.length === 1 && e.key.trim() !== "";
   return isPrintable && song.sections[section].bars.length > 0 ? { kind: "type", text: e.key } : null;

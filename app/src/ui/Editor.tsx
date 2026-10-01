@@ -6,14 +6,14 @@ import type { Bar, Song } from "../model/song";
 import { confirmDeleteSection } from "./fileActions";
 import { Grid } from "./Grid";
 import { Field } from "./Toolbar";
-import { clampCursor, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
+import { clampCursor, countFlagged, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
 import type { useHistory } from "./useHistory";
 
-type Props = { history: ReturnType<typeof useHistory>; barsPerRow: 2 | 4 | 8; style: DisplayStyle };
+type Props = { history: ReturnType<typeof useHistory>; barsPerRow: 2 | 4 | 8; style: DisplayStyle; lowConfidenceThreshold: number };
 type Draft = { kind: "chord" | "label"; text: string; error?: string };
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, style }: Props) => {
+export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: Props) => {
   const { song } = history;
   const [rawCursor, setCursor] = useState<SlotRef>({ section: 0, bar: 0, slot: 0 });
   const [anchor, setAnchor] = useState<BarRef | null>(null);
@@ -24,9 +24,10 @@ export const Editor = ({ history, barsPerRow, style }: Props) => {
   const helpOpener = useRef<HTMLElement | null>(null);
   // Undo/redo and structural edits can leave the cursor dangling: always read it clamped.
   const cursor = clampCursor(song, rawCursor);
+  const flaggedCount = countFlagged(song, lowConfidenceThreshold);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const command = keyToCommand(e, { song, cursor, anchor, clipboard, barsPerRow });
+    const command = keyToCommand(e, { song, cursor, anchor, clipboard, barsPerRow, lowConfidenceThreshold });
     if (command === null) return;
     e.preventDefault();
     setNotice(command.kind === "refused" ? "Not possible here" : "");
@@ -169,6 +170,7 @@ export const Editor = ({ history, barsPerRow, style }: Props) => {
         barsPerRow={barsPerRow}
         style={style}
         cursor={cursor}
+        lowConfidenceThreshold={lowConfidenceThreshold}
         selection={anchor ? selectedBars({ cursor, anchor }) : undefined}
         editor={editor}
         onKeyDown={onKeyDown}
@@ -178,6 +180,9 @@ export const Editor = ({ history, barsPerRow, style }: Props) => {
           setDraft(null);
         }}
       />
+      <p aria-live="polite" className="review-status">
+        {flaggedCount === 0 ? "No chords to review" : `${flaggedCount} chord${flaggedCount === 1 ? "" : "s"} to review`}
+      </p>
       <p role="status" className="visually-hidden">
         {notice}
       </p>

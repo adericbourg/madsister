@@ -159,7 +159,7 @@ function App() {
       <Importer onResult={(p) => void openSong(p)} />
       <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
       {error !== null && <p role="alert">{error}</p>}
-      <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} />
+      <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} lowConfidenceThreshold={settings.lowConfidenceThreshold} />
     </main>
   );
 }

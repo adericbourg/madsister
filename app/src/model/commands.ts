@@ -134,7 +134,9 @@ export const copyBars = (song: Song, from: BarRef, to: BarRef): Bar[] => {
 /** Pasted bars lose `startSec`; a bar whose beats don't match the song meter gets a `meter` override. */
 export const pasteBars = (song: Song, ref: BarRef, bars: readonly Bar[], position: "before" | "after"): Song => {
   at(song.sections, ref.section, "section");
-  const pasted = bars.map(({ startSec: _, ...bar }): Bar => {
+  // A pasted chord is the user's decision, like a typed one: it loses its low-confidence flag.
+  const pasted = bars.map(({ startSec: _, ...copied }): Bar => {
+    const bar = { ...copied, chords: copied.chords.map(({ confidence: _, ...slot }) => slot) };
     const beats = bar.chords.reduce((sum, slot) => sum + slot.beats, 0);
     return bar.meter || beats === song.meta.meter.beats ? bar : { ...bar, meter: { beats, unit: song.meta.meter.unit } };
   });

@@ -16,7 +16,7 @@ const Harness = ({ from = emptySong }: { from?: () => Song }) => {
   const [initial] = useState(from);
   const history = useHistory(initial);
   song = history.song;
-  return <Editor history={history} barsPerRow={4} style="fr" />;
+  return <Editor history={history} barsPerRow={4} style="fr" lowConfidenceThreshold={0.5} />;
 };
 
 const bar = (...chords: [string, number][]) => ({ chords: chords.map(([chord, beats]) => ({ chord, beats })) });
@@ -124,4 +124,40 @@ test("Editor_whenUsingTheSectionControls_editsTheCursorSection", async () => {
 
   // Then only the accepted deletion happens
   await vi.waitFor(() => expect(song?.sections.map((s) => s.label)).toEqual(["Song"]));
+});
+
+test("Editor_whenReviewingLowConfidenceChords_jumpsToThemAndCountsDown", async () => {
+  // Given a transcription with two low-confidence chords (bars 2 and 4) and the cursor on bar 1
+  const user = userEvent.setup();
+  const flagged = (chord: string, confidence: number) => ({ chords: [{ chord, beats: 4, confidence }] });
+  render(
+    <Harness
+      from={() => ({
+        version: 1,
+        meta: { title: "Song", meter: { beats: 4, unit: 4 } },
+        sections: [{ id: "v", label: "Verse", bars: [flagged("C:maj", 0.9), flagged("G:maj", 0.3), bar(["A:min", 4]), flagged("F:maj", 0.1)] }],
+      })}
+    />,
+  );
+  const review = screen.getByText("2 chords to review");
+  expect(review.getAttribute("aria-live")).toBe("polite");
+
+  // When pressing F8, Then the cursor jumps to the first flagged chord
+  await user.keyboard("{F8}");
+  expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G, low confidence" }));
+
+  // When confirming it by typing the same chord, Then its flag is cleared and the counter updates
+  await user.keyboard("G{Enter}");
+  expect(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" })).toBeDefined();
+  expect(review.textContent).toBe("1 chord to review");
+
+  // When pressing Shift+F8 from bar 3, Then it goes back to the previous flagged chord, wrapping around
+  await user.keyboard("{Shift>}{F8}{/Shift}");
+  expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 4, beat 1: F, low confidence" }));
+
+  // When correcting it, Then nothing is left to review and F8 is refused
+  await user.keyboard("Fmaj7{Enter}");
+  expect(review.textContent).toBe("No chords to review");
+  await user.keyboard("{F8}");
+  expect(screen.getByRole("status").textContent).toBe("Not possible here");
 });

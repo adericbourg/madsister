@@ -1,6 +1,6 @@
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
@@ -160,7 +160,14 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   // When switching to the French style, Then the chord is re-rendered and the setting saved
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
   expect(firstSlot().textContent).toBe("C7M");
-  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2 });
+  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5 });
+
+  // When raising the low-confidence threshold, Then the setting is saved; an out-of-range value is ignored
+  const threshold = screen.getByRole("spinbutton", { name: "Review chords below confidence" });
+  fireEvent.change(threshold, { target: { value: "0.7" } });
+  fireEvent.change(threshold, { target: { value: "2" } });
+  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.7 }));
+  expect((threshold as HTMLInputElement).value).toBe("0.7");
 
   // When transposing up twice with flats, then undoing once
   await user.selectOptions(screen.getByRole("combobox", { name: "Spelling" }), "flat");
