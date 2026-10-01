@@ -64,6 +64,15 @@ M6-1.
 - CI: `release.yml` publishes the snapshot with the `.deb` and the `.AppImage`, the clean-install job passes, and a second push
   leaves a single snapshot.
 
+## Results (2026-10-01, run 1, `36cb421`)
+- `release.yml` green on the first push: snapshot pre-release `v0.0.0-snapshot.1` with `madsister_0.0.0-snapshot.1_amd64.deb`
+  (46.7 MB: app, uv sidecar, engine sources, the 23 MB madmom wheel with its weights) and
+  `madsister_0.0.0-snapshot.1_amd64.AppImage` (173 MB: WebKitGTK and GStreamer bundled).
+- Durations: build job 9 min (Tauri build 7 min, madmom wheel 39 s); clean install in `ubuntu:24.04`: `apt install` of the deb
+  42 s, then engine setup (CPython, `uv sync`, Chord-CNN-LSTM download) and the transcription together 32 s on the runner's
+  network, transcription reading `C:maj`. The env takes ~680 MB (measured on macOS with the same groups).
+- The next push (the commit recording these results) must leave a single snapshot: checked on the releases page.
+
 ## Not done
 - The all-in-one opt-in (section detection) in the packaged app: it needs `--group beats-allinone` and `setup --sections`, and
   NATTEN builds from source on macOS. Until then, "Detect sections" fails in a packaged app with the engine's

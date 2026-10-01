@@ -1,5 +1,7 @@
 # M6 · Step 3 — macOS package (nice to have)
 
+> **Postponed (user, 2026-10-01).** Known macOS items: `NSMicrophoneUsageDescription` in `Info.plist` (M5-2), and the madmom and NATTEN source builds (ship CI-built wheels as M6-2 does for madmom on Linux; `release.yml` takes a `macos` job next to `linux`).
+
 > Coarse step. Refine before starting.
 
 ## Goal
