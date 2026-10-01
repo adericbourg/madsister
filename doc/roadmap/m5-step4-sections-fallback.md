@@ -1,6 +1,8 @@
 # M5 · Step 4 — Section detection (if not done yet)
 
-> Coarse step. Probably already covered by M0-6 + M0-3. Check first; if so, mark it `done (covered by M0)`.
+> Checked 2026-10-01: covered, no work needed. all-in-one (M0-6) gives labelled sections, `quantize.sections_from_segments`
+> (M0-3) snaps them to bars and falls back to a single "Song" section, and the import dialog's "Detect sections (slow)"
+> checkbox (M2-2) exposes it as the opt-in the user chose. A cheaper detector stays possible later if the slow path hurts.
 
 ## Goal
 F-ST-1: auto-detected labelled sections, with the single-section fallback.

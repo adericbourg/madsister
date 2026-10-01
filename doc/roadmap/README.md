@@ -91,7 +91,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M3-1 | [m3-step1-playback-cursor](m3-step1-playback-cursor.md) | done | 0ca8033 |
 | M3-2 | [m3-step2-click-seek](m3-step2-click-seek.md) | done | 2bf7c97 |
 | M3-3 | [m3-step3-phase-nudge](m3-step3-phase-nudge.md) | done | 87484ca |
-| M3-4 | [m3-step4-tempo-fix](m3-step4-tempo-fix.md) | done | this |
+| M3-4 | [m3-step4-tempo-fix](m3-step4-tempo-fix.md) | done | 2c3e7c1 |
 | M4-1 | [m4-step1-chordpro-grid](m4-step1-chordpro-grid.md) | done | 07bc88f |
 | M4-2 | [m4-step2-musicxml](m4-step2-musicxml.md) | done | 66778ac |
 | M4-3 | [m4-step3-midi](m4-step3-midi.md) | done | this |
@@ -101,7 +101,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M5-1 | [m5-step1-engine-fetch](m5-step1-engine-fetch.md) | done | 2f0cc01 |
 | M5-2 | [m5-step2-engine-record](m5-step2-engine-record.md) | done | this |
 | M5-3 | [m5-step3-sources-ui](m5-step3-sources-ui.md) | todo | |
-| M5-4 | [m5-step4-sections-fallback](m5-step4-sections-fallback.md) | todo | |
+| M5-4 | [m5-step4-sections-fallback](m5-step4-sections-fallback.md) | done (covered by M0-6 + M2-2) | |
 | M6-1 | [m6-step1-engine-setup-script](m6-step1-engine-setup-script.md) | todo | |
 | M6-2 | [m6-step2-linux-bundle](m6-step2-linux-bundle.md) | todo | |
 | M6-3 | [m6-step3-macos-bundle](m6-step3-macos-bundle.md) | todo | |
