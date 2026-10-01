@@ -50,13 +50,28 @@ beforeEach(() => {
   vi.mocked(transcribe).mockResolvedValue(42);
 });
 
-test("App_rendersAnEmptySongGrid", () => {
-  // Given / When
+const createGrid = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Create grid" }));
+
+test("App_onStart_offersANewGridOrAnAudioImportButNoGridNorParameters", async () => {
+  // Given / When the app just started
+  const user = userEvent.setup();
   render(<App />);
 
-  // Then
+  // Then both ways in are offered, without grid, parameters or song-specific actions
+  expect(screen.getByRole("button", { name: "Create grid" })).toBeDefined();
+  expect(screen.getByRole("button", { name: "Import audio…" })).toBeDefined();
+  expect(screen.queryByRole("grid")).toBeNull();
+  expect(screen.queryByRole("combobox", { name: "Chord style" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+
+  // When creating a grid
+  await createGrid(user);
+
+  // Then the empty song is shown with its parameters
   expect(screen.getByRole("heading", { name: "Untitled" })).toBeDefined();
   expect(screen.getAllByRole("gridcell", { name: /^Verse, bar \d, beat 1: no chord$/ })).toHaveLength(4);
+  expect(screen.getByRole("combobox", { name: "Chord style" })).toBeDefined();
+  expect(screen.queryByRole("button", { name: "Create grid" })).toBeNull();
 });
 
 test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
@@ -94,12 +109,14 @@ test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
   // When starting a new song with Mod+N
   await user.keyboard("{Control>}n{/Control}");
 
-  // Then an empty song replaces the loaded one
-  expect(await screen.findByRole("heading", { name: "Untitled" })).toBeDefined();
+  // Then the start screen replaces the loaded song
+  expect(await screen.findByRole("button", { name: "Create grid" })).toBeDefined();
+  expect(screen.queryByRole("grid")).toBeNull();
 });
 
-test("App_whenImportingAudio_loadsTheResultAndKeepsItOnError", async () => {
+test("App_whenImportingAudio_loadsTheResultAndReportsErrors", async () => {
   // Given the app, and the song the engine will write
+  const user = userEvent.setup();
   render(<App />);
   files["/music/blues.madsister.json"] = serializeSong(song);
   const engineSays = (event: Parameters<Parameters<typeof transcribe>[4]>[0]) =>
@@ -113,13 +130,14 @@ test("App_whenImportingAudio_loadsTheResultAndKeepsItOnError", async () => {
   expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
   expect(screen.getByRole("button", { name: "/music/blues.madsister.json" })).toBeDefined();
 
-  // When a second import fails
+  // When a second import fails, started from the start screen
+  await user.click(screen.getByRole("button", { name: "New" }));
   await act(() => drop.handler({ payload: { type: "drop", paths: ["/music/other.mp3"] } }));
   await engineSays({ type: "error", message: "boom", stderr: "" });
 
-  // Then the error is shown and the song is kept
+  // Then the error is shown on the start screen
   expect(screen.getByRole("alert").textContent).toContain("boom");
-  expect(screen.getByRole("heading", { name: "Blues" })).toBeDefined();
+  expect(screen.getByRole("button", { name: "Create grid" })).toBeDefined();
 });
 
 test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAudio", async () => {
@@ -168,6 +186,7 @@ test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   render(<App />);
+  await createGrid(user);
   expect(setTitle).toHaveBeenLastCalledWith("Untitled — madsister");
 
   // When saving it with Mod+S (no path yet: Save As)
@@ -195,6 +214,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   const user = userEvent.setup();
   files["/config/settings.json"] = '{"style":"intl","barsPerRow":2}';
   render(<App />);
+  await createGrid(user);
   await vi.waitFor(() => expect(screen.getAllByRole("row")).toHaveLength(2));
   await user.keyboard("Cmaj7{Enter}");
   const firstSlot = () => screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ });
@@ -249,8 +269,9 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(screen.queryByRole("alert")).toBeNull();
 
   // When starting a new 3/4 song and saving it
-  await user.selectOptions(screen.getByRole("combobox", { name: "New song meter" }), "3/4");
   await user.click(screen.getByRole("button", { name: "New" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "New song meter" }), "3/4");
+  await createGrid(user);
   vi.mocked(save).mockResolvedValueOnce("/waltz.madsister.json");
   await user.click(screen.getByRole("button", { name: "Save as…" }));
 
@@ -264,6 +285,7 @@ test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMus
   const user = userEvent.setup();
   const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
   render(<App />);
+  await createGrid(user);
 
   // When clicking Print, then pressing Mod+P from the grid
   await user.click(screen.getByRole("button", { name: "Print…" }));
@@ -306,6 +328,7 @@ test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () =>
   const user = userEvent.setup();
   files["/config/recent.json"] = '["/blues.madsister.json"]';
   render(<App />);
+  await createGrid(user);
   await screen.findByText("Recent");
 
   // When tabbing forward past the end

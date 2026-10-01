@@ -34,6 +34,7 @@ function App() {
   const { song } = history;
   const [savedSong, setSavedSong] = useState(initial);
   const [path, setPath] = useState<string | null>(null);
+  const [hasSong, setHasSong] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(() => parseSettings(null));
@@ -55,12 +56,17 @@ function App() {
     history.reset(next);
     setSavedSong(next);
     setPath(nextPath);
+    setHasSong(true);
     setError(null);
   };
   const canDiscard = async () => !isSongDirty || (await confirmDiscard());
 
+  const createGrid = () => load(emptySong(METERS[newMeter]), null);
+  // Back to the start screen; the song is reset so that it isn't dirty or autosaved behind it.
   const newSong = async () => {
-    if (await canDiscard()) load(emptySong(METERS[newMeter]), null);
+    if (!(await canDiscard())) return;
+    load(emptySong(), null);
+    setHasSong(false);
   };
   const openSong = async (from?: string) => {
     if (!(await canDiscard())) return;
@@ -135,8 +141,9 @@ function App() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
-      const action = { n: newSong, o: () => openSong(), p: printSong, s: e.shiftKey ? saveAs : saveSong }[e.key.toLowerCase()];
-      if (action === undefined) return;
+      const key = e.key.toLowerCase();
+      const action = { n: newSong, o: () => openSong(), p: printSong, s: e.shiftKey ? saveAs : saveSong }[key];
+      if (action === undefined || (!hasSong && "ps".includes(key))) return;
       e.preventDefault();
       void action();
     };
@@ -147,41 +154,42 @@ function App() {
   return (
     <main>
       <nav aria-label="File">
-        <label>
-          New song meter{" "}
-          <select value={newMeter} onChange={(e) => setNewMeter(e.target.value)}>
-            {Object.keys(METERS).map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={newSong}>
-          New
-        </button>
-        <button type="button" onClick={() => openSong()}>
-          Open…
-        </button>
-        <button type="button" onClick={saveSong}>
-          Save
-        </button>
-        <button type="button" onClick={saveAs}>
-          Save as…
-        </button>
-        <button type="button" onClick={printSong}>
-          Print…
-        </button>
-        <span role="group" aria-label="Export">
-          Export{" "}
-          <button type="button" onClick={() => exportSong(song, "ChordPro", "cho", toChordPro).catch(fail)}>
-            ChordPro…
+        {hasSong && (
+          <>
+            <button type="button" onClick={newSong}>
+              New
+            </button>
+            <button type="button" onClick={() => openSong()}>
+              Open…
+            </button>
+            <button type="button" onClick={saveSong}>
+              Save
+            </button>
+            <button type="button" onClick={saveAs}>
+              Save as…
+            </button>
+            <button type="button" onClick={printSong}>
+              Print…
+            </button>
+            <span role="group" aria-label="Export">
+              Export{" "}
+              <button type="button" onClick={() => exportSong(song, "ChordPro", "cho", toChordPro).catch(fail)}>
+                ChordPro…
+              </button>
+              <button type="button" onClick={() => exportSong(song, "MusicXML", "musicxml", toMusicXml).catch(fail)}>
+                MusicXML…
+              </button>
+              <button type="button" onClick={() => exportSong(song, "MIDI", "mid", toMidi).catch(fail)}>
+                MIDI…
+              </button>
+            </span>
+          </>
+        )}
+        {!hasSong && (
+          <button type="button" onClick={() => openSong()}>
+            Open…
           </button>
-          <button type="button" onClick={() => exportSong(song, "MusicXML", "musicxml", toMusicXml).catch(fail)}>
-            MusicXML…
-          </button>
-          <button type="button" onClick={() => exportSong(song, "MIDI", "mid", toMidi).catch(fail)}>
-            MIDI…
-          </button>
-        </span>
+        )}
         {recent.length > 0 && (
           <details>
             <summary>Recent</summary>
@@ -197,20 +205,44 @@ function App() {
           </details>
         )}
       </nav>
-      <EngineSetup>
-        <Importer onResult={(p) => void openSong(p)} />
-      </EngineSetup>
-      <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
       {error !== null && <p role="alert">{error}</p>}
-      {audioNotice !== null && (
-        <p role="status">
-          <span>{audioNotice}</span>{" "}
-          <button type="button" onClick={locateAudio}>
-            Locate audio…
-          </button>
-        </p>
+      {hasSong ? (
+        <>
+          <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
+          {audioNotice !== null && (
+            <p role="status">
+              <span>{audioNotice}</span>{" "}
+              <button type="button" onClick={locateAudio}>
+                Locate audio…
+              </button>
+            </p>
+          )}
+          <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} lowConfidenceThreshold={settings.lowConfidenceThreshold} />
+        </>
+      ) : (
+        <div className="start">
+          <section aria-labelledby="new-grid-title">
+            <h2 id="new-grid-title">New grid</h2>
+            <label>
+              New song meter{" "}
+              <select value={newMeter} onChange={(e) => setNewMeter(e.target.value)}>
+                {Object.keys(METERS).map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>
+            </label>{" "}
+            <button type="button" onClick={createGrid}>
+              Create grid
+            </button>
+          </section>
+          <section aria-labelledby="import-title">
+            <h2 id="import-title">Import audio</h2>
+            <EngineSetup>
+              <Importer onResult={(p) => void openSong(p)} />
+            </EngineSetup>
+          </section>
+        </div>
       )}
-      <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} lowConfidenceThreshold={settings.lowConfidenceThreshold} />
     </main>
   );
 }
