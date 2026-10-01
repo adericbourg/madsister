@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
 import {
   deleteBar,
+  doubleTempo,
   duplicateBar,
+  halveTempo,
   insertBar,
   mergeSlotWithNext,
   moveSection,
@@ -177,6 +179,9 @@ test("keyToCommand_ofEditShortcuts_appliesTheCommandAndPlacesTheCursor", () => {
   // And < / > shift the bar lines one beat earlier / later from the cursor bar on
   expect(edit(key("<"))).toEqual({ kind: "edit", song: shiftPhase(song, -1, bar), cursor: at(0, 1, 0) });
   expect(edit(key(">", { shift: true }))).toEqual({ kind: "edit", song: shiftPhase(song, 1, bar), cursor: at(0, 1, 0) });
+  // And - / + halve / double the tempo from the cursor bar on
+  expect(edit(key("-"))).toEqual({ kind: "edit", song: halveTempo(song, bar), cursor: at(0, 1, 0) });
+  expect(edit(key("+", { shift: true }))).toEqual({ kind: "edit", song: doubleTempo(song, bar), cursor: at(0, 1, 0) });
   const jig: Song = { ...song, meta: { ...song.meta, meter: { beats: 6, unit: 8 } }, sections: [{ id: "j", label: "A", bars: [{ chords: [{ chord: "D:maj", beats: 6 }] }] }] };
   expect(edit(key("b", { mod: true }), state(at(0, 0), { song: jig }))).toMatchObject({
     song: { sections: [{ bars: [{ meter: { beats: 3, unit: 8 }, chords: [{ chord: "D:maj", beats: 3 }] }] }] },

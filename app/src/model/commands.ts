@@ -160,6 +160,29 @@ export const pasteBars = (song: Song, ref: BarRef, bars: readonly Bar[], positio
 };
 
 type Beat = { readonly slot: ChordSlot; readonly sec?: number; readonly section: number };
+type TimedBar = { readonly bar: Bar; readonly s: number; readonly b: number; readonly beats: readonly Beat[]; readonly period?: number };
+
+/**
+ * The bars from `from` to the end of the song, each with its beats. Beat times are interpolated between bar starts; when
+ * the next bar has no time (or for the last bar) the last timed period carries on. A bar without `startSec` has untimed beats.
+ */
+const barsFrom = (song: Song, from: BarRef): TimedBar[] => {
+  barAt(song, from);
+  const all = song.sections.flatMap((section, s) => section.bars.map((bar, b) => ({ bar, s, b })));
+  let period: number | undefined;
+  const timed = all.map(({ bar, s, b }, i): TimedBar => {
+    const { startSec } = bar;
+    const next = all[i + 1]?.bar.startSec;
+    if (startSec !== undefined && next !== undefined) period = (next - startSec) / (bar.meter ?? song.meta.meter).beats;
+    const beats = bar.chords.flatMap((slot) => Array.from({ length: slot.beats }, () => slot)).map((slot, j) => ({
+      slot,
+      section: s,
+      sec: startSec === undefined || (j > 0 && period === undefined) ? undefined : startSec + j * (period ?? 0),
+    }));
+    return { bar, s, b, beats, period };
+  });
+  return timed.slice(timed.findIndex(({ s, b }) => s === from.section && b === from.bar));
+};
 
 /** Consecutive beats of the same chord make one slot; a merged slot keeps the lowest confidence (the most doubtful). */
 const toSlots = (beats: readonly Beat[]): ChordSlot[] =>
@@ -171,6 +194,26 @@ const toSlots = (beats: readonly Beat[]): ChordSlot[] =>
     return [...slots.slice(0, -1), { ...last, beats: last.beats + 1, confidence }];
   }, []);
 
+/** A bar made of `beats`, with a meter override when it isn't as long as the song meter. */
+const toBar = (song: Song, beats: readonly Beat[]): Bar => {
+  const bar: Bar = { startSec: beats[0].sec, chords: toSlots(beats) };
+  const { beats: size, unit } = song.meta.meter;
+  return beats.length === size ? bar : { ...bar, meter: { beats: beats.length, unit } };
+};
+
+/** Replaces the bars from `from` to the end of the song with `bars`, each going to its section. */
+const replaceFrom = (song: Song, from: BarRef, bars: readonly { section: number; bar: Bar }[]): Song => ({
+  ...song,
+  sections: song.sections.map((section, s) =>
+    s < from.section
+      ? section
+      : {
+          ...section,
+          bars: [...(s === from.section ? section.bars.slice(0, from.bar) : []), ...bars.filter((b) => b.section === s).map((b) => b.bar)],
+        },
+  ),
+});
+
 /**
  * Moves every bar line from bar `from` (default: the first bar) to the end of the song by `delta` beats (spec F-PB-3):
  * +1 = the downbeats come one beat later. Beats are slot beats (eighths in 6/8). The range is re-cut into bars of the song
@@ -180,46 +223,52 @@ const toSlots = (beats: readonly Beat[]): ChordSlot[] =>
  * the bar line its first bar line moved to.
  */
 export const shiftPhase = (song: Song, delta: 1 | -1, from: BarRef = { section: 0, bar: 0 }): Song => {
-  barAt(song, from);
-  const { beats: size, unit } = song.meta.meter;
-  const all = song.sections.flatMap((section, s) => section.bars.map((bar, b) => ({ bar, s, b })));
-  const first = all.findIndex(({ s, b }) => s === from.section && b === from.bar);
-  const lengths = all.slice(first).map(({ bar }) => (bar.meter ?? song.meta.meter).beats);
+  const size = song.meta.meter.beats;
+  const range = barsFrom(song, from);
+  const lengths = range.map(({ bar }) => (bar.meter ?? song.meta.meter).beats);
   // ponytail: a bar with its own meter inside the range is refused rather than kept; handle it if break bars get detected.
   if (lengths.some((n, i) => n > size || (n < size && i > 0 && i < lengths.length - 1)))
     throw new Error("the phase can't be shifted across a bar with its own meter");
 
-  let period: number | undefined;
-  const beats = all.flatMap(({ bar, bar: { startSec }, s }, i): Beat[] => {
-    const next = all[i + 1]?.bar.startSec;
-    if (startSec !== undefined && next !== undefined) period = (next - startSec) / (bar.meter ?? song.meta.meter).beats;
-    if (i < first) return [];
-    return bar.chords.flatMap((slot) => Array.from({ length: slot.beats }, () => slot)).map((slot, j) => ({
-      slot,
-      section: s,
-      sec: startSec === undefined || (j > 0 && period === undefined) ? undefined : startSec + j * (period ?? 0),
-    }));
-  });
-
+  const beats = range.flatMap((t) => t.beats);
   const phase = (((lengths[0] < size ? lengths[0] : 0) + delta) % size + size) % size;
   const starts = phase > 0 ? [0] : [];
   for (let q = phase; q < beats.length; q += size) starts.push(q);
-  const bars = starts.map((q, i) => {
-    const part = beats.slice(q, starts[i + 1] ?? beats.length);
-    const bar: Bar = { startSec: part[0].sec, chords: toSlots(part) };
-    const section = beats[Math.min(Math.max(q - delta, 0), beats.length - 1)].section;
-    return { section, bar: part.length === size ? bar : { ...bar, meter: { beats: part.length, unit } } };
-  });
+  const bars = starts.map((q, i) => ({
+    section: beats[Math.min(Math.max(q - delta, 0), beats.length - 1)].section,
+    bar: toBar(song, beats.slice(q, starts[i + 1] ?? beats.length)),
+  }));
+  return replaceFrom(song, from, bars);
+};
 
-  return {
-    ...song,
-    sections: song.sections.map((section, s) =>
-      s < from.section
-        ? section
-        : {
-            ...section,
-            bars: [...(s === from.section ? section.bars.slice(0, from.bar) : []), ...bars.filter((b) => b.section === s).map((b) => b.bar)],
-          },
-    ),
-  };
+// The song tempo only changes when the whole song does.
+const scaleTempo = (song: Song, from: BarRef, factor: number): Song => {
+  const { tempoBpm } = song.meta;
+  const isWholeSong = from.section === 0 && from.bar === 0;
+  return isWholeSong && tempoBpm !== undefined ? { ...song, meta: { ...song.meta, tempoBpm: tempoBpm * factor } } : song;
+};
+
+/**
+ * Fixes a double tempo (spec F-PB-4): from bar `from` (default: the first bar) on, bars are merged two by two within each
+ * section and every two beats make one, taking the chord and time of the first. So a chord change on an odd beat moves to
+ * the next beat, and a 1-beat chord there is dropped. A section's odd last bar becomes a half bar (meter override).
+ */
+export const halveTempo = (song: Song, from: BarRef = { section: 0, bar: 0 }): Song => {
+  const range = barsFrom(song, from);
+  const bars = range.flatMap(({ s, b, beats }, i) => {
+    if ((b - (s === from.section ? from.bar : 0)) % 2 === 1) return [];
+    const next = range[i + 1];
+    const pair = next?.s === s ? [...beats, ...next.beats] : beats;
+    return [{ section: s, bar: toBar(song, pair.filter((_, j) => j % 2 === 0)) }];
+  });
+  return scaleTempo(replaceFrom(song, from, bars), from, 0.5);
+};
+
+/** Fixes a half tempo (spec F-PB-4): from bar `from` on, each bar is split in two bars of its meter, every beat becoming two. */
+export const doubleTempo = (song: Song, from: BarRef = { section: 0, bar: 0 }): Song => {
+  const bars = barsFrom(song, from).flatMap(({ s, beats, period }) => {
+    const halves = beats.flatMap((beat) => [beat, { ...beat, sec: beat.sec === undefined || period === undefined ? undefined : beat.sec + period / 2 }]);
+    return [halves.slice(0, beats.length), halves.slice(beats.length)].map((part) => ({ section: s, bar: toBar(song, part) }));
+  });
+  return scaleTempo(replaceFrom(song, from, bars), from, 2);
 };

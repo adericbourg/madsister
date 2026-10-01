@@ -214,6 +214,36 @@ test("Editor_whenShiftingThePhase_movesTheBarLinesInOneUndoableStep", async () =
   expect(screen.getByRole("status").textContent).toBe("the phase can't be shifted across a bar with its own meter");
 });
 
+test("Editor_whenFixingTheTempo_mergesOrSplitsBarsInOneUndoableStep", async () => {
+  // Given a 120 BPM song of 4 bars
+  const user = userEvent.setup();
+  const original: Song = {
+    version: 1,
+    meta: { title: "Song", tempoBpm: 120, meter: { beats: 4, unit: 4 } },
+    sections: [{ id: "v", label: "Verse", bars: [bar(["A:min", 4]), bar(["C:maj", 4]), bar(["G:maj", 4]), bar(["F:maj", 4])] }],
+  };
+  render(<Harness from={() => original} />);
+  const chords = () => song?.sections[0].bars.map((b) => b.chords.map((c) => `${c.chord}:${c.beats}`).join(" "));
+
+  // When halving the whole song's tempo, Then bars are merged two by two at 60 BPM
+  await user.click(screen.getByRole("button", { name: "Whole song half tempo" }));
+  expect(chords()).toEqual(["A:min:2 C:maj:2", "G:maj:2 F:maj:2"]);
+  expect(song?.meta.tempoBpm).toBe(60);
+
+  // When undoing, Then the song is back in one step
+  screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ }).focus();
+  await user.keyboard("{Control>}z{/Control}");
+  expect(song).toBe(original);
+
+  // When doubling the tempo from bar 4, Then only bar 4 is split
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 4, beat 1: F" }));
+  await user.click(screen.getByRole("button", { name: "From this bar double tempo" }));
+  expect(chords()).toEqual(["A:min:4", "C:maj:4", "G:maj:4", "F:maj:4", "F:maj:4"]);
+  expect(song?.meta.tempoBpm).toBe(120);
+  expect(screen.getByRole("button", { name: "Whole song double tempo" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "From this bar half tempo" })).toBeTruthy();
+});
+
 test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   // Given a transcribed song (bars at 0, 2, 4, 6 s plus a manually added bar) and a fake media element (jsdom has none)
   const user = userEvent.setup();

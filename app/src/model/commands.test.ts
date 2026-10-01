@@ -4,7 +4,9 @@ import {
   copyBars,
   deleteBar,
   deleteSection,
+  doubleTempo,
   duplicateBar,
+  halveTempo,
   insertBar,
   mergeSlotWithNext,
   moveSection,
@@ -426,5 +428,86 @@ describe("shiftPhase", () => {
     expect(shape(wrong)).not.toEqual(shape(reference));
     expect(fixed.sections[0].bars.map((b) => b.chords)).toEqual(reference.sections[0].bars.map((b) => b.chords));
     fixed.sections[0].bars.forEach((b, i) => expect(b.startSec).toBeCloseTo(reference.sections[0].bars[i].startSec ?? NaN, 9));
+  });
+});
+
+describe("halveTempo / doubleTempo", () => {
+  const frozen = (sections: unknown[], tempoBpm = 120): Song =>
+    deepFreeze(parseSong({ version: 1, meta: { title: "t", tempoBpm, meter: { beats: 4, unit: 4 } }, sections }));
+  const shape = (song: Song) =>
+    song.sections.map((s) => s.bars.map((b) => `${b.startSec ?? "-"}|${b.chords.map((c) => `${c.chord}:${c.beats}`).join(" ")}`));
+  const bars = (...specs: [number | undefined, ...[string, number][]][]) =>
+    specs.map(([startSec, ...slots]) => ({ startSec, chords: slots.map(([chord, beats]) => ({ chord, beats })) }));
+
+  test("halveTempo_ofASongTrackedAtDoubleTempo_mergesBarsTwoByTwoWithinEachSection", () => {
+    // Given a 120 BPM Verse of 5 bars (a chord change on an odd beat in bar 3) and a Chorus of 2 bars
+    const song = frozen([
+      { id: "v", label: "Verse", bars: bars([0, ["A:maj", 4]], [1, ["A:maj", 2], ["B:maj", 2]], [2, ["C:maj", 3], ["D:maj", 1]], [3, ["E:maj", 4]], [4, ["F:maj", 4]]) },
+      { id: "c", label: "Chorus", bars: bars([5, ["G:maj", 4]], [6, ["G:maj", 2], ["A:min", 2]]) },
+    ]);
+
+    // When halving the tempo of the whole song
+    const halved = halveTempo(song);
+
+    // Then each pair of tracked beats is one beat (the first one's chord), the odd last bar of the Verse is a 2/4 bar,
+    // the Chorus still starts on its own bar, and the tempo is halved
+    expect(shape(halved)).toEqual([["0|A:maj:3 B:maj:1", "2|C:maj:2 E:maj:2", "4|F:maj:2"], ["5|G:maj:3 A:min:1"]]);
+    expect(halved.sections[0].bars[2].meter).toEqual({ beats: 2, unit: 4 });
+    expect(halved.sections[0].bars[0]).not.toHaveProperty("meter");
+    expect(halved.meta.tempoBpm).toBe(60);
+
+    // When halving from bar 2, Then bar 1 is the same object, pairs start on bar 2 and the song tempo is kept
+    const fromBar2 = halveTempo(song, { section: 0, bar: 1 });
+    expect(fromBar2.sections[0].bars[0]).toBe(song.sections[0].bars[0]);
+    expect(shape(fromBar2)).toEqual([["0|A:maj:4", "1|A:maj:1 B:maj:1 C:maj:2", "3|E:maj:2 F:maj:2"], ["5|G:maj:3 A:min:1"]]);
+    expect(fromBar2.meta.tempoBpm).toBe(120);
+  });
+
+  test("doubleTempo_ofASongTrackedAtHalfTempo_splitsEachBarAtItsMidpoint", () => {
+    // Given a 60 BPM song: two timed bars, then an untimed bar and a 3/4 bar
+    const song = frozen(
+      [
+        { id: "v", label: "Verse", bars: bars([0, ["A:maj", 3], ["B:maj", 1]], [2, ["C:maj", 4]]) },
+        { id: "c", label: "Chorus", bars: [...bars([undefined, ["G:maj", 4]]), { meter: { beats: 3, unit: 4 }, chords: [{ chord: "D:min", beats: 3, confidence: 0.3 }] }] },
+      ],
+      60,
+    );
+
+    // When doubling the tempo
+    const doubled = doubleTempo(song);
+
+    // Then each bar is two bars, the second one starting at the midpoint (the last period carries on), untimed bars stay untimed,
+    // the 3/4 bar is two 3/4 bars, and the tempo is doubled
+    expect(shape(doubled)).toEqual([
+      ["0|A:maj:4", "1|A:maj:2 B:maj:2", "2|C:maj:4", "3|C:maj:4"],
+      ["-|G:maj:4", "-|G:maj:4", "-|D:min:3", "-|D:min:3"],
+    ]);
+    expect(doubled.sections[1].bars[3]).toEqual({ meter: { beats: 3, unit: 4 }, chords: [{ chord: "D:min", beats: 3, confidence: 0.3 }] });
+    expect(doubled.meta.tempoBpm).toBe(120);
+
+    // And halving undoes doubling, for the whole song or from a bar
+    expect(halveTempo(doubled)).toEqual(song);
+    const from = { section: 0, bar: 1 };
+    expect(doubleTempo(song, from).sections[0].bars[0]).toBe(song.sections[0].bars[0]);
+    expect(halveTempo(doubleTempo(song, from), from)).toEqual(song);
+  });
+
+  test("halveTempo_ofAGuitarSetReferenceTrackedAtDoubleTempo_restoresIt", () => {
+    // Given the first 12 bars of GuitarSet 00_Rock1-130-A_comp (130 BPM), tracked at 260 BPM: each bar cut in two
+    const chords = ["A:maj", "A:maj", "A:maj", "A:maj", "D:maj/5", "D:maj/5", "A:maj", "A:maj", "E:maj", "D:sus2/2", "A:maj/5", "A:maj/5"];
+    const barSec = (4 * 60) / 130;
+    const reference = frozen([{ id: "s", label: "Song", bars: chords.map((chord, i) => ({ startSec: i * barSec, chords: [{ chord, beats: 4 }] })) }], 130);
+    const wrong = frozen(
+      [{ id: "s", label: "Song", bars: chords.flatMap((chord, i) => [0, 0.5].map((half) => ({ startSec: (i + half) * barSec, chords: [{ chord, beats: 4 }] }))) }],
+      260,
+    );
+
+    // When fixing the tempo in one action
+    const fixed = halveTempo(wrong);
+
+    // Then every bar is back on its reference chord and time, at the reference tempo
+    expect(fixed.sections[0].bars.map((b) => b.chords)).toEqual(reference.sections[0].bars.map((b) => b.chords));
+    fixed.sections[0].bars.forEach((b, i) => expect(b.startSec).toBeCloseTo(reference.sections[0].bars[i].startSec ?? NaN, 9));
+    expect(fixed.meta.tempoBpm).toBe(130);
   });
 });
