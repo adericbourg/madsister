@@ -37,7 +37,9 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 - Chord canonical syntax = Harte (`C:maj7/3`, `A:min`, `N`) + the `add2`/`add4` extension (spec §4).
 - Minimal code (no speculative abstractions). Mark a deliberate shortcut with a `ponytail:` comment naming its ceiling.
 - CI = GitHub Actions, one workflow per project: `.github/workflows/engine.yml` (M0-1), `.github/workflows/app.yml` (M1-1).
-  CI runs fast tests only (no model weights). Every step keeps CI green: if it adds a system dependency or a new test command,
+  CI runs fast tests only (no model weights), except `.github/workflows/engine-models.yml` (model groups + slow tests,
+  Linux and macOS): engine dependency PRs (Renovate) must have `engine-models` green before merge.
+  Every step keeps CI green: if it adds a system dependency or a new test command,
   it updates the workflow in the same commit. Lint workflows with `uvx --from actionlint-py actionlint`. Pin actions to tags that exist
   (e.g. `astral-sh/setup-uv` has no floating major tag: use the exact version).
 - Checking CI: don't use `gh` (logged into another account). The unauthenticated REST API allows only **60 requests/hour**,
@@ -115,7 +117,7 @@ Second unattended run (2026-10-01): M2, M3, M4, M5, M6, one agent per step, same
   snapshot is kept; tagged releases are kept.
 - Coarse steps: each agent refines its step file (in the same commit) before implementing. Steps needing hardware or a desktop
   session (microphone, audio playback, printing) get automated tests + a "check by hand" list in the step file.
-- Engine model dependencies (torch, torchaudio, natten, madmom, allin1, demucs, librosa…) aren't covered by CI: test them locally.
+- Engine model dependencies (torch, torchaudio, natten, madmom, allin1, demucs, librosa…) are tested by the `engine-models` workflow, not by `engine`.
 
 ## Morning hand-off
 When stopping (all tonight's steps done, or everything left is blocked), make sure these are up to date and pushed:

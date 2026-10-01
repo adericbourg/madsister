@@ -18,7 +18,7 @@ madsister-engine = "madsister_engine.cli:main"
 beats-allinone = [
     "allin1",
     "madmom",
-    "natten==0.17.4; sys_platform == 'darwin'",  # last release with the legacy ops allin1 1.1.0 calls
+    "natten==0.17.4",  # last release with the legacy ops allin1 1.1.0 calls (allin1 only requires it on macOS)
     "torch==2.5.1",
     "torchaudio==2.5.1",
 ]

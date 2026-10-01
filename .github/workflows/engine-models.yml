@@ -1,0 +1,48 @@
+name: engine-models
+
+# The model dependency groups (torch, torchaudio, natten, madmom, allin1, demucs…) and their slow tests, which the
+# `engine` workflow skips. Required for dependency updates: a torch/torchaudio ABI mismatch only shows up here.
+on:
+  push:
+    branches: [main]
+    paths: ["engine/**", ".github/workflows/engine-models.yml"]
+  pull_request:
+    paths: ["engine/**", ".github/workflows/engine-models.yml"]
+  schedule:
+    - cron: "0 4 * * 1"  # weekly: upstream repos, Hugging Face weights and git deps can move under us
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90  # cold run: NATTEN source build + model downloads
+    env:
+      MADSISTER_MODELS_DIR: ${{ github.workspace }}/.models
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0  # no floating major tag upstream
+        with:
+          enable-cache: true
+          cache-suffix: models  # keeps the NATTEN wheel built from source (`uv cache prune --ci` keeps built wheels)
+      - uses: actions/cache@v6
+        with:
+          path: .models
+          key: models-${{ runner.os }}-${{ hashFiles('engine/madsister_engine/models.py', 'engine/madsister_engine/separate.py', 'engine/madsister_engine/beats/*.py', 'engine/madsister_engine/chords/*.py', 'engine/uv.lock') }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - run: >-
+          uv sync --locked --group beats-madmom --group beats-allinone --group chords-btc --group chords-cnnlstm
+          --group separate
+      - name: Import smoke test
+        run: uv run --no-sync pytest -m slow tests/test_model_imports.py
+      - name: Slow tests
+        run: uv run --no-sync pytest -m slow --ignore tests/test_model_imports.py
