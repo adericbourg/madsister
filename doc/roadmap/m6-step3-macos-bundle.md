@@ -12,7 +12,7 @@ A `.dmg` for macOS arm64 with the same first-launch engine setup.
 M6-2.
 
 ## Tasks
-- `tauri build --target aarch64-apple-darwin` in `release.yml` on `macos-latest`. `NSMicrophoneUsageDescription` in `Info.plist` (M5-2).
+- `tauri build --target aarch64-apple-darwin` in `release.yml` on `macos-latest`, following the snapshot/release rules from M6-2. `NSMicrophoneUsageDescription` in `Info.plist` (M5-2).
 - Signing/notarization: none for personal use (document the Gatekeeper bypass); ask the user before adding any Apple credentials to CI.
 - Try MPS for torch inference; keep CPU if the results differ from the bench.
 

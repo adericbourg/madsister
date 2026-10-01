@@ -12,7 +12,11 @@ M6 "done when" on Linux: AppImage/deb that installs on a clean machine and sets 
 M6-1.
 
 ## Tasks
-- `tauri build` with `deb` and `appimage` targets in a `release.yml` workflow (on tag), artifacts uploaded to the run.
+- `tauri build` with `deb` and `appimage` targets in a `release.yml` workflow. Release rules (user request, 2026-10-01):
+  - every build of `main` publishes a **snapshot pre-release**; only the latest snapshot is kept (delete the previous one and its tag);
+  - every **versioned build** (tag) publishes a release that is kept;
+  - versions are **semver**. Proposed (the user had no preference, confirm before implementing): the version comes from tag `vX.Y.Z`,
+    injected at build time; snapshots are `<last tag or 0.0.0>-snapshot.<run number>`. The platform list is decided with M6-3.
 - Engine resolution in the packaged app (the M2-1 resolver's third branch): bundled `uv` binary as a Tauri sidecar + the `engine/` sources as
   resources; first launch runs `setup` with a progress screen.
 - Runtime deps: ffmpeg (deb `Depends`; AppImage: document or bundle a static ffmpeg — decide by size).
