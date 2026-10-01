@@ -41,3 +41,5 @@ jobs:
         working-directory: app/src-tauri
       - run: cargo clippy --locked -- -D warnings
         working-directory: app/src-tauri
+      - run: cargo test --locked
+        working-directory: app/src-tauri
