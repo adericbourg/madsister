@@ -63,4 +63,19 @@ pnpm tauri build
 On macOS this produces `app/src-tauri/target/release/bundle/macos/madsister.app` (~4.5 MB) and
 `bundle/dmg/madsister_<version>_aarch64.dmg`. The DMG step drives Finder through AppleScript and fails ("AppleEvent timed
 out") when the terminal lacks the Automation permission; `pnpm tauri build --bundles app` builds the `.app` alone.
-The engine isn't bundled yet (M6): the built app still runs the engine of this checkout through `uv`.
+Such a build still runs the engine of this checkout through `uv`, like `pnpm tauri dev`.
+
+To bundle the engine as the releases do, add the `uv` sidecar (any uv ≥ 0.12, named after the Rust target triple) and merge
+`src-tauri/tauri.bundle.conf.json`:
+
+```sh
+cd app
+mkdir -p src-tauri/binaries
+cp "$(which uv)" "src-tauri/binaries/madsister-uv-$(rustc -vV | sed -n 's/^host: //p')"
+pnpm tauri build --config src-tauri/tauri.bundle.conf.json      # Linux: --bundles deb,appimage
+```
+
+On first launch (and after each update) the packaged app installs its engine into its data dir (`engine-env`) with
+`src-tauri/setup-engine.sh`, then downloads the models. Without the madmom wheel the release workflow bundles, that first
+launch builds madmom from git: it needs git and a C compiler. The deb depends on ffmpeg, the GStreamer plugins and
+`libportaudio2`; the AppImage bundles GStreamer but needs ffmpeg and `libportaudio2` on the system.

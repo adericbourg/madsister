@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "externalBin": ["binaries/madsister-uv"],
+    "resources": {
+      "../../engine/pyproject.toml": "engine/pyproject.toml",
+      "../../engine/uv.lock": "engine/uv.lock",
+      "../../engine/.python-version": "engine/.python-version",
+      "../../engine/madsister_engine/": "engine/madsister_engine/"
+    }
+  }
+}
