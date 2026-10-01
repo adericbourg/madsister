@@ -10,7 +10,6 @@ import {
   audioSha256,
   confirmDiscard,
   exportSong,
-  isDirty,
   pickAudioPath,
   pickOpenPath,
   pickSavePath,
@@ -41,7 +40,7 @@ function App() {
   // ponytail: the meter is only chosen for new songs; changing it on an existing song would invalidate every bar.
   const [newMeter, setNewMeter] = useState("4/4");
   const [audioNotice, setAudioNotice] = useState<string | null>(null);
-  const isSongDirty = isDirty(song, savedSong);
+  const isSongDirty = song !== savedSong;
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
   const updateRecent = (next: string[]) => {

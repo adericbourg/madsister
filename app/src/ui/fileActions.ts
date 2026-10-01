@@ -11,8 +11,6 @@ const filters = [{ name: "madsister song", extensions: ["json"] }];
 
 export const pushRecent = (list: readonly string[], path: string): string[] => [path, ...list.filter((p) => p !== path)].slice(0, 10);
 
-export const isDirty = (song: Song, savedSong: Song): boolean => song !== savedSong;
-
 export const confirmDiscard = (): Promise<boolean> => confirm("Discard unsaved changes?", { kind: "warning" });
 
 export const confirmDeleteSection = (label: string): Promise<boolean> =>
