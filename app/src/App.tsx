@@ -4,6 +4,7 @@ import { toMidi } from "./model/export/midi";
 import { toMusicXml } from "./model/export/musicxml";
 import { emptySong, type Song, type SongMeter } from "./model/song";
 import { Editor } from "./ui/Editor";
+import { EngineSetup } from "./ui/EngineSetup";
 import { Importer } from "./ui/Importer";
 import {
   audioSha256,
@@ -197,7 +198,9 @@ function App() {
           </details>
         )}
       </nav>
-      <Importer onResult={(p) => void openSong(p)} />
+      <EngineSetup>
+        <Importer onResult={(p) => void openSong(p)} />
+      </EngineSetup>
       <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
       {error !== null && <p role="alert">{error}</p>}
       {audioNotice !== null && (

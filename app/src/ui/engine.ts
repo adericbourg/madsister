@@ -39,3 +39,9 @@ export const record = (outPath: string, onEvent: (event: EngineEvent) => void): 
 export const stop = (jobId: number): Promise<void> => invoke("stop", { jobId });
 
 export const cancel = (jobId: number): Promise<void> => invoke("cancel", { jobId });
+
+/** True on a packaged app's first launch (and after an update): `setupEngine` must run before the commands above. */
+export const engineNeedsSetup = (): Promise<boolean> => invoke("engine_needs_setup");
+
+/** Installs the packaged engine: an `install` progress (uv), then `setup`'s per model, then a result. */
+export const setupEngine = (onEvent: (event: EngineEvent) => void): Promise<number> => start("setup_engine", {}, onEvent);

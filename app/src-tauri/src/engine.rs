@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::os::unix::process::CommandExt; // ponytail: unix only (Linux, macOS), Windows is out of scope (D4)
+use std::path::PathBuf;
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -37,11 +38,54 @@ pub fn parse_line(line: &str) -> serde_json::Result<EngineEvent> {
     serde_json::from_str(line)
 }
 
-/// `MADSISTER_ENGINE` (a command line, split on whitespace) or the dev engine. `--no-sync`: a plain `uv run` would
-/// re-sync the env and remove the model dependency groups. Packaged resolution is M6.
-pub fn engine_command() -> Vec<String> {
-    match std::env::var("MADSISTER_ENGINE") {
-        Ok(cmd) if !cmd.trim().is_empty() => cmd.split_whitespace().map(String::from).collect(),
+/// The engine installed by `setup-engine.sh` in a packaged app (`tauri build`): `uv` is a sidecar next to the app's
+/// binary, the `engine/` project a resource, the env lives in the app data dir.
+pub struct Packaged {
+    pub uv: PathBuf,
+    pub project: PathBuf,
+    pub env: PathBuf,
+    pub version: String,
+}
+
+const SETUP_SCRIPT: &str = include_str!("../setup-engine.sh");
+
+impl Packaged {
+    /// No env yet, or one set up by another app version.
+    pub fn needs_setup(&self) -> bool {
+        std::fs::read_to_string(self.env.join(".madsister-version")).ok()
+            != Some(self.version.clone())
+    }
+
+    pub fn setup_command(&self) -> Vec<String> {
+        let path = |p: &PathBuf| p.display().to_string();
+        vec![
+            "sh".into(),
+            "-c".into(),
+            SETUP_SCRIPT.into(),
+            "sh".into(),
+            path(&self.uv),
+            path(&self.project),
+            path(&self.env),
+            self.version.clone(),
+        ]
+    }
+}
+
+/// `MADSISTER_ENGINE` (a command line, split on whitespace), then the packaged engine, then the dev engine.
+/// `--no-sync`: a plain `uv run` would re-sync the env and remove the model dependency groups.
+pub fn engine_command(
+    override_command: Option<String>,
+    packaged: Option<&Packaged>,
+) -> Vec<String> {
+    match (override_command, packaged) {
+        (Some(cmd), _) if !cmd.trim().is_empty() => {
+            cmd.split_whitespace().map(String::from).collect()
+        }
+        (_, Some(packaged)) => vec![packaged
+            .env
+            .join("bin/madsister-engine")
+            .display()
+            .to_string()],
         _ => {
             let project = concat!(env!("CARGO_MANIFEST_DIR"), "/../../engine");
             [
@@ -253,6 +297,100 @@ mod tests {
             record_args("/data/sources/r.wav".into()).join(" "),
             "record --out /data/sources/r.wav"
         );
+    }
+
+    fn packaged(root: &std::path::Path) -> Packaged {
+        Packaged {
+            uv: root.join("uv"),
+            project: root.join("engine"),
+            env: root.join("env"),
+            version: "1.2.3".into(),
+        }
+    }
+
+    #[test]
+    fn engine_command_prefers_the_override_then_the_packaged_engine_then_dev() {
+        // Given a packaged engine
+        let packaged = packaged(std::path::Path::new("/data"));
+
+        // When / Then
+        assert_eq!(
+            engine_command(Some("python -m x".into()), Some(&packaged)),
+            ["python", "-m", "x"]
+        );
+        assert_eq!(
+            engine_command(Some(" ".into()), Some(&packaged)),
+            ["/data/env/bin/madsister-engine"]
+        );
+        let dev = engine_command(None, None);
+        assert_eq!(dev[..2], ["uv", "run"]);
+        assert!(dev[3].ends_with("/../../engine"));
+    }
+
+    #[test]
+    fn setup_command_installs_the_env_with_the_bundled_wheel_then_runs_setup() {
+        // Given a fake uv that logs its calls and creates the engine, and a bundled madmom wheel
+        let root = std::env::temp_dir().join(format!("madsister-setup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("engine/wheels")).unwrap();
+        std::fs::write(root.join("engine/wheels/madmom-0.17-cp311.whl"), "").unwrap();
+        let fake_uv = r#"#!/bin/sh
+echo "$*" >> "$UV_PROJECT_ENVIRONMENT.log"
+echo "Resolved 110 packages"
+mkdir -p "$UV_PROJECT_ENVIRONMENT/bin"
+cat > "$UV_PROJECT_ENVIRONMENT/bin/madsister-engine" <<'EOF'
+#!/bin/sh
+echo '{"type":"progress","stage":"setup","pct":50}'
+echo '{"type":"result","path":"/models"}'
+EOF
+chmod +x "$UV_PROJECT_ENVIRONMENT/bin/madsister-engine"
+"#;
+        std::fs::write(root.join("uv"), fake_uv).unwrap();
+        std::fs::set_permissions(
+            root.join("uv"),
+            std::os::unix::fs::PermissionsExt::from_mode(0o755),
+        )
+        .unwrap();
+        let packaged = packaged(&root);
+        assert!(packaged.needs_setup());
+
+        // When running the setup command to its end
+        let (send, receive) = std::sync::mpsc::channel();
+        Jobs::default()
+            .spawn(&packaged.setup_command(), false, move |e| {
+                send.send(e).unwrap()
+            })
+            .unwrap();
+        let events: Vec<EngineEvent> = receive.iter().collect();
+
+        // Then progress goes from install to setup, ends with setup's result, and the env is stamped
+        assert_eq!(
+            events,
+            [
+                EngineEvent::Progress {
+                    stage: "install".into(),
+                    pct: 0,
+                    elapsed_sec: None
+                },
+                EngineEvent::Progress {
+                    stage: "setup".into(),
+                    pct: 50,
+                    elapsed_sec: None
+                },
+                EngineEvent::Result {
+                    path: "/models".into()
+                },
+            ]
+        );
+        assert!(!packaged.needs_setup());
+        // And uv synced the frozen lock without madmom, then installed the wheel into the env
+        let calls = std::fs::read_to_string(root.join("env.log")).unwrap();
+        let calls: Vec<&str> = calls.lines().collect();
+        assert!(calls[0].starts_with("sync --frozen --no-dev --no-editable --project "));
+        assert!(calls[0].ends_with("--group record --no-install-package madmom"));
+        assert!(calls[1].starts_with("pip install --python "));
+        assert!(calls[1].ends_with("/engine/wheels/madmom-0.17-cp311.whl"));
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

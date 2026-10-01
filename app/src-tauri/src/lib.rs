@@ -1,19 +1,33 @@
 pub mod engine;
 
-use engine::{EngineEvent, Jobs};
+use engine::{EngineEvent, Jobs, Packaged};
 use sha2::{Digest, Sha256};
 use tauri::ipc::{Channel, Response};
 use tauri::{Manager, RunEvent, State};
 
+/// The packaged engine; None in dev (`tauri dev`) and when `MADSISTER_ENGINE` overrides it.
+struct Engine(Option<Packaged>);
+
 /// Starts `madsister-engine <args>`; returns the job id. Events stream on `on_event` (see `EngineEvent`).
 fn start(
     jobs: State<Jobs>,
+    engine: State<Engine>,
     args: Vec<String>,
     has_stdin: bool,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
-    let mut argv = engine::engine_command();
+    let mut argv =
+        engine::engine_command(std::env::var("MADSISTER_ENGINE").ok(), engine.0.as_ref());
     argv.extend(args);
+    spawn(jobs, argv, has_stdin, on_event)
+}
+
+fn spawn(
+    jobs: State<Jobs>,
+    argv: Vec<String>,
+    has_stdin: bool,
+    on_event: Channel<EngineEvent>,
+) -> Result<u32, String> {
     jobs.spawn(&argv, has_stdin, move |event| {
         let _ = on_event.send(event); // the window is gone: nothing to tell
     })
@@ -23,6 +37,7 @@ fn start(
 #[tauri::command]
 fn transcribe(
     jobs: State<Jobs>,
+    engine: State<Engine>,
     audio_path: String,
     out_path: String,
     meter: Option<String>,
@@ -30,30 +45,67 @@ fn transcribe(
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
     let args = engine::transcribe_args(audio_path, out_path, meter, sections);
-    start(jobs, args, false, on_event)
+    start(jobs, engine, args, false, on_event)
 }
 
 #[tauri::command]
 fn fetch(
     jobs: State<Jobs>,
+    engine: State<Engine>,
     url: String,
     out_dir: String,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
-    start(jobs, engine::fetch_args(url, out_dir), false, on_event)
+    start(
+        jobs,
+        engine,
+        engine::fetch_args(url, out_dir),
+        false,
+        on_event,
+    )
 }
 
 /// Records until `stop` (keeps the file) or `cancel` (the file is lost): its stdin is piped for `stop`.
 #[tauri::command]
 fn record(
     jobs: State<Jobs>,
+    engine: State<Engine>,
     out_path: String,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
     if let Some(dir) = std::path::Path::new(&out_path).parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("can't create {}: {e}", dir.display()))?;
     }
-    start(jobs, engine::record_args(out_path), true, on_event)
+    start(jobs, engine, engine::record_args(out_path), true, on_event)
+}
+
+/// True on a packaged app's first launch, and after an update: `setup_engine` must run before any engine command.
+#[tauri::command]
+fn engine_needs_setup(engine: State<Engine>) -> bool {
+    engine.0.as_ref().is_some_and(Packaged::needs_setup)
+}
+
+/// Installs the packaged engine (`setup-engine.sh`): same events as the engine commands.
+#[tauri::command]
+fn setup_engine(
+    jobs: State<Jobs>,
+    engine: State<Engine>,
+    on_event: Channel<EngineEvent>,
+) -> Result<u32, String> {
+    let packaged = engine.0.as_ref().ok_or("the engine isn't packaged")?;
+    spawn(jobs, packaged.setup_command(), false, on_event)
+}
+
+fn packaged_engine(app: &tauri::App) -> Option<Packaged> {
+    if tauri::is_dev() || std::env::var_os("MADSISTER_ENGINE").is_some() {
+        return None;
+    }
+    Some(Packaged {
+        uv: std::env::current_exe().ok()?.with_file_name("madsister-uv"), // the sidecar (bundle.externalBin)
+        project: app.path().resource_dir().ok()?.join("engine"),
+        env: app.path().app_data_dir().ok()?.join("engine-env"),
+        version: app.package_info().version.to_string(),
+    })
 }
 
 #[tauri::command]
@@ -99,12 +151,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(Jobs::default())
+        .setup(|app| {
+            app.manage(Engine(packaged_engine(app)));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             transcribe,
             fetch,
             record,
             stop,
             cancel,
+            engine_needs_setup,
+            setup_engine,
             audio_sha256,
             read_audio
         ])

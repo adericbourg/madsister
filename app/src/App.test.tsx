@@ -11,7 +11,7 @@ import { transcribe } from "./ui/engine";
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), writeFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn() }));
+vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn(), engineNeedsSetup: async () => false }));
 const drop = vi.hoisted(() => ({ handler: (_: { payload: unknown }) => {} }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({
