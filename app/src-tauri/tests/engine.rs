@@ -5,11 +5,19 @@ use std::thread;
 use std::time::Duration;
 
 fn spawn_fake(jobs: &Jobs, scenario: &str) -> (u32, Receiver<EngineEvent>) {
+    spawn_fake_with_stdin(jobs, scenario, false)
+}
+
+fn spawn_fake_with_stdin(
+    jobs: &Jobs,
+    scenario: &str,
+    has_stdin: bool,
+) -> (u32, Receiver<EngineEvent>) {
     let (tx, rx) = mpsc::channel();
     let script = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fake-engine.sh");
     let argv = ["sh", script, scenario].map(String::from);
     let job_id = jobs
-        .spawn(&argv, move |event| {
+        .spawn(&argv, has_stdin, move |event| {
             let _ = tx.send(event);
         })
         .unwrap();
@@ -38,11 +46,13 @@ fn spawn_of_successful_engine_streams_progress_then_result() {
         [
             EngineEvent::Progress {
                 stage: "decode".into(),
-                pct: 0
+                pct: 0,
+                elapsed_sec: None
             },
             EngineEvent::Progress {
                 stage: "chords".into(),
-                pct: 50
+                pct: 50,
+                elapsed_sec: None
             },
             EngineEvent::Result {
                 path: "/tmp/song.json".into()
@@ -104,4 +114,30 @@ fn cancel_kills_the_engine_and_its_children_then_ends_with_cancelled() {
         !is_child_alive()
     });
     assert!(is_child_gone, "child {child_pid} still alive");
+}
+
+#[test]
+fn stop_writes_stop_to_the_engine_stdin_then_ends_with_its_result() {
+    // Given a recording engine that waits for `stop` on its stdin
+    let jobs = Jobs::default();
+    let (job_id, rx) = spawn_fake_with_stdin(&jobs, "record", true);
+    assert!(matches!(
+        rx.recv().unwrap(),
+        EngineEvent::Progress {
+            elapsed_sec: Some(0),
+            ..
+        }
+    ));
+
+    // When stopping the job
+    jobs.stop(job_id);
+    let event = rx.recv_timeout(Duration::from_secs(5));
+
+    // Then the engine finishes on its own and its result comes through
+    assert_eq!(
+        event,
+        Ok(EngineEvent::Result {
+            path: "/tmp/take.wav".into()
+        })
+    );
 }

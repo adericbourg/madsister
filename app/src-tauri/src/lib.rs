@@ -5,7 +5,21 @@ use sha2::{Digest, Sha256};
 use tauri::ipc::{Channel, Response};
 use tauri::{Manager, RunEvent, State};
 
-/// Starts `madsister-engine transcribe`; returns the job id. Events stream on `on_event` (see `EngineEvent`).
+/// Starts `madsister-engine <args>`; returns the job id. Events stream on `on_event` (see `EngineEvent`).
+fn start(
+    jobs: State<Jobs>,
+    args: Vec<String>,
+    has_stdin: bool,
+    on_event: Channel<EngineEvent>,
+) -> Result<u32, String> {
+    let mut argv = engine::engine_command();
+    argv.extend(args);
+    jobs.spawn(&argv, has_stdin, move |event| {
+        let _ = on_event.send(event); // the window is gone: nothing to tell
+    })
+    .map_err(|e| format!("can't start the engine ({}): {e}", argv[0]))
+}
+
 #[tauri::command]
 fn transcribe(
     jobs: State<Jobs>,
@@ -15,14 +29,36 @@ fn transcribe(
     sections: bool,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
-    let mut argv = engine::engine_command();
-    argv.extend(engine::transcribe_args(
-        audio_path, out_path, meter, sections,
-    ));
-    jobs.spawn(&argv, move |event| {
-        let _ = on_event.send(event); // the window is gone: nothing to tell
-    })
-    .map_err(|e| format!("can't start the engine ({}): {e}", argv[0]))
+    let args = engine::transcribe_args(audio_path, out_path, meter, sections);
+    start(jobs, args, false, on_event)
+}
+
+#[tauri::command]
+fn fetch(
+    jobs: State<Jobs>,
+    url: String,
+    out_dir: String,
+    on_event: Channel<EngineEvent>,
+) -> Result<u32, String> {
+    start(jobs, engine::fetch_args(url, out_dir), false, on_event)
+}
+
+/// Records until `stop` (keeps the file) or `cancel` (the file is lost): its stdin is piped for `stop`.
+#[tauri::command]
+fn record(
+    jobs: State<Jobs>,
+    out_path: String,
+    on_event: Channel<EngineEvent>,
+) -> Result<u32, String> {
+    if let Some(dir) = std::path::Path::new(&out_path).parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("can't create {}: {e}", dir.display()))?;
+    }
+    start(jobs, engine::record_args(out_path), true, on_event)
+}
+
+#[tauri::command]
+fn stop(jobs: State<Jobs>, job_id: u32) {
+    jobs.stop(job_id);
 }
 
 #[tauri::command]
@@ -65,6 +101,9 @@ pub fn run() {
         .manage(Jobs::default())
         .invoke_handler(tauri::generate_handler![
             transcribe,
+            fetch,
+            record,
+            stop,
             cancel,
             audio_sha256,
             read_audio

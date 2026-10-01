@@ -16,4 +16,11 @@ hang)
   sleep 60 &
   echo "{\"type\":\"progress\",\"stage\":\"$!\",\"pct\":0}"
   wait ;;
+record)
+  # Like `record`, stops on a `stop` line (other lines ignored); unlike it, stdin EOF is a failure, so tests see the stop.
+  echo '{"type":"progress","stage":"record","pct":0,"elapsedSec":0}'
+  while read -r line; do
+    [ "$line" = stop ] && echo '{"type":"result","path":"/tmp/take.wav"}' && exit 0
+  done
+  exit 4 ;;
 esac

@@ -99,8 +99,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M4b-2 | [m4b-step2-bench-modes](m4b-step2-bench-modes.md) | skipped (D7, user 2026-10-01) | |
 | M4b-3 | [m4b-step3-mode-picker-ui](m4b-step3-mode-picker-ui.md) | skipped (D7, user 2026-10-01) | |
 | M5-1 | [m5-step1-engine-fetch](m5-step1-engine-fetch.md) | done | 2f0cc01 |
-| M5-2 | [m5-step2-engine-record](m5-step2-engine-record.md) | done | this |
-| M5-3 | [m5-step3-sources-ui](m5-step3-sources-ui.md) | todo | |
+| M5-2 | [m5-step2-engine-record](m5-step2-engine-record.md) | done | 9b4e88b |
+| M5-3 | [m5-step3-sources-ui](m5-step3-sources-ui.md) | done | this |
 | M5-4 | [m5-step4-sections-fallback](m5-step4-sections-fallback.md) | done (covered by M0-6 + M2-2) | |
 | M6-1 | [m6-step1-engine-setup-script](m6-step1-engine-setup-script.md) | done | this |
 | M6-2 | [m6-step2-linux-bundle](m6-step2-linux-bundle.md) | todo | |

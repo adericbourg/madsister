@@ -304,7 +304,7 @@ test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () =>
 
   // When tabbing forward past the end
   const reached = new Set<Element | null>();
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 50; i++) {
     await user.tab();
     reached.add(document.activeElement);
   }

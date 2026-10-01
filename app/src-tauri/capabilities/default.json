@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window. Files picked in a dialog are added to the fs scope at runtime by the dialog plugin; the static scope only covers the app config dir and *.madsister.json under $HOME (recent files after a restart).",
+  "description": "Capability for the main window. Files picked in a dialog are added to the fs scope at runtime by the dialog plugin; the static scope only covers the app config dir and *.madsister.json under $HOME (recent files after a restart) and in the app data sources/ dir (URL imports and recordings; $HOME/** skips dot dirs such as ~/.local).",
   "windows": [
     "main"
   ],
@@ -14,16 +14,16 @@
     "dialog:allow-confirm",
     {
       "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "$APPCONFIG/*" }, { "path": "$HOME/**/*.madsister.json" }]
+      "allow": [{ "path": "$APPCONFIG/*" }, { "path": "$HOME/**/*.madsister.json" }, { "path": "$APPDATA/sources/*.madsister.json" }]
     },
     {
       "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "$APPCONFIG/*" }, { "path": "$HOME/**/*.madsister.json" }]
+      "allow": [{ "path": "$APPCONFIG/*" }, { "path": "$HOME/**/*.madsister.json" }, { "path": "$APPDATA/sources/*.madsister.json" }]
     },
     "fs:allow-write-file",
     {
       "identifier": "fs:allow-exists",
-      "allow": [{ "path": "$HOME/**/*.madsister.json" }]
+      "allow": [{ "path": "$HOME/**/*.madsister.json" }, { "path": "$APPDATA/sources/*.madsister.json" }]
     },
     {
       "identifier": "fs:allow-mkdir",

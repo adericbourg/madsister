@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from "vitest";
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { cancel, transcribe, type EngineEvent } from "./engine";
+import { cancel, fetchAudio, record, stop, transcribe, type EngineEvent } from "./engine";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -30,10 +30,23 @@ test("transcribe_invokesTheCommandAndForwardsChannelEvents", async () => {
   expect(events).toEqual([{ type: "progress", stage: "beats", pct: 40 }]);
 });
 
-test("cancel_invokesTheCommandWithTheJobId", async () => {
-  // Given / When cancelling job 42
+test("fetchAudio_and_record_invokeTheirCommandsWithAChannel", async () => {
+  // Given / When fetching a URL and recording
+  const onEvent = () => {};
+  await fetchAudio("https://x/v", "/data/sources", onEvent);
+  await record("/data/sources/r.wav", onEvent);
+
+  // Then each command gets its arguments and a channel
+  expect(invoke).toHaveBeenNthCalledWith(1, "fetch", { url: "https://x/v", outDir: "/data/sources", onEvent: expect.any(Object) });
+  expect(invoke).toHaveBeenNthCalledWith(2, "record", { outPath: "/data/sources/r.wav", onEvent: expect.any(Object) });
+});
+
+test("cancel_and_stop_invokeTheirCommandWithTheJobId", async () => {
+  // Given / When cancelling job 42, then stopping job 43
   await cancel(42);
+  await stop(43);
 
   // Then
   expect(invoke).toHaveBeenCalledWith("cancel", { jobId: 42 });
+  expect(invoke).toHaveBeenCalledWith("stop", { jobId: 43 });
 });

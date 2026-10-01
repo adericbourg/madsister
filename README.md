@@ -23,7 +23,7 @@ Checked on macOS (Apple silicon) with these versions:
 
 ```sh
 cd engine
-uv sync --group beats-madmom --group chords-cnnlstm --group beats-allinone  # drop beats-allinone to skip section detection
+uv sync --group beats-madmom --group chords-cnnlstm --group beats-allinone --group fetch --group record  # drop beats-allinone to skip section detection
 ```
 
 Each `uv sync` installs only the groups it names, and a plain `uv sync` or `uv run` removes them: use `uv run --no-sync`
