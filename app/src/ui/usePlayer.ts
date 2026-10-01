@@ -47,6 +47,15 @@ export const usePlayer = (path: string | undefined) => {
     return true;
   };
 
+  /** Moves the playback position (and the bar cursor, even while paused). False when there's nothing to play. */
+  const seek = (sec: number): boolean => {
+    const audio = ref.current;
+    if (audio === null || src === undefined) return false;
+    audio.currentTime = sec;
+    setTime(Math.floor(sec * 10) / 10);
+    return true;
+  };
+
   const audioProps = {
     ref,
     src,
@@ -54,5 +63,5 @@ export const usePlayer = (path: string | undefined) => {
     onPause: () => setIsPlaying(false),
     onError: () => fail(ref.current?.error?.message || "unsupported format"),
   };
-  return { audioProps, isReady: src !== undefined, isPlaying, time, error, toggle };
+  return { audioProps, isReady: src !== undefined, isPlaying, time, error, toggle, seek };
 };

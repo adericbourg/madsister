@@ -194,13 +194,14 @@ test("keyToCommand_ofEditShortcuts_appliesTheCommandAndPlacesTheCursor", () => {
 });
 
 test("keyToCommand_ofOtherKeys_returnsTheMatchingAction", () => {
-  // Then history, help, rename, typing and play/pause
+  // Then history, help, rename, typing, play/pause and play from the cursor bar
   expect(keyToCommand(key("z", { mod: true }), state(at(0, 0)))).toEqual({ kind: "undo" });
   expect(keyToCommand(key("Z", { mod: true, shift: true }), state(at(0, 0)))).toEqual({ kind: "redo" });
   expect(keyToCommand(key("?", { shift: true }), state(at(0, 0)))).toEqual({ kind: "help" });
   expect(keyToCommand(key("F2"), state(at(0, 0)))).toEqual({ kind: "rename" });
   expect(keyToCommand(key("A", { shift: true }), state(at(0, 0)))).toEqual({ kind: "type", text: "A" });
   expect(keyToCommand(key(" "), state(at(0, 0)))).toEqual({ kind: "play" });
+  expect(keyToCommand(key(" ", { shift: true }), state(at(0, 0)))).toEqual({ kind: "playFromCursor" });
 
   // And copy takes the selected bars, or the cursor bar without a selection
   expect(keyToCommand(key("c", { mod: true }), state(at(0, 1, 1), { anchor: { section: 0, bar: 0 } }))).toEqual({

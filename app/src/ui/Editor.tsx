@@ -64,6 +64,13 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
       case "play":
         if (!player.toggle()) setNotice("No audio to play");
         break;
+      case "playFromCursor": {
+        const startSec = song.sections[cursor.section].bars[cursor.bar]?.startSec;
+        if (startSec === undefined) setNotice("This bar has no time in the audio");
+        else if (!player.seek(startSec)) setNotice("No audio to play");
+        else if (!player.isPlaying) player.toggle();
+        break;
+      }
       case "help":
         helpOpener.current = document.activeElement as HTMLElement | null;
         setIsHelpOpen(true);
@@ -218,6 +225,8 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
         editor={editor}
         onKeyDown={onKeyDown}
         onCellClick={(ref) => {
+          const startSec = song.sections[ref.section].bars[ref.bar].startSec;
+          if (startSec !== undefined) player.seek(startSec);
           setCursor(ref);
           setAnchor(null);
           setDraft(null);

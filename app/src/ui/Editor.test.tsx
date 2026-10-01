@@ -189,6 +189,7 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   const user = userEvent.setup();
   let currentTime = 0;
   vi.spyOn(HTMLMediaElement.prototype, "currentTime", "get").mockImplementation(() => currentTime);
+  vi.spyOn(HTMLMediaElement.prototype, "currentTime", "set").mockImplementation((t) => (currentTime = t));
   vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(function (this: HTMLMediaElement) {
     this.dispatchEvent(new Event("play"));
     return Promise.resolve();
@@ -239,4 +240,26 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new DOMException("The operation is not supported.", "NotSupportedError"));
   await user.keyboard(" ");
   expect((await screen.findByRole("alert")).textContent).toBe("Can't play this audio: NotSupportedError: The operation is not supported.");
+
+  // When clicking bar 3 while paused, Then the audio seeks to its start and the highlight moves, without playing
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 3, beat 1: C" }));
+  expect(currentTime).toBe(4);
+  expect(barOf(3).classList).toContain("is-playing");
+  expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
+
+  // When clicking the manual bar 4, Then only the edit cursor moves; Shift+Space there doesn't play
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 4, beat 1: C" }));
+  await user.keyboard("{Shift>} {/Shift}");
+  expect(currentTime).toBe(4);
+  expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
+
+  // When pressing Shift+Space on bar 5, Then it plays from that bar
+  await user.keyboard("{ArrowRight}{Shift>} {/Shift}");
+  expect(currentTime).toBe(6);
+  expect(screen.getByRole("button", { name: "Pause" })).toBeDefined();
+
+  // When clicking bar 1 while playing, Then it keeps playing from there
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }));
+  expect(currentTime).toBe(0);
+  expect(screen.getByRole("button", { name: "Pause" })).toBeDefined();
 });

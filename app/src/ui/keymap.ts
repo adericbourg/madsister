@@ -33,7 +33,7 @@ export type Command =
   | { kind: "edit"; song: Song; cursor: SlotRef }
   | { kind: "copy"; bars: Bar[] }
   | { kind: "type"; text: string }
-  | { kind: "rename" | "undo" | "redo" | "help" | "play" | "refused" };
+  | { kind: "rename" | "undo" | "redo" | "help" | "play" | "playFromCursor" | "refused" };
 
 export const MOD_LABEL = /Mac|iP/.test(navigator.platform) ? "⌘" : "Ctrl";
 
@@ -59,6 +59,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["Alt+↑ / Alt+↓", "Repeat the section one more / one less time"],
   ["Alt+Shift+↑ / Alt+Shift+↓", "Move the section up / down"],
   ["Space", "Play / pause the source audio"],
+  ["Shift+Space", "Play from the cursor bar"],
   ["Mod+N / Mod+O", "New song / open a file"],
   ["Mod+S / Mod+Shift+S", "Save / save as"],
   ["Mod+P", "Print"],
@@ -198,7 +199,7 @@ const commandFor = (e: KeyInput, state: EditorState): Command | null => {
     case "?":
       return { kind: "help" };
     case " ":
-      return { kind: "play" };
+      return { kind: e.shiftKey ? "playFromCursor" : "play" };
     case "F2":
       return { kind: "rename" };
     case "F8": {
