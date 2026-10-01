@@ -19,14 +19,14 @@ beats-allinone = [
     "allin1",
     "madmom",
     "natten==0.17.4",  # last release with the legacy ops allin1 1.1.0 calls (allin1 only requires it on macOS)
-    "torch==2.5.1",
+    "torch==2.13.0",
     "torchaudio==2.5.1",
 ]
 chords-btc = [
     "librosa",
     "mir-eval",  # imported by BTC's feature code
     "pyyaml",
-    "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
+    "torch==2.13.0",  # same pin as beats-allinone (one lockfile)
 ]
 chords-cnnlstm = [
     "h5py",  # the imports below are pulled in by upstream's `mir` package, not used for inference
@@ -34,14 +34,14 @@ chords-cnnlstm = [
     "librosa",
     "pretty-midi",
     "pydub",
-    "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
+    "torch==2.13.0",  # same pin as beats-allinone (one lockfile)
 ]
 beats-madmom = [
     "madmom",
 ]
 separate = [
     "demucs",
-    "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
+    "torch==2.13.0",  # same pin as beats-allinone (one lockfile)
 ]
 dev = ["pytest"]
 
