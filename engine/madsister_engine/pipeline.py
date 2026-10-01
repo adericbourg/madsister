@@ -72,6 +72,20 @@ def _stdout_to_stderr():
         os.close(saved)
 
 
+def setup(has_sections: bool, is_all: bool) -> None:
+    """Download what the default models need (+ all-in-one with `has_sections`, + the bench-only ones with `is_all`)
+    into `models_dir()`, so transcription then runs offline (D5). Each adapter's `prepare()` is idempotent."""
+    items = [("chord model", _CHORDS, "cnnlstm")]  # madmom ships its weights in the package
+    if has_sections or is_all:
+        items.append(("beat tracker", _BEATS, "allinone"))
+    if is_all:
+        items += [("chord model", _CHORDS, "btc"), ("source separation", _SEPARATE, "demucs")]
+    for done, item in enumerate(items, 1):
+        with _stdout_to_stderr():
+            _adapter(*item).prepare()
+        events.progress("setup", 100 * done // len(items))
+
+
 def beats_per_bar(beats: list[float], downbeats: list[float]) -> int:
     """Median number of beats between consecutive downbeats; 4 with fewer than two downbeats."""
     starts = sorted({min(range(len(beats)), key=lambda i: abs(beats[i] - d)) for d in downbeats})

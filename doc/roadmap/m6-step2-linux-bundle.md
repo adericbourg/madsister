@@ -19,6 +19,11 @@ M6-1.
     injected at build time; snapshots are `<last tag or 0.0.0>-snapshot.<run number>`. The platform list is decided with M6-3.
 - Engine resolution in the packaged app (the M2-1 resolver's third branch): bundled `uv` binary as a Tauri sidecar + the `engine/` sources as
   resources; first launch runs `setup` with a progress screen.
+- Notes from M6-1 ([packaged engine shape](m6-step1-engine-setup-script.md#packaged-engine-shape-recommendation-for-m6-2)):
+  first launch = `uv sync --frozen` (default groups: `beats-madmom`, `chords-cnnlstm`) into the app data dir, then
+  `madsister-engine setup` (`--sections` when the user opts in to all-in-one), reading its JSONL progress. madmom (git source +
+  Cython) and NATTEN (macOS, sections) build from source: ship CI-built wheels instead, or first launch needs git and a C
+  compiler. Add `uv` (MIT OR Apache-2.0) to `THIRD_PARTY.md`.
 - Runtime deps: ffmpeg (deb `Depends`; AppImage: document or bundle a static ffmpeg — decide by size).
 
 ## Verify

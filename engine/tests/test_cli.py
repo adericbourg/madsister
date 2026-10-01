@@ -198,3 +198,50 @@ def test_main_of_record_when_no_input_device_emits_error_without_writing(microph
     assert not out.exists()
     assert _lines(capfd) == [{"type": "error", "message": "Error querying device -1"}]
     assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
+
+
+def test_main_of_setup_when_run_twice_downloads_default_models_once(monkeypatch, capfd, tmp_path):
+    from madsister_engine.chords import cnnlstm
+    from test_models import _publish_archive
+
+    # Given the default chord model's repo archive, and an empty models dir
+    upstream = tmp_path / "upstream"
+    _publish_archive(upstream, "abc123", {"model.sdict": b"weights"})
+    monkeypatch.setattr(cnnlstm, "_REPO", ("chord-cnn-lstm", upstream.as_uri(), "abc123"))
+    monkeypatch.setattr(pipeline, "_installed", lambda module: True)
+    monkeypatch.setenv("MADSISTER_MODELS_DIR", str(tmp_path / "models"))
+
+    # When setup runs, then runs again with the archive gone
+    first = cli.main(["setup"])
+    (upstream / "archive" / "abc123.tar.gz").unlink()
+    second = cli.main(["setup"])
+
+    # Then the repo is downloaded into the models dir, and the second run downloads nothing
+    assert first == second == 0
+    assert (tmp_path / "models" / "chord-cnn-lstm" / "model.sdict").read_bytes() == b"weights"
+    expected = [
+        {"type": "progress", "stage": "setup", "pct": 100},
+        {"type": "result", "path": str(tmp_path / "models")},
+    ]
+    assert _lines(capfd) == expected * 2
+
+
+def test_main_of_setup_with_sections_or_all_prepares_more_models_with_progress_per_model(monkeypatch, capfd, tmp_path):
+    # Given every model adapter installed
+    prepared = []
+    for module in ("chords.cnnlstm", "beats.allinone_tracker", "chords.btc", "separate"):
+        fake = types.SimpleNamespace(prepare=lambda module=module: prepared.append(module))
+        monkeypatch.setitem(sys.modules, f"madsister_engine.{module}", fake)
+    monkeypatch.setattr(pipeline, "_installed", lambda module: True)
+    monkeypatch.setenv("MADSISTER_MODELS_DIR", str(tmp_path))
+
+    # When
+    sections = cli.main(["setup", "--sections"])
+    sections_prepared, prepared[:] = list(prepared), []
+    everything = cli.main(["setup", "--all"])
+
+    # Then --sections adds all-in-one to the default models, --all adds the bench-only ones
+    assert sections == everything == 0
+    assert sections_prepared == ["chords.cnnlstm", "beats.allinone_tracker"]
+    assert prepared == ["chords.cnnlstm", "beats.allinone_tracker", "chords.btc", "separate"]
+    assert [line.get("pct") for line in _lines(capfd)] == [50, 100, None, 25, 50, 75, 100, None]

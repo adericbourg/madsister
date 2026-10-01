@@ -42,7 +42,12 @@ jobs:
       - run: >-
           uv sync --locked --group beats-madmom --group beats-allinone --group chords-btc --group chords-cnnlstm
           --group separate --group fetch --group record
+      - name: Download every model
+        run: uv run --no-sync madsister-engine setup --all
       - name: Import smoke test
         run: uv run --no-sync pytest -m slow tests/test_model_imports.py
-      - name: Slow tests
+      - name: Slow tests, offline after setup (NF-1)
+        env:  # an unreachable proxy: any download fails
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
         run: uv run --no-sync pytest -m slow --ignore tests/test_model_imports.py

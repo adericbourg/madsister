@@ -14,6 +14,15 @@ import allin1  # noqa: E402
 from madsister_engine.beats import BeatResult  # noqa: E402
 
 
+def prepare() -> None:
+    """Download the weights `analyze()` loads: its default 8-fold ensemble, and htdemucs for its source separation."""
+    from allin1.models import load_pretrained_model
+    from demucs.pretrained import get_model
+
+    load_pretrained_model("harmonix-all", device="cpu")
+    get_model("htdemucs")
+
+
 def track(wav_path: str | Path, meter: int | None = None) -> BeatResult:
     """all-in-one has no meter input: a forced `meter` is ignored and the detected downbeats are kept."""
     # Demucs stems and spectrograms are per-song byproducts: keep them out of the cwd, allin1 deletes them afterwards.

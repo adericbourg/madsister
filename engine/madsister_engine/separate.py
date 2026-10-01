@@ -11,6 +11,11 @@ os.environ.setdefault("HF_HUB_CACHE", str(models_dir() / "huggingface"))
 
 import numpy as np  # noqa: E402
 from demucs.api import Separator  # noqa: E402
+from demucs.pretrained import get_model  # noqa: E402
+
+
+def prepare() -> None:
+    get_model("htdemucs")
 
 
 def harmonic_stem(wav_path: str | Path, out_dir: str | Path) -> Path:

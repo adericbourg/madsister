@@ -14,6 +14,10 @@ _REPO = ("btc-ismir19", "https://github.com/jayg996/BTC-ISMIR19", "2682317be6680
 _NUM_CHORDS = 170  # large vocabulary: 12 roots x 14 qualities + X + N
 
 
+def prepare() -> None:
+    ensure_repo(*_REPO)
+
+
 def recognize(wav_path: str | Path) -> list[ChordSegment]:
     import numpy as np
     import torch

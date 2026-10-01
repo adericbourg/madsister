@@ -4,6 +4,7 @@ import traceback
 from pathlib import Path
 
 from madsister_engine import events, fetch, pipeline, record
+from madsister_engine.models import models_dir
 
 
 def _transcribe(args: argparse.Namespace) -> int:
@@ -18,6 +19,12 @@ def _transcribe(args: argparse.Namespace) -> int:
 
 def _fetch(args: argparse.Namespace) -> int:
     events.result(str(fetch.fetch(args.url, args.out_dir).resolve()))
+    return 0
+
+
+def _setup(args: argparse.Namespace) -> int:
+    pipeline.setup(args.sections, args.all)
+    events.result(str(models_dir()))
     return 0
 
 
@@ -46,6 +53,11 @@ def _parser() -> argparse.ArgumentParser:
     fetch.add_argument("url")
     fetch.add_argument("--out-dir", required=True)
     fetch.set_defaults(func=_fetch)
+
+    setup = sub.add_parser("setup", help="download the model weights once, for offline transcription")
+    setup.add_argument("--sections", action="store_true", help="also all-in-one (section detection)")
+    setup.add_argument("--all", action="store_true", help="every model, bench-only ones included")
+    setup.set_defaults(func=_setup)
 
     record = sub.add_parser("record", help="record from the microphone")
     record.add_argument("--out", required=True)

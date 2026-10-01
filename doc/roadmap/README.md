@@ -102,7 +102,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M5-2 | [m5-step2-engine-record](m5-step2-engine-record.md) | done | this |
 | M5-3 | [m5-step3-sources-ui](m5-step3-sources-ui.md) | todo | |
 | M5-4 | [m5-step4-sections-fallback](m5-step4-sections-fallback.md) | done (covered by M0-6 + M2-2) | |
-| M6-1 | [m6-step1-engine-setup-script](m6-step1-engine-setup-script.md) | todo | |
+| M6-1 | [m6-step1-engine-setup-script](m6-step1-engine-setup-script.md) | done | this |
 | M6-2 | [m6-step2-linux-bundle](m6-step2-linux-bundle.md) | todo | |
 | M6-3 | [m6-step3-macos-bundle](m6-step3-macos-bundle.md) | todo | |
 | M6-4 | [m6-step4-user-docs](m6-step4-user-docs.md) | todo | |

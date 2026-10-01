@@ -10,6 +10,15 @@ The app (dev build) runs `uv run --project engine --no-sync madsister-engine` (p
 groups), so sync once with `uv sync --group beats-madmom --group chords-cnnlstm` (+ `--group beats-allinone` for sections),
 or set `MADSISTER_ENGINE` to another command line.
 
+`setup` downloads the model weights and repos once into `$MADSISTER_MODELS_DIR` (default `~/.cache/madsister/models`);
+transcription then runs offline. Idempotent; one progress line per model, then the models dir as `result`:
+```
+uv run --no-sync madsister-engine setup              # default models (Chord-CNN-LSTM; madmom ships its weights): 30 MB
+uv run --no-sync madsister-engine setup --sections   # + all-in-one (sections) and htdemucs: + 98 MB
+uv run --no-sync madsister-engine setup --all        # + the bench-only models (BTC, htdemucs for --separate)
+```
+Without `setup`, each model downloads on first use.
+
 `fetch` downloads a URL's audio with yt-dlp (`--group fetch`; the engine's only network access) and emits the file path:
 ```
 uv sync --group fetch    # add the groups you transcribe with: --group replaces

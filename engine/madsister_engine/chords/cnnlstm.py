@@ -20,6 +20,10 @@ _REPO = (
 _MODELS = [f"joint_chord_net_ismir_naive_v1.0_reweight(0.0,10.0)_s{i}.best" for i in range(5)]
 
 
+def prepare() -> None:
+    ensure_repo(*_REPO)
+
+
 def recognize(wav_path: str | Path) -> list[ChordSegment]:
     import numpy as np
 
