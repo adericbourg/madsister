@@ -85,8 +85,9 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M2-2 | [m2-step2-import-ui](m2-step2-import-ui.md) | done | 69eaef7 |
 | M2-3 | [m2-step3-meter-force](m2-step3-meter-force.md) | done | 12029a7 |
 | M2-4 | [m2-step4-confidence-flags](m2-step4-confidence-flags.md) | done | e337c10 |
-| M2-5 | [m2-step5-bar-meter-override](m2-step5-bar-meter-override.md) | done | this |
+| M2-5 | [m2-step5-bar-meter-override](m2-step5-bar-meter-override.md) | done | 17e5bd8 |
 | M2-6 | [m2-step6-audio-ref-and-perf](m2-step6-audio-ref-and-perf.md) | todo | |
+| M2-7 | [m2-step7-developer-docs](m2-step7-developer-docs.md) | todo | |
 | M3-1 | [m3-step1-playback-cursor](m3-step1-playback-cursor.md) | todo | |
 | M3-2 | [m3-step2-click-seek](m3-step2-click-seek.md) | todo | |
 | M3-3 | [m3-step3-phase-nudge](m3-step3-phase-nudge.md) | todo | |
@@ -104,6 +105,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M6-1 | [m6-step1-engine-setup-script](m6-step1-engine-setup-script.md) | todo | |
 | M6-2 | [m6-step2-linux-bundle](m6-step2-linux-bundle.md) | todo | |
 | M6-3 | [m6-step3-macos-bundle](m6-step3-macos-bundle.md) | todo | |
+| M6-4 | [m6-step4-user-docs](m6-step4-user-docs.md) | todo | |
 
 Scope of the first unattended run (2026-09-30 night): M0 + M1. M2–M6 are written at a coarser level. Revise them
 after M0 (the model choices change M2/M4b/M6), and ask the user before starting them.
@@ -118,6 +120,8 @@ Second unattended run (2026-10-01): M2, M3, M4, M5, M6, one agent per step, same
 - Coarse steps: each agent refines its step file (in the same commit) before implementing. Steps needing hardware or a desktop
   session (microphone, audio playback, printing) get automated tests + a "check by hand" list in the step file.
 - Engine model dependencies (torch, torchaudio, natten, madmom, allin1, demucs, librosa…) are tested by the `engine-models` workflow, not by `engine`.
+- Independent steps may run in parallel (user OK, up to 3 agents), each in its own git worktree; stage only your own paths,
+  `git fetch origin && git rebase origin/main` right before pushing, keep the status-table edit to your own row.
 
 ## Morning hand-off
 When stopping (all tonight's steps done, or everything left is blocked), make sure these are up to date and pushed:
