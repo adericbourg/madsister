@@ -1,19 +1,27 @@
 name: release
 
 # Every push to main publishes a snapshot pre-release `v<last tag or 0.0.0>-snapshot.<run number>` (only the latest is kept);
-# a `vX.Y.Z` tag publishes a release that is kept. It doesn't wait for the `app`/`engine` workflows: the clean-install
+# running it by hand (Actions > release > Run workflow, on main) with a patch/minor/major bump publishes the release
+# `vX.Y.Z` that is kept; the tag is created by the publication itself. It doesn't wait for the `app`/`engine` workflows: the clean-install
 # check below gates the publication, and a later push replaces a bad snapshot.
 on:
   push:
     branches: [main]
-    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version component to bump
+        required: true
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type == 'branch' }} # a newer snapshot supersedes this one
+  group: release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }} # a newer snapshot supersedes this one, a release is never cancelled
 
 env:
   UV_VERSION: 0.12.21 # the uv bundled as the app's sidecar, also used to build the madmom wheel
@@ -28,11 +36,22 @@ jobs:
         with:
           fetch-depth: 0 # the tags
       - id: version
+        env:
+          BUMP: ${{ inputs.bump }}
         run: |
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            version=${GITHUB_REF_NAME#v}
+          last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || echo v0.0.0)
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            if [ "$GITHUB_REF" != refs/heads/main ]; then
+              echo "::error::releases are made from main, not $GITHUB_REF"
+              exit 1
+            fi
+            IFS=. read -r major minor patch <<< "${last#v}"
+            case "$BUMP" in
+              major) version=$((major + 1)).0.0 ;;
+              minor) version=$major.$((minor + 1)).0 ;;
+              patch) version=$major.$minor.$((patch + 1)) ;;
+            esac
           else
-            last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || echo v0.0.0)
             version=${last#v}-snapshot.$GITHUB_RUN_NUMBER
           fi
           if ! echo "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-snapshot\.[0-9]+)?$'; then
@@ -149,8 +168,9 @@ jobs:
           notes="For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see THIRD_PARTY.md).
           Linux: \`sudo apt install ./madsister_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
           The first launch downloads the engine (Python, its libraries and the models), once."
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            gh release create "$GITHUB_REF_NAME" dist/*/* --verify-tag --title "madsister $VERSION" --notes "$notes"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            # Creates the tag on this commit (a tag pushed with the workflow's token wouldn't trigger anything anyway).
+            gh release create "v$VERSION" dist/*/* --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
           else
             tag=v$VERSION
             gh release create "$tag" dist/*/* --prerelease --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"

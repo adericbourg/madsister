@@ -87,7 +87,8 @@ sidecar), installs the deb in a clean `ubuntu:24.04` container to set up its eng
 
 - every push to `main`: a pre-release `v<last vX.Y.Z tag or 0.0.0>-snapshot.<run number>`; the previous snapshot (release and
   tag) is deleted once the new one is published, so only the latest is kept;
-- a pushed tag `vX.Y.Z`: the release `X.Y.Z`, kept. The version comes from the tag (injected with `tauri build --config`),
+- a manual run on `main` (Actions > release > Run workflow) with a `patch`, `minor` or `major` bump of the last `vX.Y.Z` tag:
+  the release `X.Y.Z`, kept, and its tag is created on the run's commit. The version is injected with `tauri build --config`,
   so `tauri.conf.json` and `Cargo.toml` aren't bumped.
 
 Releases are on the [releases page](https://github.com/adericbourg/madsister/releases).
