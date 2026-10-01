@@ -42,7 +42,7 @@ def _parser() -> argparse.ArgumentParser:
     transcribe.add_argument("--out", required=True)
     transcribe.add_argument("--meter", choices=pipeline.METERS)
     transcribe.add_argument("--no-sections", action="store_true")
-    # Bench-only options (M0-13), hidden until M4b replaces them with --mode.
+    # Hidden: the bench combinations (M0-13), and `--beats allinone`, which the app passes for section detection.
     transcribe.add_argument("--beats", choices=["auto", "allinone", "madmom"], default="auto", help=argparse.SUPPRESS)
     transcribe.add_argument("--chords", choices=["auto", "btc", "cnnlstm"], default="auto", help=argparse.SUPPRESS)
     transcribe.add_argument("--separate", action="store_true", help=argparse.SUPPRESS)
