@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -8,6 +9,7 @@ import { Editor } from "./Editor";
 import { useHistory } from "./useHistory";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ confirm: vi.fn() }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 afterEach(cleanup);
 
@@ -26,6 +28,7 @@ test("Editor_whenTypingAChartByKeyboard_buildsTheSong", async () => {
   const user = userEvent.setup();
   render(<Harness />);
   expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: no chord" }));
+  expect(screen.queryByRole("group", { name: "Playback" })).toBeNull(); // no audio, no transport
 
   // When typing the verse, splitting the last bar 2+2
   await user.keyboard("C{Enter}G{Enter}Am{Enter}/F{Enter}Gx{Enter}");
@@ -179,4 +182,61 @@ test("Editor_whenSettingTheBarMeter_overridesTheCursorBar", async () => {
   expect(song?.sections[0].bars[0]).toEqual({ meter: { beats: 3, unit: 4 }, chords: [{ chord: "N", beats: 3 }] });
   fireEvent.change(beats, { target: { value: "4" } });
   expect(song?.sections[0].bars[0]).toEqual({ chords: [{ chord: "N", beats: 4 }] });
+});
+
+test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
+  // Given a transcribed song (bars at 0, 2, 4, 6 s plus a manually added bar) and a fake media element (jsdom has none)
+  const user = userEvent.setup();
+  let currentTime = 0;
+  vi.spyOn(HTMLMediaElement.prototype, "currentTime", "get").mockImplementation(() => currentTime);
+  vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(function (this: HTMLMediaElement) {
+    this.dispatchEvent(new Event("play"));
+    return Promise.resolve();
+  });
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(function (this: HTMLMediaElement) {
+    this.dispatchEvent(new Event("pause"));
+  });
+  URL.createObjectURL = vi.fn(() => "blob:song");
+  URL.revokeObjectURL = vi.fn();
+  vi.mocked(invoke).mockResolvedValue(new ArrayBuffer(8));
+  const timed = (startSec?: number) => ({ startSec, chords: [{ chord: "C:maj", beats: 4 }] });
+  render(
+    <Harness
+      from={() => ({
+        version: 1,
+        meta: { title: "Song", meter: { beats: 4, unit: 4 } },
+        audio: { path: "/music/song.mp3", sha256: "x" },
+        sections: [{ id: "v", label: "Verse", bars: [timed(0), timed(2), timed(4), timed(), timed(6)] }],
+      })}
+    />,
+  );
+  const barOf = (n: number) => screen.getByRole("gridcell", { name: `Verse, bar ${n}, beat 1: C` }).parentElement!;
+  const transport = screen.getByRole("group", { name: "Playback" }) as HTMLFieldSetElement;
+  await vi.waitFor(() => expect(transport.disabled).toBe(false));
+  expect(invoke).toHaveBeenCalledWith("read_audio", { path: "/music/song.mp3" });
+
+  // When pressing Play with the audio at 2.5 s
+  currentTime = 2.5;
+  await user.click(screen.getByRole("button", { name: "Play" }));
+
+  // Then only bar 2 is highlighted and the time shows
+  await vi.waitFor(() => expect(barOf(2).classList).toContain("is-playing"));
+  expect(document.querySelectorAll(".is-playing")).toHaveLength(1);
+  expect(transport.textContent).toContain("0:02");
+
+  // When the audio reaches 6.1 s, Then the cursor skips the manual bar 4 and goes to bar 5
+  currentTime = 6.1;
+  await vi.waitFor(() => expect(barOf(5).classList).toContain("is-playing"));
+  expect(barOf(4).classList).not.toContain("is-playing");
+
+  // When pressing Space in the grid, Then it pauses and the edit cursor stays on bar 1
+  barOf(1).querySelector<HTMLElement>('[tabindex="0"]')!.focus();
+  await user.keyboard(" ");
+  expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
+  expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }));
+
+  // When the webview can't play it (e.g. missing codecs), Then it says so
+  vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new DOMException("The operation is not supported.", "NotSupportedError"));
+  await user.keyboard(" ");
+  expect((await screen.findByRole("alert")).textContent).toBe("Can't play this audio: NotSupportedError: The operation is not supported.");
 });

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { SlotRef } from "../model/commands";
+import type { BarRef, SlotRef } from "../model/commands";
 import { displayChord, speakChord, type DisplayStyle } from "../model/display";
 import type { Bar } from "../model/song";
 import type { Selection } from "./SectionBlock";
@@ -10,18 +10,20 @@ type Props = {
   sectionLabel: string;
   style: DisplayStyle;
   tabStop: SlotRef;
+  playing: BarRef | null;
   lowConfidenceThreshold: number;
   selection: Selection;
   editor: ReactNode;
   onCellClick?: (ref: SlotRef) => void;
 };
 
-export const BarCell = ({ bar, at, sectionLabel, style, tabStop, lowConfidenceThreshold, selection, editor, onCellClick }: Props) => {
+export const BarCell = ({ bar, at, sectionLabel, style, tabStop, playing, lowConfidenceThreshold, selection, editor, onCellClick }: Props) => {
   const isSelected = selection?.section === at.section && at.bar >= selection.from && at.bar <= selection.to;
+  const isPlaying = playing?.section === at.section && playing.bar === at.bar;
   const meter = bar.meter && `${bar.meter.beats}/${bar.meter.unit}`;
   let beat = 1;
   return (
-    <div className={isSelected ? "bar is-selected" : "bar"}>
+    <div className={`bar${isSelected ? " is-selected" : ""}${isPlaying ? " is-playing" : ""}`}>
       {meter && (
         <span className="bar-meter" aria-hidden="true">
           {meter}

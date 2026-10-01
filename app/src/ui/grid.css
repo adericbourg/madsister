@@ -7,6 +7,7 @@
   --focus: #1d4ed8; /* 6.7:1 on paper, 5.5:1 on selection */
   --doubt: #a64200; /* 6.2:1 on paper */
   --selection: #dbeafe; /* ink stays 17:1 on it */
+  --playing: #116329; /* 7.4:1 on paper, 6.1:1 on selection */
   color-scheme: light;
   color: var(--ink);
   background: var(--paper);
@@ -118,6 +119,11 @@
 
 .bar.is-selected {
   background: var(--selection);
+}
+
+/* The bar being played (F-PB-1): a thick bar under it, unlike the focus outline and the selection background. */
+.bar.is-playing {
+  box-shadow: inset 0 -6px 0 var(--playing);
 }
 
 .slot.is-editing {
@@ -238,6 +244,10 @@
 
   .bar.is-selected {
     background: none;
+  }
+
+  .bar.is-playing {
+    box-shadow: none;
   }
 
   .slot.is-low-confidence {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEventHandler, type ReactNode } from "react";
-import type { SlotRef } from "../model/commands";
+import type { BarRef, SlotRef } from "../model/commands";
 import { displayChord, type DisplayStyle } from "../model/display";
 import type { Song } from "../model/song";
 import { SectionBlock, type Selection } from "./SectionBlock";
@@ -10,6 +10,8 @@ type Props = {
   barsPerRow: 2 | 4 | 8;
   style: DisplayStyle;
   cursor: SlotRef | null;
+  /** The bar being played (spec F-PB-1). */
+  playing?: BarRef | null;
   lowConfidenceThreshold?: number;
   selection?: Selection;
   /** Rendered in the cursor cell instead of its chord (inline input). */
@@ -18,7 +20,7 @@ type Props = {
   onCellClick?: (ref: SlotRef) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, cursor, lowConfidenceThreshold = 0.5, selection, editor, onKeyDown, onCellClick }: Props) => {
+export const Grid = ({ song, barsPerRow, style, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, editor, onKeyDown, onCellClick }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
@@ -52,6 +54,7 @@ export const Grid = ({ song, barsPerRow, style, cursor, lowConfidenceThreshold =
             barsPerRow={barsPerRow}
             style={style}
             tabStop={tabStop}
+            playing={playing}
             lowConfidenceThreshold={lowConfidenceThreshold}
             selection={selection}
             editor={editor}

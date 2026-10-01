@@ -33,7 +33,7 @@ export type Command =
   | { kind: "edit"; song: Song; cursor: SlotRef }
   | { kind: "copy"; bars: Bar[] }
   | { kind: "type"; text: string }
-  | { kind: "rename" | "undo" | "redo" | "help" | "refused" };
+  | { kind: "rename" | "undo" | "redo" | "help" | "play" | "refused" };
 
 export const MOD_LABEL = /Mac|iP/.test(navigator.platform) ? "⌘" : "Ctrl";
 
@@ -58,6 +58,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["F2", "Rename the section"],
   ["Alt+↑ / Alt+↓", "Repeat the section one more / one less time"],
   ["Alt+Shift+↑ / Alt+Shift+↓", "Move the section up / down"],
+  ["Space", "Play / pause the source audio"],
   ["Mod+N / Mod+O", "New song / open a file"],
   ["Mod+S / Mod+Shift+S", "Save / save as"],
   ["Mod+P", "Print"],
@@ -196,6 +197,8 @@ const commandFor = (e: KeyInput, state: EditorState): Command | null => {
       return edit((s) => mergeSlotWithNext(s, { ...cursor, slot: cursor.slot - 1 }), { ...cursor, slot: cursor.slot - 1 });
     case "?":
       return { kind: "help" };
+    case " ":
+      return { kind: "play" };
     case "F2":
       return { kind: "rename" };
     case "F8": {

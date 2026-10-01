@@ -2,15 +2,19 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import { parseChord } from "../model/chord";
 import { addSection, deleteSection, moveSection, renameSection, setBarMeter, setChord, setRepeat, type BarRef, type SlotRef } from "../model/commands";
 import type { DisplayStyle } from "../model/display";
+import { barAtTime } from "../model/playback";
 import type { Bar, Song } from "../model/song";
 import { confirmDeleteSection } from "./fileActions";
 import { Grid } from "./Grid";
 import { Field } from "./Toolbar";
 import { clampCursor, countFlagged, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
 import type { useHistory } from "./useHistory";
+import { usePlayer } from "./usePlayer";
 
 type Props = { history: ReturnType<typeof useHistory>; barsPerRow: 2 | 4 | 8; style: DisplayStyle; lowConfidenceThreshold: number };
 type Draft = { kind: "chord" | "label"; text: string; error?: string };
+
+const minutes = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
 export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: Props) => {
@@ -25,6 +29,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
   // Undo/redo and structural edits can leave the cursor dangling: always read it clamped.
   const cursor = clampCursor(song, rawCursor);
   const flaggedCount = countFlagged(song, lowConfidenceThreshold);
+  const player = usePlayer(song.audio?.path);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const command = keyToCommand(e, { song, cursor, anchor, clipboard, barsPerRow, lowConfidenceThreshold });
@@ -55,6 +60,9 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
         break;
       case "redo":
         history.redo();
+        break;
+      case "play":
+        if (!player.toggle()) setNotice("No audio to play");
         break;
       case "help":
         helpOpener.current = document.activeElement as HTMLElement | null;
@@ -184,11 +192,27 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
         </label>{" "}
         /{barMeter?.unit ?? song.meta.meter.unit}
       </fieldset>
+      {song.audio !== undefined && (
+        <fieldset className="toolbar" disabled={!player.isReady}>
+          <legend>Playback</legend>
+          <audio {...player.audioProps} />
+          <button type="button" onClick={player.toggle}>
+            {player.isPlaying ? "Pause" : "Play"}
+          </button>
+          <span>{minutes(player.time)}</span>
+          {player.error !== null && (
+            <span role="alert" className="field-error">
+              {player.error}
+            </span>
+          )}
+        </fieldset>
+      )}
       <Grid
         song={song}
         barsPerRow={barsPerRow}
         style={style}
         cursor={cursor}
+        playing={barAtTime(song, player.time)}
         lowConfidenceThreshold={lowConfidenceThreshold}
         selection={anchor ? selectedBars({ cursor, anchor }) : undefined}
         editor={editor}

@@ -18,12 +18,23 @@ export const confirmDiscard = (): Promise<boolean> => confirm("Discard unsaved c
 export const confirmDeleteSection = (label: string): Promise<boolean> =>
   confirm(`Delete the section "${label}" and its chords?`, { kind: "warning" });
 
-export const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "m4a", "ogg"];
+// The MIME type lets WKWebView (AVFoundation) play a blob; keep the extensions in sync with `read_audio` (lib.rs).
+const AUDIO_TYPES: Record<string, string> = { mp3: "audio/mpeg", wav: "audio/wav", flac: "audio/flac", m4a: "audio/mp4", ogg: "audio/ogg" };
+export const AUDIO_EXTENSIONS = Object.keys(AUDIO_TYPES);
 
 export const pickAudioPath = async (): Promise<string | null> => open({ filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }] });
 
 /** The file's sha256 (hashed in Rust: no fs scope needed for audio files), or null when it can't be read. */
 export const audioSha256 = (path: string): Promise<string | null> => invoke("audio_sha256", { path });
+
+/**
+ * An object URL for playing the audio file in `<audio>` (revoke it when done). Read in Rust and played as a blob rather than
+ * through the asset protocol: WebKitGTK's GStreamer can't read `asset://` URLs.
+ */
+export const audioObjectUrl = async (path: string): Promise<string> => {
+  const bytes = await invoke<ArrayBuffer>("read_audio", { path });
+  return URL.createObjectURL(new Blob([bytes], { type: AUDIO_TYPES[path.split(".").pop()!.toLowerCase()] }));
+};
 
 /** True when there's no file at `path` yet, or the user agrees to overwrite it. */
 export const canWrite = async (path: string): Promise<boolean> =>

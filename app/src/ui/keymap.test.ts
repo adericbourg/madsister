@@ -194,12 +194,13 @@ test("keyToCommand_ofEditShortcuts_appliesTheCommandAndPlacesTheCursor", () => {
 });
 
 test("keyToCommand_ofOtherKeys_returnsTheMatchingAction", () => {
-  // Then history, help, rename and typing
+  // Then history, help, rename, typing and play/pause
   expect(keyToCommand(key("z", { mod: true }), state(at(0, 0)))).toEqual({ kind: "undo" });
   expect(keyToCommand(key("Z", { mod: true, shift: true }), state(at(0, 0)))).toEqual({ kind: "redo" });
   expect(keyToCommand(key("?", { shift: true }), state(at(0, 0)))).toEqual({ kind: "help" });
   expect(keyToCommand(key("F2"), state(at(0, 0)))).toEqual({ kind: "rename" });
   expect(keyToCommand(key("A", { shift: true }), state(at(0, 0)))).toEqual({ kind: "type", text: "A" });
+  expect(keyToCommand(key(" "), state(at(0, 0)))).toEqual({ kind: "play" });
 
   // And copy takes the selected bars, or the cursor bar without a selection
   expect(keyToCommand(key("c", { mod: true }), state(at(0, 1, 1), { anchor: { section: 0, bar: 0 } }))).toEqual({
@@ -209,7 +210,6 @@ test("keyToCommand_ofOtherKeys_returnsTheMatchingAction", () => {
   expect(keyToCommand(key("c", { mod: true }), state(at(0, 2)))).toEqual({ kind: "copy", bars: [song.sections[0].bars[2]] });
 
   // And unmapped keys, reserved shortcuts and typing into an empty section do nothing
-  expect(keyToCommand(key(" "), state(at(0, 0)))).toBeNull();
   expect(keyToCommand(key("s", { mod: true }), state(at(0, 0)))).toBeNull();
   expect(keyToCommand(key("C"), state(at(2, 0)))).toBeNull();
 });

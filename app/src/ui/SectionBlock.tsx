@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { SlotRef } from "../model/commands";
+import type { BarRef, SlotRef } from "../model/commands";
 import type { DisplayStyle } from "../model/display";
 import type { Section } from "../model/song";
 import { BarCell } from "./BarCell";
@@ -12,6 +12,7 @@ type Props = {
   barsPerRow: 2 | 4 | 8;
   style: DisplayStyle;
   tabStop: SlotRef;
+  playing: BarRef | null;
   lowConfidenceThreshold: number;
   selection: Selection;
   editor: ReactNode;
