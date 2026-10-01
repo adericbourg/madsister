@@ -11,6 +11,11 @@
       "enabled": false
     },
     {
+      "description": "Pinned on purpose: the engine stays on Python 3.11 for madmom and allin1 (engine/.python-version, requires-python).",
+      "matchDepNames": ["python"],
+      "enabled": false
+    },
+    {
       "description": "torchaudio wheels are built against one torch version: update them together.",
       "matchPackageNames": ["torch", "torchaudio"],
       "groupName": "torch"
