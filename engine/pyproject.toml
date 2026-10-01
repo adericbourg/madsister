@@ -43,6 +43,7 @@ separate = [
     "demucs",
     "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
 ]
+fetch = ["yt-dlp"]
 dev = ["pytest"]
 
 [build-system]

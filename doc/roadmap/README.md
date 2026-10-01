@@ -98,7 +98,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M4b-1 | [m4b-step1-engine-mode-presets](m4b-step1-engine-mode-presets.md) | skipped (D7, user 2026-10-01) | |
 | M4b-2 | [m4b-step2-bench-modes](m4b-step2-bench-modes.md) | skipped (D7, user 2026-10-01) | |
 | M4b-3 | [m4b-step3-mode-picker-ui](m4b-step3-mode-picker-ui.md) | skipped (D7, user 2026-10-01) | |
-| M5-1 | [m5-step1-engine-fetch](m5-step1-engine-fetch.md) | todo | |
+| M5-1 | [m5-step1-engine-fetch](m5-step1-engine-fetch.md) | done | this |
 | M5-2 | [m5-step2-engine-record](m5-step2-engine-record.md) | todo | |
 | M5-3 | [m5-step3-sources-ui](m5-step3-sources-ui.md) | todo | |
 | M5-4 | [m5-step4-sections-fallback](m5-step4-sections-fallback.md) | todo | |

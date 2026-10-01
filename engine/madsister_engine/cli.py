@@ -3,7 +3,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from madsister_engine import events, pipeline
+from madsister_engine import events, fetch, pipeline
 
 
 def _transcribe(args: argparse.Namespace) -> int:
@@ -13,6 +13,11 @@ def _transcribe(args: argparse.Namespace) -> int:
         args.audio, args.out, args.meter, not args.no_sections, args.beats, args.chords, args.separate, args.add_tau
     )
     events.result(str(Path(args.out).resolve()))
+    return 0
+
+
+def _fetch(args: argparse.Namespace) -> int:
+    events.result(str(fetch.fetch(args.url, args.out_dir).resolve()))
     return 0
 
 
@@ -40,7 +45,7 @@ def _parser() -> argparse.ArgumentParser:
     fetch = sub.add_parser("fetch", help="download audio from a URL")
     fetch.add_argument("url")
     fetch.add_argument("--out-dir", required=True)
-    fetch.set_defaults(func=_not_implemented)
+    fetch.set_defaults(func=_fetch)
 
     record = sub.add_parser("record", help="record from the microphone")
     record.add_argument("--out", required=True)
