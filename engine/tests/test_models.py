@@ -1,10 +1,17 @@
-import subprocess
+import io
+import tarfile
 
 from madsister_engine.models import ensure_repo, models_dir
 
 
-def _git(cwd, *args):
-    return subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True, text=True).stdout.strip()
+def _publish_archive(upstream, sha, files):
+    """Write `files` as GitHub serves `<upstream>/archive/<sha>.tar.gz`: one top-level `<repo>-<sha>/` directory."""
+    (upstream / "archive").mkdir(parents=True)
+    with tarfile.open(upstream / "archive" / f"{sha}.tar.gz", "w:gz") as tar:
+        for name, content in files.items():
+            info = tarfile.TarInfo(f"repo-{sha}/{name}")
+            info.size = len(content)
+            tar.addfile(info, io.BytesIO(content))
 
 
 def test_models_dir_when_env_var_set_uses_it(monkeypatch, tmp_path):
@@ -15,25 +22,21 @@ def test_models_dir_when_env_var_set_uses_it(monkeypatch, tmp_path):
     assert models_dir().parts[-3:] == (".cache", "madsister", "models")
 
 
-def test_ensure_repo_clones_at_pinned_sha_once(monkeypatch, tmp_path):
-    # Given a local repo with two commits, and an empty models dir
+def test_ensure_repo_downloads_pinned_sha_archive_once(monkeypatch, tmp_path):
+    # Given the archive of a pinned sha, and an empty models dir
     upstream = tmp_path / "upstream"
-    upstream.mkdir()
-    _git(upstream, "init", "-q")
-    for content in ("v1", "v2"):
-        (upstream / "f.txt").write_text(content)
-        _git(upstream, "add", ".")
-        _git(upstream, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--no-gpg-sign", "-m", content)
-    first_sha = _git(upstream, "rev-list", "--max-parents=0", "HEAD")
+    _publish_archive(upstream, "abc123", {"f.txt": b"v1", "sub/g.txt": b"g"})
     monkeypatch.setenv("MADSISTER_MODELS_DIR", str(tmp_path / "models"))
 
     # When
-    path = ensure_repo("demo", str(upstream), first_sha)
+    path = ensure_repo("demo", upstream.as_uri(), "abc123")
 
-    # Then the first commit is checked out under the models dir
+    # Then the archive's content is extracted under the models dir, without its top-level directory
     assert path == tmp_path / "models" / "demo"
     assert (path / "f.txt").read_text() == "v1"
-    # And a second call reuses the existing clone
+    assert (path / "sub/g.txt").read_text() == "g"
+    assert sorted(p.name for p in (tmp_path / "models").iterdir()) == ["demo"]
+    # And a second call reuses the extracted repo
     (path / "f.txt").write_text("local")
-    assert ensure_repo("demo", str(upstream), first_sha) == path
+    assert ensure_repo("demo", upstream.as_uri(), "abc123") == path
     assert (path / "f.txt").read_text() == "local"

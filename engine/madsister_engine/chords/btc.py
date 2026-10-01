@@ -1,6 +1,6 @@
 """BTC large-vocabulary chord recognizer (spec §2.1). Needs the `chords-btc` dependency group.
 
-Code and weights come from a pinned clone of the upstream repo under `models_dir()`; the inference path mirrors its `test.py`.
+Code and weights come from a pinned archive of the upstream repo under `models_dir()`; the inference path mirrors its `test.py`.
 """
 
 import sys

@@ -2,7 +2,8 @@
 
 import os
 import shutil
-import subprocess
+import tarfile
+import urllib.request
 from pathlib import Path
 
 
@@ -11,13 +12,16 @@ def models_dir() -> Path:
 
 
 def ensure_repo(name: str, url: str, sha: str) -> Path:
-    """Clone `url` at `sha` into `models_dir()/name` unless it is already there."""
+    """Download GitHub repo `url` at `sha` (its archive: no git needed) into `models_dir()/name` unless it is already there."""
     path = models_dir() / name
     if not path.exists():
-        # Clone next to the target and rename, so an interrupted clone is never mistaken for a complete one.
+        # Extract next to the target and rename, so an interrupted download is never mistaken for a complete one.
         tmp = path.with_name(name + ".partial")
         shutil.rmtree(tmp, ignore_errors=True)
-        subprocess.run(["git", "clone", "--quiet", url, str(tmp)], check=True)
-        subprocess.run(["git", "-C", str(tmp), "checkout", "--quiet", sha], check=True)
-        tmp.rename(path)
+        archive = urllib.request.urlopen(f"{url}/archive/{sha}.tar.gz")
+        with archive, tarfile.open(fileobj=archive, mode="r|gz") as tar:
+            tar.extractall(tmp, filter="data")
+        (top,) = tmp.iterdir()  # GitHub archives hold one `<repo>-<sha>/` directory
+        top.rename(path)
+        tmp.rmdir()
     return path

@@ -1,6 +1,6 @@
 """Chord-CNN-LSTM large-vocabulary chord recognizer (spec §2.1). Needs the `chords-cnnlstm` dependency group.
 
-Code and weights come from a pinned clone of the upstream repo under `models_dir()`; the inference path mirrors its
+Code and weights come from a pinned archive of the upstream repo under `models_dir()`; the inference path mirrors its
 `chord_recognition.py` (5-model ensemble + HMM decoding over the `submission` chord dictionary, which has inversions).
 """
 
