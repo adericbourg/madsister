@@ -10,7 +10,6 @@ import os
 import statistics
 import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 
 from madsister_engine import add_heuristic, events
@@ -32,13 +31,6 @@ _CHORDS = {
 _SEPARATE = {"demucs": ("separate", "demucs", "madsister_engine.separate")}
 # --meter -> (tracker beats per bar, Song meter unit). 6/8 is tracked at the dotted-quarter pulse (spec §3.2).
 METERS = {"3": (3, 4), "4": (4, 4), "6/8": (2, 8)}
-
-
-@dataclass(frozen=True)
-class Transcription:
-    song: Song
-    beats: BeatResult  # tracker output, before quantization
-    chords: list[ChordSegment]  # recognizer output, before quantization
 
 
 def _installed(module: str) -> bool:
@@ -134,7 +126,7 @@ def transcribe(
     chords: str = "auto",
     separate: bool = False,
     add_tau: float | None = None,
-) -> Transcription:
+) -> None:
     tracker = _adapter("beat tracker", _BEATS, beats)
     recognizer = _adapter("chord model", _CHORDS, chords)
     separator = _adapter("source separation", _SEPARATE, "demucs") if separate else None
@@ -163,4 +155,3 @@ def transcribe(
     song = dataclasses.replace(song, audio=Audio(str(Path(audio).resolve()), sha256))
     events.progress("write", 100)
     write(song, Path(out))
-    return Transcription(song, beat_result, segments)

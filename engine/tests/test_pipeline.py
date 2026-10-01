@@ -164,7 +164,7 @@ def test_transcribe_e2e_of_synthetic_clip_finds_8_bars_of_4_4_and_the_progressio
     out = tmp_path / "s.madsister.json"
 
     # When
-    result = pipeline.transcribe(make_wav(), out, meter=None, has_sections=True)
+    pipeline.transcribe(make_wav(), out, meter=None, has_sections=True)
 
     # Then
     song = json.loads(out.read_text())
@@ -173,4 +173,3 @@ def test_transcribe_e2e_of_synthetic_clip_finds_8_bars_of_4_4_and_the_progressio
     assert abs(len(bars) - 8) <= 1
     first = [bar["chords"][0]["chord"] for bar in bars]
     assert sum(a == b for a, b in zip(first, PROGRESSION)) >= 6, first
-    assert result.beats.beats and result.chords
