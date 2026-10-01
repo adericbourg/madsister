@@ -253,7 +253,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 3, unit: 4 });
 });
 
-test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordPro", async () => {
+test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProAndMusicXml", async () => {
   // Given the app
   const user = userEvent.setup();
   const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
@@ -275,6 +275,14 @@ test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordPro", 
   // Then the dialog proposes a .cho named after the title and the grid is written there
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.cho" }));
   await vi.waitFor(() => expect(files["/out/untitled.cho"]).toContain('{start_of_grid shape="1+4x4+1" label="Verse"}'));
+
+  // When exporting MusicXML to a picked path
+  vi.mocked(save).mockResolvedValueOnce("/out/untitled.musicxml");
+  await user.click(screen.getByRole("button", { name: "MusicXML…" }));
+
+  // Then the dialog proposes a .musicxml named after the title and the score is written there
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.musicxml" }));
+  await vi.waitFor(() => expect(files["/out/untitled.musicxml"]).toContain("<rehearsal>Verse</rehearsal>"));
 });
 
 test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () => {
