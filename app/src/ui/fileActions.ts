@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { appConfigDir, join } from "@tauri-apps/api/path";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
-import { exists, mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { exists, mkdir, readTextFile, writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { parseSong, serializeSong, type Song } from "../model/song";
 
 // ponytail: "json" rather than "madsister.json", macOS dialogs don't handle multi-dot extensions.
@@ -50,10 +50,17 @@ export const readSong = async (path: string): Promise<Song> => parseSong(JSON.pa
 
 export const writeSong = (path: string, song: Song): Promise<void> => writeTextFile(path, serializeSong(song));
 
-/** Asks where to export the song as `<title>.<extension>`, then writes `render(song)` there; does nothing on cancel. */
-export const exportSong = async (song: Song, name: string, extension: string, render: (song: Song) => string): Promise<void> => {
+/** Asks where to export the song as `<title>.<extension>`, then writes `render(song)` there (text or bytes); does nothing on cancel. */
+export const exportSong = async (
+  song: Song,
+  name: string,
+  extension: string,
+  render: (song: Song) => string | Uint8Array,
+): Promise<void> => {
   const path = await save({ defaultPath: `${song.meta.title}.${extension}`, filters: [{ name, extensions: [extension] }] });
-  if (path !== null) await writeTextFile(path, render(song));
+  if (path === null) return;
+  const content = render(song);
+  await (typeof content === "string" ? writeTextFile(path, content) : writeFile(path, content));
 };
 
 /** On macOS, Tauri replaces window.print with its webview print command (needs core:webview:allow-print). */

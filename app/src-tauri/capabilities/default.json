@@ -20,6 +20,7 @@
       "identifier": "fs:allow-write-text-file",
       "allow": [{ "path": "$APPCONFIG/*" }, { "path": "$HOME/**/*.madsister.json" }]
     },
+    "fs:allow-write-file",
     {
       "identifier": "fs:allow-exists",
       "allow": [{ "path": "$HOME/**/*.madsister.json" }]

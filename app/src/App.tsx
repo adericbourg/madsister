@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toChordPro } from "./model/export/chordpro";
+import { toMidi } from "./model/export/midi";
 import { toMusicXml } from "./model/export/musicxml";
 import { emptySong, type Song, type SongMeter } from "./model/song";
 import { Editor } from "./ui/Editor";
@@ -176,6 +177,9 @@ function App() {
           </button>
           <button type="button" onClick={() => exportSong(song, "MusicXML", "musicxml", toMusicXml).catch(fail)}>
             MusicXML…
+          </button>
+          <button type="button" onClick={() => exportSong(song, "MIDI", "mid", toMidi).catch(fail)}>
+            MIDI…
           </button>
         </span>
         {recent.length > 0 && (

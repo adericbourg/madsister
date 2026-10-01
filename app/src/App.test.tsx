@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
-import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { exists, readTextFile, writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -9,7 +9,7 @@ import { serializeSong, type Song } from "./model/song";
 import { transcribe } from "./ui/engine";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn(), confirm: vi.fn() }));
-vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn() }));
+vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), writeFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn() }));
 const drop = vi.hoisted(() => ({ handler: (_: { payload: unknown }) => {} }));
@@ -253,7 +253,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 3, unit: 4 });
 });
 
-test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProAndMusicXml", async () => {
+test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMusicXmlAndMidi", async () => {
   // Given the app
   const user = userEvent.setup();
   const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
@@ -283,6 +283,16 @@ test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProAnd
   // Then the dialog proposes a .musicxml named after the title and the score is written there
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.musicxml" }));
   await vi.waitFor(() => expect(files["/out/untitled.musicxml"]).toContain("<rehearsal>Verse</rehearsal>"));
+
+  // When exporting MIDI to a picked path
+  vi.mocked(save).mockResolvedValueOnce("/out/untitled.mid");
+  await user.click(screen.getByRole("button", { name: "MIDI…" }));
+
+  // Then the dialog proposes a .mid named after the title and a Standard MIDI File is written there as bytes
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.mid" }));
+  await vi.waitFor(() => expect(writeFile).toHaveBeenCalledWith("/out/untitled.mid", expect.any(Uint8Array)));
+  const midi = vi.mocked(writeFile).mock.calls[0][1] as Uint8Array;
+  expect(String.fromCharCode(...midi.slice(0, 4))).toBe("MThd");
 });
 
 test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () => {

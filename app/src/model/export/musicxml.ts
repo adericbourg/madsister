@@ -1,7 +1,8 @@
 // MusicXML 4.0 export (spec F-EX-3): one measure per bar, a <harmony> per slot over one slash note per beat.
 import { parseHarte } from "../chord";
 import { displayChord } from "../display";
-import { barBeats, type Bar, type Meter, type Song } from "../song";
+import type { Meter, Song } from "../song";
+import { playedBars } from "./bars";
 
 const KINDS: Record<string, string> = {
   maj: "major", min: "minor", aug: "augmented", dim: "diminished", sus2: "suspended-second", sus4: "suspended-fourth",
@@ -47,19 +48,9 @@ const time = (meter: Meter): string => `<time><beats>${meter.beats}</beats><beat
 export const toMusicXml = (song: Song): string => {
   const { title, artist } = song.meta;
   // Repeated sections are written out, each pass under its own rehearsal mark.
-  const bars = song.sections.flatMap((section) =>
-    Array.from({ length: section.repeat ?? 1 }, () =>
-      section.bars.map((bar, i) => ({ bar, label: i === 0 ? section.label : undefined })),
-    ).flat(),
-  );
-  let previous: Bar | undefined;
-  const measures = bars.map(({ bar, label }, i) => {
+  const measures = playedBars(song).map(({ bar, label }, i, bars) => {
     const meter = bar.meter ?? song.meta.meter;
-    // ponytail: a lone "%" copies the previous bar's chords; a "%" slot inside a split bar is left without a harmony.
-    const isRepeatBar = bar.chords.length === 1 && bar.chords[0].chord === "%";
-    const previousMeter = previous && (previous.meter ?? song.meta.meter);
-    const chords = isRepeatBar && previous && barBeats(song, previous) === barBeats(song, bar) ? previous.chords : bar.chords;
-    previous = { ...bar, chords };
+    const previousMeter = i === 0 ? undefined : (bars[i - 1].bar.meter ?? song.meta.meter);
     const lines = [];
     if (previousMeter === undefined) {
       lines.push(`<attributes><divisions>${DIVISIONS}</divisions>${time(meter)}<clef><sign>G</sign><line>2</line></clef></attributes>`);
@@ -69,7 +60,7 @@ export const toMusicXml = (song: Song): string => {
     if (label !== undefined) {
       lines.push(`<direction placement="above"><direction-type><rehearsal>${escape(label)}</rehearsal></direction-type></direction>`);
     }
-    for (const slot of chords) {
+    for (const slot of bar.chords) {
       const chord = harmony(slot.chord);
       if (chord !== undefined) lines.push(chord);
       for (let beat = 0; beat < slot.beats; beat++) lines.push(slash(meter.unit));
