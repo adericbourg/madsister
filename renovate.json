@@ -19,6 +19,16 @@
       "description": "torchaudio wheels are built against one torch version: update them together.",
       "matchPackageNames": ["torch", "torchaudio"],
       "groupName": "torch"
+    },
+    {
+      "description": "Tauri npm packages and Rust crates must stay on the same major.minor.",
+      "matchPackageNames": ["@tauri-apps/**", "tauri", "tauri-build", "tauri-plugin-*"],
+      "groupName": "tauri"
+    },
+    {
+      "description": "React runtime and its type packages move together.",
+      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
+      "groupName": "react"
     }
   ]
 }
