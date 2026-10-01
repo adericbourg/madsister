@@ -56,9 +56,16 @@ impl Packaged {
             != Some(self.version.clone())
     }
 
-    pub fn setup_command(&self) -> Vec<String> {
+    /// All-in-one (section detection) is installed for this app version: `setup_command(true)` ran after the last setup.
+    pub fn has_sections(&self) -> bool {
+        std::fs::read_to_string(self.env.join(".madsister-sections")).ok()
+            == Some(self.version.clone())
+    }
+
+    /// `sections`: also install all-in-one (slow opt-in, on demand).
+    pub fn setup_command(&self, sections: bool) -> Vec<String> {
         let path = |p: &PathBuf| p.display().to_string();
-        vec![
+        let mut command = vec![
             "sh".into(),
             "-c".into(),
             SETUP_SCRIPT.into(),
@@ -67,7 +74,11 @@ impl Packaged {
             path(&self.project),
             path(&self.env),
             self.version.clone(),
-        ]
+        ];
+        if sections {
+            command.push("sections".into());
+        }
+        command
     }
 }
 
@@ -357,7 +368,7 @@ chmod +x "$UV_PROJECT_ENVIRONMENT/bin/madsister-engine"
         // When running the setup command to its end
         let (send, receive) = std::sync::mpsc::channel();
         Jobs::default()
-            .spawn(&packaged.setup_command(), false, move |e| {
+            .spawn(&packaged.setup_command(false), false, move |e| {
                 send.send(e).unwrap()
             })
             .unwrap();
@@ -390,6 +401,27 @@ chmod +x "$UV_PROJECT_ENVIRONMENT/bin/madsister-engine"
         assert!(calls[0].ends_with("--group record --no-install-package madmom"));
         assert!(calls[1].starts_with("pip install --python "));
         assert!(calls[1].ends_with("/engine/wheels/madmom-0.17-cp311.whl"));
+        assert!(!calls[0].contains("beats-allinone"));
+        assert!(!packaged.has_sections());
+
+        // When installing section detection on demand
+        let run = |sections| {
+            let (send, receive) = std::sync::mpsc::channel();
+            Jobs::default()
+                .spawn(&packaged.setup_command(sections), false, move |e| {
+                    send.send(e).unwrap()
+                })
+                .unwrap();
+            receive.iter().count()
+        };
+        run(true);
+
+        // Then uv synced with all-in-one and the env remembers it, until a plain setup (an update) drops it
+        let calls = std::fs::read_to_string(root.join("env.log")).unwrap();
+        assert!(calls.lines().nth(2).unwrap().contains("--group beats-allinone"));
+        assert!(packaged.has_sections());
+        run(false);
+        assert!(!packaged.has_sections());
         std::fs::remove_dir_all(&root).unwrap();
     }
 

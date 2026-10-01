@@ -2,7 +2,7 @@
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useRef, useState } from "react";
-import { cancel, fetchAudio, record, stop, transcribe, type EngineEvent, type ForcedMeter } from "./engine";
+import { cancel, engineHasSections, fetchAudio, record, setupSections, stop, transcribe, type EngineEvent, type ForcedMeter } from "./engine";
 import { AUDIO_EXTENSIONS, canWrite, pickAudioPath } from "./fileActions";
 
 type Job = { id: number | null; stage: string; pct: number; elapsedSec?: number };
@@ -39,6 +39,10 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
 
   /** Transcribes into `<stem>.madsister.json` next to the audio. */
   const transcribeFile = async (audioPath: string) => {
+    if (shouldDetectSections && !(await engineHasSections())) {
+      await run(setupSections, () => void latest.current.transcribeFile(audioPath)); // one-time install, then back here
+      return;
+    }
     const outPath = `${audioPath.replace(/\.[^./\\]+$/, "")}.madsister.json`;
     if (!(await canWrite(outPath))) return;
     await run((onEvent) => transcribe(audioPath, outPath, meter, shouldDetectSections, onEvent), (path) => latest.current.onResult(path));
@@ -106,7 +110,7 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
       </label>{" "}
       <label>
         <input type="checkbox" checked={shouldDetectSections} onChange={(e) => setShouldDetectSections(e.target.checked)} /> Detect
-        sections (slow: ≈ 6 min for a 4-min song, instead of ≈ 20 s)
+        sections (slow: ≈ 6 min for a 4-min song, instead of ≈ 20 s; installed on first use)
       </label>{" "}
       <span>or drop an audio file on the window.</span>
       <form

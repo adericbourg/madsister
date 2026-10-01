@@ -3,10 +3,10 @@ import { exists } from "@tauri-apps/plugin-fs";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { cancel, fetchAudio, record, stop, transcribe, type EngineEvent } from "./engine";
+import { cancel, engineHasSections, fetchAudio, record, setupSections, stop, transcribe, type EngineEvent } from "./engine";
 import { Importer } from "./Importer";
 
-vi.mock("./engine", () => ({ transcribe: vi.fn(), fetchAudio: vi.fn(), record: vi.fn(), stop: vi.fn(), cancel: vi.fn() }));
+vi.mock("./engine", () => ({ engineHasSections: vi.fn(), setupSections: vi.fn(), transcribe: vi.fn(), fetchAudio: vi.fn(), record: vi.fn(), stop: vi.fn(), cancel: vi.fn() }));
 vi.mock("@tauri-apps/api/path", () => ({ appDataDir: async () => "/data", join: async (...parts: string[]) => parts.join("/") }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ exists: vi.fn() }));
@@ -31,6 +31,8 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(engineHasSections).mockResolvedValue(true);
+  vi.mocked(setupSections).mockResolvedValue(9);
   vi.mocked(transcribe).mockResolvedValue(42);
   vi.mocked(fetchAudio).mockResolvedValue(7);
   vi.mocked(record).mockResolvedValue(8);
@@ -61,6 +63,26 @@ test("Importer_whenDroppingAnAudioFile_showsProgressThenReportsTheResult", async
   await emit({ type: "result", path: "/music/song.madsister.json" });
   expect(onResult).toHaveBeenCalledWith("/music/song.madsister.json");
   expect(screen.queryByRole("progressbar")).toBeNull();
+});
+
+test("Importer_whenSectionsAreNotInstalled_installsThemBeforeTranscribing", async () => {
+  // Given "Detect sections" checked while all-in-one isn't installed
+  const user = userEvent.setup();
+  vi.mocked(engineHasSections).mockResolvedValue(false);
+  render(<Importer onResult={onResult} />);
+  await user.click(screen.getByRole("checkbox", { name: /Detect sections \(slow/ }));
+
+  // When dropping an mp3
+  await dropFile("/music/song.mp3");
+
+  // Then the install runs first and nothing is transcribed yet
+  expect(setupSections).toHaveBeenCalledOnce();
+  expect(transcribe).not.toHaveBeenCalled();
+
+  // When the install ends, Then the transcription starts with all-in-one
+  vi.mocked(engineHasSections).mockResolvedValue(true);
+  await emit({ type: "result", path: "/models" }, () => vi.mocked(setupSections).mock.lastCall![0]);
+  expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", null, true, expect.any(Function));
 });
 
 test("Importer_whenCancelling_cancelsTheJob", async () => {

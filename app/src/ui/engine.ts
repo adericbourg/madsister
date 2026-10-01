@@ -45,3 +45,9 @@ export const engineNeedsSetup = (): Promise<boolean> => invoke("engine_needs_set
 
 /** Installs the packaged engine: an `install` progress (uv), then `setup`'s per model, then a result. */
 export const setupEngine = (onEvent: (event: EngineEvent) => void): Promise<number> => start("setup_engine", {}, onEvent);
+
+/** True when "Detect sections" can run (always outside a packaged app). */
+export const engineHasSections = (): Promise<boolean> => invoke("engine_has_sections");
+
+/** Installs all-in-one into the packaged engine (slow, once): same events as `setupEngine`. */
+export const setupSections = (onEvent: (event: EngineEvent) => void): Promise<number> => start("setup_sections", {}, onEvent);

@@ -32,8 +32,7 @@ M6-1.
   workflow builds it (`uv build --wheel` of the pinned sha, with its weights submodule) and bundles it as
   `engine/wheels/`; the script then syncs with `--no-install-package madmom` and installs the wheel with `uv pip install
   --no-deps` (the lock stays untouched). A local `tauri build` without that wheel builds madmom from git on first launch
-  (needs git and a C compiler). NATTEN only matters for the all-in-one opt-in, which the packaged engine doesn't install yet
-  (see "Not done").
+  (needs git and a C compiler). NATTEN only matters for the all-in-one opt-in, which is installed on demand (see "Detect sections").
 - **Runtime dependencies**: deb `Depends`: `ca-certificates` (HTTPS downloads at setup), `ffmpeg`, `gstreamer1.0-plugins-base`,
   `gstreamer1.0-plugins-good`, `gstreamer1.0-libav` (playback, M3-1), `libportaudio2` (recording, M5-2). The AppImage bundles
   GStreamer (`bundleMediaFramework`, +15–35 MB per Tauri's docs: playback is the AppImage's point) but not ffmpeg (a static one
@@ -73,10 +72,15 @@ M6-1.
   network, transcription reading `C:maj`. The env takes ~680 MB (measured on macOS with the same groups).
 - The next push (the commit recording these results) must leave a single snapshot: checked on the releases page.
 
+## Detect sections
+The default env has no all-in-one (NATTEN builds from source, torch is large). Ticking "Detect sections" runs
+`setup-engine.sh ... sections` once (`setup_sections`): same script plus `--group beats-allinone` and `setup --sections`, marked by
+`<env>/.madsister-sections` (= the app version). `uv sync` is exact, so the plain setup after an update drops the group, and the
+marker with it: the next use reinstalls.
+
 ## Not done
-- The all-in-one opt-in (section detection) in the packaged app: it needs `--group beats-allinone` and `setup --sections`, and
-  NATTEN builds from source on macOS. Until then, "Detect sections" fails in a packaged app with the engine's
-  `uv sync --group beats-allinone` hint.
+- Check by hand (needs a desktop, a compiler and cmake): tick "Detect sections" in a packaged app, watch the one-time install, then
+  the sections transcription.
 - Check by hand (needs a desktop): install the deb on a desktop Ubuntu, launch, watch the setup screen, import an mp3, play it;
   same with the AppImage (with ffmpeg and libportaudio2 installed).
 
