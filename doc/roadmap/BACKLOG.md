@@ -3,7 +3,10 @@
 Needs the user reported that no roadmap step covers yet. Newest first.
 
 ## Detect short break bars (e.g. one 2/4 bar in a 4/4 song) — 2026-10-01
-- User: "I often find 2-beat bars as a break."
+- User: "I often find 2-beat bars as a break." It's a recurring pain: other chord/beat detectors the user tried already
+  got these wrong, so detecting them correctly is a differentiator, not a nice-to-have.
+- Measure it: when the user's own `bench/` songs are annotated, include songs with 2-beat break bars and report how each
+  beat tracker handles them (phase recovered after the break, or shifted for the rest of the song).
 - Today: the file format supports it (`Bar.meter` override), and M2-5 lets the user set it by hand. Transcription doesn't
   detect it: madmom's DBN tracker uses a fixed `beats_per_bar`, so a 2-beat break shifts the bar phase for the rest of the
   song instead of producing one short bar (spec §11.3: meter-change detection is out of scope).
