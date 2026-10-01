@@ -106,7 +106,19 @@ def test_main_of_transcribe_with_separate_and_add_tau_uses_harmonic_stem(fakes, 
     assert bars[0]["chords"][0]["chord"] == "C:add2"
 
 
-def test_main_when_adapter_fails_or_group_missing_emits_error_and_exits_1(fakes, make_wav, tmp_path, capfd, monkeypatch):
+def test_main_when_adapter_fails_finds_no_beats_or_group_missing_emits_error_and_exits_1(fakes, make_wav, tmp_path, capfd, monkeypatch):
+    # Given a tracker that finds a single beat (all-in-one on one GuitarSet take, m0-results)
+    monkeypatch.setitem(
+        sys.modules, "madsister_engine.beats.madmom_tracker", types.SimpleNamespace(track=lambda wav, meter: BeatResult([1.0], [1.0]))
+    )
+
+    # When
+    code = cli.main(["transcribe", str(make_wav()), "--out", str(tmp_path / "s.json")])
+
+    # Then
+    assert code == 1
+    assert _lines(capfd)[-1] == {"type": "error", "message": "could not find beats in this audio"}
+
     # Given a chord model that raises
     def recognize(wav):
         raise RuntimeError("boom")

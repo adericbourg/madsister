@@ -88,6 +88,8 @@ def to_song(
     add_tau: float | None = None,
 ) -> Song:
     """Quantization (§3.3 steps 4-6, with 5b when `add_tau` is set): model outputs -> Song. `chroma` = `add_heuristic.chroma`."""
+    if len(beat_result.beats) < 2:
+        raise ValueError("could not find beats in this audio")
     refine = None
     if add_tau is not None:
         features, times = chroma
