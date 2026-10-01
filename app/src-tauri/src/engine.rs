@@ -34,10 +34,6 @@ pub enum EngineEvent {
     Cancelled,
 }
 
-pub fn parse_line(line: &str) -> serde_json::Result<EngineEvent> {
-    serde_json::from_str(line)
-}
-
 /// The engine installed by `setup-engine.sh` in a packaged app (`tauri build`): `uv` is a sidecar next to the app's
 /// binary, the `engine/` project a resource, the env lives in the app data dir.
 pub struct Packaged {
@@ -130,14 +126,6 @@ pub fn transcribe_args(
     args
 }
 
-pub fn fetch_args(url: String, out_dir: String) -> Vec<String> {
-    vec!["fetch".into(), url, "--out-dir".into(), out_dir]
-}
-
-pub fn record_args(out_path: String) -> Vec<String> {
-    vec!["record".into(), "--out".into(), out_path]
-}
-
 const TAIL_LINES: usize = 20;
 
 fn push_bounded(tail: &mut VecDeque<String>, line: String) {
@@ -188,7 +176,7 @@ impl Jobs {
             let mut last = None;
             let mut stray = VecDeque::new();
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                match parse_line(&line) {
+                match serde_json::from_str(&line) {
                     Ok(event @ EngineEvent::Progress { .. }) => emit(event),
                     Ok(event) => last = Some(event),
                     Err(_) => push_bounded(&mut stray, line),
@@ -246,10 +234,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_line_of_engine_lines_returns_events() {
+    fn from_str_of_engine_lines_returns_events() {
         // Given / When / Then each §3.2 line type parses
         assert_eq!(
-            parse_line(r#"{"type":"progress","stage":"beats","pct":40}"#).unwrap(),
+            serde_json::from_str::<EngineEvent>(r#"{"type":"progress","stage":"beats","pct":40}"#)
+                .unwrap(),
             EngineEvent::Progress {
                 stage: "beats".into(),
                 pct: 40,
@@ -257,13 +246,14 @@ mod tests {
             }
         );
         assert_eq!(
-            parse_line(r#"{"type":"result","path":"/a/song.json"}"#).unwrap(),
+            serde_json::from_str::<EngineEvent>(r#"{"type":"result","path":"/a/song.json"}"#)
+                .unwrap(),
             EngineEvent::Result {
                 path: "/a/song.json".into()
             }
         );
         assert_eq!(
-            parse_line(r#"{"type":"error","message":"boom"}"#).unwrap(),
+            serde_json::from_str::<EngineEvent>(r#"{"type":"error","message":"boom"}"#).unwrap(),
             EngineEvent::Error {
                 message: "boom".into(),
                 stderr: String::new()
@@ -285,28 +275,18 @@ mod tests {
     }
 
     #[test]
-    fn parse_line_of_record_progress_keeps_elapsed_seconds() {
+    fn from_str_of_record_progress_keeps_elapsed_seconds() {
         // Given / When / Then
         assert_eq!(
-            parse_line(r#"{"type":"progress","stage":"record","pct":0,"elapsedSec":3}"#).unwrap(),
+            serde_json::from_str::<EngineEvent>(
+                r#"{"type":"progress","stage":"record","pct":0,"elapsedSec":3}"#
+            )
+            .unwrap(),
             EngineEvent::Progress {
                 stage: "record".into(),
                 pct: 0,
                 elapsed_sec: Some(3)
             }
-        );
-    }
-
-    #[test]
-    fn fetch_args_and_record_args_build_the_engine_verbs() {
-        // Given / When / Then
-        assert_eq!(
-            fetch_args("https://x/v".into(), "/data/sources".into()).join(" "),
-            "fetch https://x/v --out-dir /data/sources"
-        );
-        assert_eq!(
-            record_args("/data/sources/r.wav".into()).join(" "),
-            "record --out /data/sources/r.wav"
         );
     }
 
@@ -426,9 +406,9 @@ chmod +x "$UV_PROJECT_ENVIRONMENT/bin/madsister-engine"
     }
 
     #[test]
-    fn parse_line_of_invalid_json_or_unknown_type_fails() {
+    fn from_str_of_invalid_json_or_unknown_type_fails() {
         // Given / When / Then a non-JSON line and an unknown type are rejected
-        assert!(parse_line("Downloading weights...").is_err());
-        assert!(parse_line(r#"{"type":"debug","message":"x"}"#).is_err());
+        assert!(serde_json::from_str::<EngineEvent>("Downloading weights...").is_err());
+        assert!(serde_json::from_str::<EngineEvent>(r#"{"type":"debug","message":"x"}"#).is_err());
     }
 }

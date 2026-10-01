@@ -57,13 +57,8 @@ fn fetch(
     out_dir: String,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
-    start(
-        jobs,
-        engine,
-        engine::fetch_args(url, out_dir),
-        false,
-        on_event,
-    )
+    let args = vec!["fetch".into(), url, "--out-dir".into(), out_dir];
+    start(jobs, engine, args, false, on_event)
 }
 
 /// Records until `stop` (keeps the file) or `cancel` (the file is lost): its stdin is piped for `stop`.
@@ -77,7 +72,8 @@ fn record(
     if let Some(dir) = std::path::Path::new(&out_path).parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("can't create {}: {e}", dir.display()))?;
     }
-    start(jobs, engine, engine::record_args(out_path), true, on_event)
+    let args = vec!["record".into(), "--out".into(), out_path];
+    start(jobs, engine, args, true, on_event)
 }
 
 /// True on a packaged app's first launch, and after an update: `setup_engine` must run before any engine command.
