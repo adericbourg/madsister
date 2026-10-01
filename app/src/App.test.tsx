@@ -205,6 +205,12 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(firstSlot().textContent).toBe("C7M");
   expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5 });
 
+  // When switching to the Latin style, Then the root is spelled Do and the setting saved
+  await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "latin");
+  expect(firstSlot().textContent).toBe("Do7M");
+  expect(JSON.parse(files["/config/settings.json"]).style).toBe("latin");
+  await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
+
   // When raising the low-confidence threshold, Then the setting is saved; an out-of-range value is ignored
   const threshold = screen.getByRole("spinbutton", { name: "Review chords below confidence" });
   fireEvent.change(threshold, { target: { value: "0.7" } });

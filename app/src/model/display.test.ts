@@ -52,6 +52,24 @@ describe("displayChord", () => {
     expect(displayChord(harte, "intl")).toBe(intl);
   });
 
+  test.each([
+    ["C:maj", "Do"],
+    ["D:min", "Rém"],
+    ["E:7", "Mi7"],
+    ["F:maj7", "Fa7M"],
+    ["G:dim", "Sol°"],
+    ["A:min7", "Lam7"],
+    ["B:hdim7", "Sim7b5"],
+    ["Db:maj7/2", "Réb7M/Mib"],
+    ["F#:min7/b7", "Fa#m7/Mi"],
+    ["C:maj/3", "Do/Mi"],
+    ["N", "N.C."],
+    ["%", "%"],
+  ])("displayChord_of%s_returnsLatinRootsWithFrenchSuffixes", (harte, latin) => {
+    // Given / When / Then
+    expect(displayChord(harte, "latin")).toBe(latin);
+  });
+
   test.each(rows)("displayChord_of%s_parsesBackToSameHarte", (harte, fr, intl) => {
     // Given / When / Then
     expect(parseChord(fr)).toEqual({ ok: true, harte });

@@ -13,7 +13,7 @@ const isThreshold = (v: unknown): v is number => typeof v === "number" && v >= 0
 export const parseSettings = (json: unknown): Settings => {
   const raw = (typeof json === "object" && json !== null ? json : {}) as Record<string, unknown>;
   return {
-    style: raw.style === "intl" ? "intl" : "fr",
+    style: raw.style === "intl" || raw.style === "latin" ? raw.style : "fr",
     barsPerRow: raw.barsPerRow === 2 || raw.barsPerRow === 8 ? raw.barsPerRow : 4,
     lowConfidenceThreshold: isThreshold(raw.lowConfidenceThreshold) ? raw.lowConfidenceThreshold : 0.5,
   };
@@ -79,6 +79,7 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
           <select value={settings.style} onChange={(e) => onSettingsChange({ ...settings, style: e.target.value as DisplayStyle })}>
             <option value="fr">French (C7M)</option>
             <option value="intl">International (Cmaj7)</option>
+            <option value="latin">Latin (Sol7M)</option>
           </select>
         </label>
         <label>

@@ -228,7 +228,7 @@ Rules:
 
 ### 5.3 Display
 - **F-DS-1** Display style setting: French (`C7M`, `C°`, `Cm7b5`) default, or international (`Cmaj7`, `Cdim`, `Cø7`).
-- **F-DS-2** MAY: Latin note names (Do, Ré, Mi…).
+- **F-DS-2** Latin display style: note names Do, Ré, Mi, Fa, Sol, La, Si with the French suffixes (`Sol7M`, `Ré°`, `Sim7b5`). Display only; chords are still typed with A–G.
 
 ### 5.4 Verification playback
 - **F-PB-1** Play/pause the source audio. A cursor highlights the current bar (via `startSec`).
