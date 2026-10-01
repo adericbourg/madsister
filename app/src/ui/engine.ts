@@ -43,11 +43,9 @@ export const cancel = (jobId: number): Promise<void> => invoke("cancel", { jobId
 /** True on a packaged app's first launch (and after an update): `setupEngine` must run before the commands above. */
 export const engineNeedsSetup = (): Promise<boolean> => invoke("engine_needs_setup");
 
-/** Installs the packaged engine: an `install` progress (uv), then `setup`'s per model, then a result. */
-export const setupEngine = (onEvent: (event: EngineEvent) => void): Promise<number> => start("setup_engine", {}, onEvent);
+/** Installs the packaged engine: an `install` progress (uv), then `setup`'s per model, then a result. `sections`: also all-in-one (slow, once). */
+export const setupEngine = (sections: boolean, onEvent: (event: EngineEvent) => void): Promise<number> =>
+  start("setup_engine", { sections }, onEvent);
 
 /** True when "Detect sections" can run (always outside a packaged app). */
 export const engineHasSections = (): Promise<boolean> => invoke("engine_has_sections");
-
-/** Installs all-in-one into the packaged engine (slow, once): same events as `setupEngine`. */
-export const setupSections = (onEvent: (event: EngineEvent) => void): Promise<number> => start("setup_sections", {}, onEvent);

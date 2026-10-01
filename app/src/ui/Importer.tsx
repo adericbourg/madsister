@@ -2,7 +2,7 @@
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useRef, useState } from "react";
-import { cancel, engineHasSections, fetchAudio, record, setupSections, stop, transcribe, type EngineEvent, type ForcedMeter } from "./engine";
+import { cancel, engineHasSections, fetchAudio, record, setupEngine, stop, transcribe, type EngineEvent, type ForcedMeter } from "./engine";
 import { AUDIO_EXTENSIONS, canWrite, pickAudioPath } from "./fileActions";
 
 type Job = { id: number | null; stage: string; pct: number; elapsedSec?: number };
@@ -40,7 +40,7 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
   /** Transcribes into `<stem>.madsister.json` next to the audio. */
   const transcribeFile = async (audioPath: string) => {
     if (shouldDetectSections && !(await engineHasSections())) {
-      await run(setupSections, () => void latest.current.transcribeFile(audioPath)); // one-time install, then back here
+      await run((onEvent) => setupEngine(true, onEvent), () => void latest.current.transcribeFile(audioPath)); // one-time install, then back here
       return;
     }
     const outPath = `${audioPath.replace(/\.[^./\\]+$/, "")}.madsister.json`;

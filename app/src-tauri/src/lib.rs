@@ -82,32 +82,23 @@ fn engine_needs_setup(engine: State<Engine>) -> bool {
     engine.0.as_ref().is_some_and(Packaged::needs_setup)
 }
 
-/// Installs the packaged engine (`setup-engine.sh`): same events as the engine commands.
+/// Installs the packaged engine (`setup-engine.sh`): same events as the engine commands. `sections`: also all-in-one
+/// (slow: natten builds from source).
 #[tauri::command]
 fn setup_engine(
     jobs: State<Jobs>,
     engine: State<Engine>,
+    sections: bool,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
     let packaged = engine.0.as_ref().ok_or("the engine isn't packaged")?;
-    spawn(jobs, packaged.setup_command(false), false, on_event)
+    spawn(jobs, packaged.setup_command(sections), false, on_event)
 }
 
-/// True when "Detect sections" can run: always in dev or with `MADSISTER_ENGINE`, else once `setup_sections` ran.
+/// True when "Detect sections" can run: always in dev or with `MADSISTER_ENGINE`, else once `setup_engine` ran with `sections`.
 #[tauri::command]
 fn engine_has_sections(engine: State<Engine>) -> bool {
     engine.0.as_ref().is_none_or(Packaged::has_sections)
-}
-
-/// Installs all-in-one into the packaged engine (slow: natten builds from source): same events as `setup_engine`.
-#[tauri::command]
-fn setup_sections(
-    jobs: State<Jobs>,
-    engine: State<Engine>,
-    on_event: Channel<EngineEvent>,
-) -> Result<u32, String> {
-    let packaged = engine.0.as_ref().ok_or("the engine isn't packaged")?;
-    spawn(jobs, packaged.setup_command(true), false, on_event)
 }
 
 fn packaged_engine(app: &tauri::App) -> Option<Packaged> {
@@ -191,7 +182,6 @@ pub fn run() {
             engine_needs_setup,
             setup_engine,
             engine_has_sections,
-            setup_sections,
             audio_sha256,
             read_audio
         ])

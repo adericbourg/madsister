@@ -3,10 +3,10 @@ import { exists } from "@tauri-apps/plugin-fs";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { cancel, engineHasSections, fetchAudio, record, setupSections, stop, transcribe, type EngineEvent } from "./engine";
+import { cancel, engineHasSections, fetchAudio, record, setupEngine, stop, transcribe, type EngineEvent } from "./engine";
 import { Importer } from "./Importer";
 
-vi.mock("./engine", () => ({ engineHasSections: vi.fn(), setupSections: vi.fn(), transcribe: vi.fn(), fetchAudio: vi.fn(), record: vi.fn(), stop: vi.fn(), cancel: vi.fn() }));
+vi.mock("./engine", () => ({ engineHasSections: vi.fn(), setupEngine: vi.fn(), transcribe: vi.fn(), fetchAudio: vi.fn(), record: vi.fn(), stop: vi.fn(), cancel: vi.fn() }));
 vi.mock("@tauri-apps/api/path", () => ({ appDataDir: async () => "/data", join: async (...parts: string[]) => parts.join("/") }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ exists: vi.fn() }));
@@ -32,7 +32,7 @@ afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(engineHasSections).mockResolvedValue(true);
-  vi.mocked(setupSections).mockResolvedValue(9);
+  vi.mocked(setupEngine).mockResolvedValue(9);
   vi.mocked(transcribe).mockResolvedValue(42);
   vi.mocked(fetchAudio).mockResolvedValue(7);
   vi.mocked(record).mockResolvedValue(8);
@@ -76,12 +76,12 @@ test("Importer_whenSectionsAreNotInstalled_installsThemBeforeTranscribing", asyn
   await dropFile("/music/song.mp3");
 
   // Then the install runs first and nothing is transcribed yet
-  expect(setupSections).toHaveBeenCalledOnce();
+  expect(setupEngine).toHaveBeenCalledExactlyOnceWith(true, expect.any(Function));
   expect(transcribe).not.toHaveBeenCalled();
 
   // When the install ends, Then the transcription starts with all-in-one
   vi.mocked(engineHasSections).mockResolvedValue(true);
-  await emit({ type: "result", path: "/models" }, () => vi.mocked(setupSections).mock.lastCall![0]);
+  await emit({ type: "result", path: "/models" }, () => vi.mocked(setupEngine).mock.lastCall![1]);
   expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", null, true, expect.any(Function));
 });
 

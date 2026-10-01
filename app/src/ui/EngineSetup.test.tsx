@@ -6,7 +6,7 @@ import { EngineSetup } from "./EngineSetup";
 
 vi.mock("./engine", () => ({ engineNeedsSetup: vi.fn(), setupEngine: vi.fn() }));
 
-const engineSays = (event: EngineEvent) => act(() => vi.mocked(setupEngine).mock.lastCall![0](event));
+const engineSays = (event: EngineEvent) => act(() => vi.mocked(setupEngine).mock.lastCall![1](event));
 
 afterEach(cleanup);
 

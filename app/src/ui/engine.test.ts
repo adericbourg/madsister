@@ -35,13 +35,13 @@ test("fetchAudio_record_and_setupEngine_invokeTheirCommandsWithAChannel", async 
   const onEvent = () => {};
   await fetchAudio("https://x/v", "/data/sources", onEvent);
   await record("/data/sources/r.wav", onEvent);
-  await setupEngine(onEvent);
+  await setupEngine(true, onEvent);
   await engineNeedsSetup();
 
   // Then each command gets its arguments and a channel
   expect(invoke).toHaveBeenNthCalledWith(1, "fetch", { url: "https://x/v", outDir: "/data/sources", onEvent: expect.any(Object) });
   expect(invoke).toHaveBeenNthCalledWith(2, "record", { outPath: "/data/sources/r.wav", onEvent: expect.any(Object) });
-  expect(invoke).toHaveBeenNthCalledWith(3, "setup_engine", { onEvent: expect.any(Object) });
+  expect(invoke).toHaveBeenNthCalledWith(3, "setup_engine", { sections: true, onEvent: expect.any(Object) });
   expect(invoke).toHaveBeenNthCalledWith(4, "engine_needs_setup");
 });
 

@@ -23,7 +23,7 @@ export const EngineSetup = ({ children }: { children: ReactNode }) => {
       if (event.type === "result") setIsReady(true);
       else setFailure(event.type === "error" ? event : { message: "The setup was cancelled.", stderr: "" });
     };
-    setupEngine(onEvent).catch((e) => onEvent({ type: "error", message: String(e), stderr: "" }));
+    setupEngine(false, onEvent).catch((e) => onEvent({ type: "error", message: String(e), stderr: "" }));
   };
 
   useEffect(() => {
