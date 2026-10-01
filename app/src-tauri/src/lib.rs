@@ -2,6 +2,7 @@ pub mod engine;
 
 use engine::{EngineEvent, Jobs, Packaged};
 use sha2::{Digest, Sha256};
+use std::io::Read;
 use tauri::ipc::{Channel, Response};
 use tauri::{Manager, RunEvent, State};
 
@@ -123,8 +124,21 @@ fn cancel(jobs: State<Jobs>, job_id: u32) {
 #[tauri::command(async)]
 fn audio_sha256(path: String) -> Option<String> {
     let mut hasher = Sha256::new();
-    std::io::copy(&mut std::fs::File::open(path).ok()?, &mut hasher).ok()?;
-    Some(format!("{:x}", hasher.finalize()))
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        match file.read(&mut buf).ok()? {
+            0 => break,
+            n => hasher.update(&buf[..n]),
+        }
+    }
+    Some(
+        hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect(),
+    )
 }
 
 /// The audio file's bytes, played as a blob in the webview (WebKitGTK's GStreamer can't read the asset protocol).
