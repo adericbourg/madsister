@@ -7,6 +7,7 @@ import {
   moveSection,
   pasteBars,
   resizeSlot,
+  setBarMeter,
   setRepeat,
   splitSlot,
   type SlotRef,
@@ -164,6 +165,19 @@ test("keyToCommand_ofEditShortcuts_appliesTheCommandAndPlacesTheCursor", () => {
   });
   expect(edit(key("v", { mod: true }))).toBeNull();
 
+  // And Mod+B makes the bar a short break bar (2/4; 3/8 in a 6/8 song), or back to the song meter
+  const half = setBarMeter(song, bar, { beats: 2, unit: 4 });
+  expect(edit(key("b", { mod: true }))).toEqual({ kind: "edit", song: half, cursor: at(0, 1, 0) });
+  expect(edit(key("b", { mod: true }), state(at(0, 1, 0), { song: half }))).toEqual({
+    kind: "edit",
+    song: setBarMeter(half, bar, null),
+    cursor: at(0, 1, 0),
+  });
+  const jig: Song = { ...song, meta: { ...song.meta, meter: { beats: 6, unit: 8 } }, sections: [{ id: "j", label: "A", bars: [{ chords: [{ chord: "D:maj", beats: 6 }] }] }] };
+  expect(edit(key("b", { mod: true }), state(at(0, 0), { song: jig }))).toMatchObject({
+    song: { sections: [{ bars: [{ meter: { beats: 3, unit: 8 }, chords: [{ chord: "D:maj", beats: 3 }] }] }] },
+  });
+
   // And section shortcuts
   expect(labels(key("k", { mod: true }))).toEqual({ labels: ["Verse", "Verse (2)", "Chorus", "Bridge"], cursor: at(1, 0) });
   expect(labels(key("K", { mod: true, shift: true }))).toEqual({ labels: ["Verse", "New section", "Chorus", "Bridge"], cursor: at(1, 0) });
@@ -176,6 +190,7 @@ test("keyToCommand_ofEditShortcuts_appliesTheCommandAndPlacesTheCursor", () => {
   expect(edit(key("Backspace"), state(at(0, 1, 0)))).toEqual({ kind: "refused" });
   expect(edit(key("ArrowUp", { alt: true, shift: true }), state(at(0, 0)))).toEqual({ kind: "refused" });
   expect(edit(key("k", { mod: true }), state(at(2, 0)))).toEqual({ kind: "refused" });
+  expect(edit(key("b", { mod: true }), state(at(2, 0)))).toEqual({ kind: "refused" });
 });
 
 test("keyToCommand_ofOtherKeys_returnsTheMatchingAction", () => {

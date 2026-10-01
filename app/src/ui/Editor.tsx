@@ -1,6 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { parseChord } from "../model/chord";
-import { addSection, deleteSection, moveSection, renameSection, setChord, setRepeat, type BarRef, type SlotRef } from "../model/commands";
+import { addSection, deleteSection, moveSection, renameSection, setBarMeter, setChord, setRepeat, type BarRef, type SlotRef } from "../model/commands";
 import type { DisplayStyle } from "../model/display";
 import type { Bar, Song } from "../model/song";
 import { confirmDeleteSection } from "./fileActions";
@@ -80,6 +80,8 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
 
   // Mouse/labelled equivalents of the section shortcuts (F-ED-6), acting on the cursor's section.
   const section = song.sections[cursor.section];
+  const cursorBar = section.bars[cursor.bar];
+  const barMeter = cursorBar && (cursorBar.meter ?? song.meta.meter);
   const editSection = (fn: (s: Song) => Song, to = cursor.section) => {
     history.apply(fn);
     setCursor({ section: to, bar: 0, slot: 0 });
@@ -164,6 +166,23 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
         <button type="button" onClick={() => void removeSection()}>
           Delete section
         </button>
+      </fieldset>
+      <fieldset className="toolbar" disabled={barMeter === undefined}>
+        <legend>Bar</legend>
+        <label>
+          Beats in this bar{" "}
+          <input
+            type="number"
+            min={1}
+            value={barMeter?.beats ?? ""}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (barMeter && Number.isInteger(n) && n >= 1 && n !== barMeter.beats)
+                history.apply((s) => setBarMeter(s, cursor, { beats: n, unit: barMeter.unit }));
+            }}
+          />
+        </label>{" "}
+        /{barMeter?.unit ?? song.meta.meter.unit}
       </fieldset>
       <Grid
         song={song}

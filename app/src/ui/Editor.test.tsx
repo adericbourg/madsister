@@ -161,3 +161,22 @@ test("Editor_whenReviewingLowConfidenceChords_jumpsToThemAndCountsDown", async (
   await user.keyboard("{F8}");
   expect(screen.getByRole("status").textContent).toBe("Not possible here");
 });
+
+test("Editor_whenSettingTheBarMeter_overridesTheCursorBar", async () => {
+  // Given an empty 4/4 song with the cursor on bar 1
+  const user = userEvent.setup();
+  render(<Harness />);
+  const beats = screen.getByRole("spinbutton", { name: "Beats in this bar" });
+  expect((beats as HTMLInputElement).value).toBe("4");
+
+  // When pressing Mod+B, Then the bar becomes a 2/4 break bar
+  await user.keyboard("{Control>}b{/Control}");
+  expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 1 in 2/4, beat 1: no chord" }));
+  expect((beats as HTMLInputElement).value).toBe("2");
+
+  // When typing 3 then 4 beats in the bar control, Then the bar goes 3/4, then back to the song meter
+  fireEvent.change(beats, { target: { value: "3" } });
+  expect(song?.sections[0].bars[0]).toEqual({ meter: { beats: 3, unit: 4 }, chords: [{ chord: "N", beats: 3 }] });
+  fireEvent.change(beats, { target: { value: "4" } });
+  expect(song?.sections[0].bars[0]).toEqual({ chords: [{ chord: "N", beats: 4 }] });
+});

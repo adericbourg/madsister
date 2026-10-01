@@ -11,6 +11,7 @@ import {
   pasteBars,
   renameSection,
   resizeSlot,
+  setBarMeter,
   setChord,
   setRepeat,
   splitSection,
@@ -280,5 +281,47 @@ describe("copyBars / pasteBars", () => {
     expect(() => parseSong(JSON.parse(JSON.stringify(result)))).not.toThrow();
     expect(result.sections[0].bars[0].meter).toEqual({ beats: 4, unit: 4 });
     expect(result.sections[0].bars[1]).not.toHaveProperty("meter");
+  });
+});
+
+describe("setBarMeter", () => {
+  test("setBarMeter_resizesTheSlotsAndRemovesTheOverrideAtTheSongMeter", () => {
+    // Given bar 0 = A:min 3 + E:7 1 in a 4/4 song
+    const song = fixture();
+    const ref = { section: 0, bar: 0 };
+
+    // When shrinking it to 2/4, growing it to 5/4, then setting it back to 4/4 or to null
+    const shrunk = check(song, setBarMeter(song, ref, { beats: 2, unit: 4 }));
+    const grown = check(song, setBarMeter(song, ref, { beats: 5, unit: 4 }));
+    const back = checkSong(song, setBarMeter(setBarMeter(song, ref, { beats: 2, unit: 4 }), ref, { beats: 4, unit: 4 }));
+    const reset = check(song, setBarMeter(song, ref, null));
+
+    // Then slots are truncated from the end, or the last slot grows; startSec and the other bars are kept
+    expect(shrunk[0]).toEqual({ startSec: 0, meter: { beats: 2, unit: 4 }, chords: [{ chord: "A:min", beats: 2, confidence: 0.4 }] });
+    expect(grown[0].chords.map((s) => [s.chord, s.beats])).toEqual([["A:min", 3], ["E:7", 2]]);
+    expect(grown[0].meter).toEqual({ beats: 5, unit: 4 });
+    expect(shrunk[1]).toBe(song.sections[0].bars[1]);
+    // And the song meter removes the override
+    expect(back.sections[0].bars[0]).not.toHaveProperty("meter");
+    expect(back.sections[0].bars[0].chords).toEqual([{ chord: "A:min", beats: 4, confidence: 0.4 }]);
+    expect(reset[0]).toEqual(song.sections[0].bars[0]);
+  });
+
+  test("setBarMeter_ofAHalfBarInA68Song_countsInEighths", () => {
+    // Given a 6/8 song whose bar is 4 + 2 eighths
+    const song = deepFreeze(
+      parseSong({
+        version: 1,
+        meta: { title: "Jig", meter: { beats: 6, unit: 8 } },
+        sections: [{ id: "s", label: "A", bars: [{ chords: [{ chord: "D:maj", beats: 4 }, { chord: "A:maj", beats: 2 }] }] }],
+      }),
+    );
+
+    // When setting it to 3/8
+    const result = setBarMeter(song, { section: 0, bar: 0 }, { beats: 3, unit: 8 });
+
+    // Then it keeps 3 eighths of the first chord
+    expect(() => parseSong(JSON.parse(JSON.stringify(result)))).not.toThrow();
+    expect(result.sections[0].bars[0]).toEqual({ meter: { beats: 3, unit: 8 }, chords: [{ chord: "D:maj", beats: 3 }] });
   });
 });

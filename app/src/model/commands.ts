@@ -1,5 +1,5 @@
 // Pure editing commands (spec F-ED-3/4/5/6/8): each returns a new Song and shares every untouched object with the input.
-import { newSectionId, type Bar, type ChordSlot, type Section, type Song } from "./song";
+import { newSectionId, type Bar, type ChordSlot, type Meter, type Section, type Song } from "./song";
 
 export type BarRef = { readonly section: number; readonly bar: number };
 export type SlotRef = BarRef & { readonly slot: number };
@@ -57,6 +57,22 @@ export const resizeSlot = (song: Song, ref: SlotRef, delta: 1 | -1): Song =>
     const other = ref.slot === slots.length - 1 ? ref.slot - 1 : ref.slot + 1;
     const beats = slots.map((s, i) => (i === ref.slot ? s.beats + delta : i === other ? s.beats - delta : s.beats));
     return slots.map((s, i) => ({ ...s, beats: beats[i] })).filter((_, i) => beats[i] > 0);
+  });
+
+/** Sets the bar's meter (F-ED-11): slots are cut from the end, or the last slot grows. `null` or the song meter removes the override. */
+export const setBarMeter = (song: Song, ref: BarRef, meter: Meter | null): Song =>
+  updateBar(song, ref, ({ meter: _, ...bar }) => {
+    const target = meter ?? song.meta.meter;
+    let left = target.beats;
+    const chords = bar.chords.flatMap((slot) => {
+      const beats = Math.min(slot.beats, left);
+      left -= beats;
+      return beats > 0 ? [{ ...slot, beats }] : [];
+    });
+    const last = chords.length - 1;
+    chords[last] = { ...chords[last], beats: chords[last].beats + left };
+    const isSongMeter = target.beats === song.meta.meter.beats && target.unit === song.meta.meter.unit;
+    return isSongMeter ? { ...bar, chords } : { ...bar, meter: target, chords };
   });
 
 // Only the section is checked, so that `{bar: 0}` inserts into an empty section.

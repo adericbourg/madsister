@@ -14,6 +14,7 @@ const song: Song = {
         { chords: [{ chord: "C:min7", beats: 4 }] },
         { chords: [{ chord: "F:min7", beats: 3 }, { chord: "G:7", beats: 1, confidence: 0.3 }] },
         { chords: [{ chord: "A:min7", beats: 4, confidence: 0.9 }] },
+        { meter: { beats: 2, unit: 4 }, chords: [{ chord: "D:7", beats: 2 }] },
       ],
     },
     { id: "b", label: "Chorus", repeat: 2, bars: [{ chords: [{ chord: "N", beats: 4 }] }] },
@@ -34,6 +35,10 @@ test("Grid_ofSong_rendersSectionedChart", () => {
   expect(screen.getByText("x2")).toBeDefined();
   expect(screen.getByText("No bars yet")).toBeDefined();
 
+  // And a bar with a meter override shows it, also to screen readers
+  expect(screen.getByText("2/4")).toBeDefined();
+  expect(screen.getByRole("gridcell", { name: "Verse, bar 4 in 2/4, beat 1: D 7" })).toBeDefined();
+
   // And bars are laid out in rows of barsPerRow: Verse takes 2 rows
   const verse = screen.getByRole("rowgroup", { name: "Verse" });
   expect(within(verse).getAllByRole("row")).toHaveLength(2);
@@ -41,7 +46,7 @@ test("Grid_ofSong_rendersSectionedChart", () => {
 
   // And there is one cell per slot, named for screen readers
   const cells = within(screen.getByRole("grid")).getAllByRole("gridcell", { name: /, bar \d/ });
-  expect(cells).toHaveLength(5);
+  expect(cells).toHaveLength(6);
   const f = screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: F minor 7" });
   const g = screen.getByRole("gridcell", { name: "Verse, bar 2, beat 4: G 7, low confidence" });
   expect(screen.getByRole("gridcell", { name: "Chorus, bar 1, beat 1: no chord" })).toBeDefined();
@@ -56,5 +61,5 @@ test("Grid_ofSong_rendersSectionedChart", () => {
 
   // And the cursor cell is the only tab stop
   expect(cells.filter((cell) => cell.tabIndex === 0)).toEqual([g]);
-  expect(cells.filter((cell) => cell.tabIndex === -1)).toHaveLength(4);
+  expect(cells.filter((cell) => cell.tabIndex === -1)).toHaveLength(5);
 });

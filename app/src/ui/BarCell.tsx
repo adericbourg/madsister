@@ -18,14 +18,20 @@ type Props = {
 
 export const BarCell = ({ bar, at, sectionLabel, style, tabStop, lowConfidenceThreshold, selection, editor, onCellClick }: Props) => {
   const isSelected = selection?.section === at.section && at.bar >= selection.from && at.bar <= selection.to;
+  const meter = bar.meter && `${bar.meter.beats}/${bar.meter.unit}`;
   let beat = 1;
   return (
     <div className={isSelected ? "bar is-selected" : "bar"}>
+      {meter && (
+        <span className="bar-meter" aria-hidden="true">
+          {meter}
+        </span>
+      )}
       {bar.chords.map((slot, i) => {
         const isLowConfidence = slot.confidence !== undefined && slot.confidence < lowConfidenceThreshold;
         const isTabStop = tabStop.section === at.section && tabStop.bar === at.bar && tabStop.slot === i;
         const isEditing = isTabStop && editor !== undefined;
-        const name = `${sectionLabel}, bar ${at.bar + 1}, beat ${beat}: ${speakChord(slot.chord)}${isLowConfidence ? ", low confidence" : ""}`;
+        const name = `${sectionLabel}, bar ${at.bar + 1}${meter ? ` in ${meter}` : ""}, beat ${beat}: ${speakChord(slot.chord)}${isLowConfidence ? ", low confidence" : ""}`;
         beat += slot.beats;
         return (
           <div

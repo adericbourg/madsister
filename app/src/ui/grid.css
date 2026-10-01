@@ -75,6 +75,14 @@
   border-right: 2px solid var(--ink);
 }
 
+/* A per-bar meter override (F-ED-11), at the start of the bar like a time signature; printed too. */
+.bar-meter {
+  align-self: center;
+  padding-left: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .slot {
   flex-basis: 0;
   min-width: 0;

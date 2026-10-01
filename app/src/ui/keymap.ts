@@ -10,6 +10,7 @@ import {
   moveSection,
   pasteBars,
   resizeSlot,
+  setBarMeter,
   setRepeat,
   splitSection,
   splitSlot,
@@ -47,6 +48,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["Mod+Enter / Mod+Shift+Enter", "Insert a bar after / before"],
   ["Mod+Backspace", "Delete the bar"],
   ["Mod+D", "Duplicate the bar"],
+  ["Mod+B", "Make the bar a short break bar (2/4, or 3/8 in 6/8) / back to the song meter"],
   ["Shift+← / Shift+→", "Select bars"],
   ["Mod+C / Mod+V", "Copy the selected bars / paste after the cursor bar"],
   ["Mod+Z / Mod+Shift+Z", "Undo / redo"],
@@ -138,6 +140,11 @@ const commandFor = (e: KeyInput, state: EditorState): Command | null => {
         return e.shiftKey ? edit((s) => deleteSection(s, section)) : edit((s) => deleteBar(s, bar));
       case "d":
         return edit((s) => duplicateBar(s, bar));
+      case "b": {
+        const unit = song.meta.meter.unit;
+        const isOverridden = song.sections[section].bars[bar.bar]?.meter !== undefined;
+        return edit((s) => setBarMeter(s, bar, isOverridden ? null : { beats: unit === 8 ? 3 : 2, unit }));
+      }
       case "k":
         return edit(
           (s) => (e.shiftKey ? addSection(s, section + 1, "New section") : splitSection(s, bar)),
