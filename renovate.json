@@ -2,5 +2,13 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "Pinned on purpose: natten 0.18+ removed the legacy ops that allin1 1.1.0 calls (see engine/pyproject.toml).",
+      "matchPackageNames": ["natten"],
+      "enabled": false
+    }
   ]
 }
