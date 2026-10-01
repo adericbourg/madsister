@@ -15,13 +15,19 @@ or set `MADSISTER_ENGINE` to another command line.
 uv sync --group fetch    # add the groups you transcribe with: --group replaces
 uv run --no-sync madsister-engine fetch https://… --out-dir ~/Music   # result: <out-dir>/<title>.<ext>, any format decode reads
 ```
+`record` records the default input (`--group record`; Linux needs `libportaudio2`) to a mono 44.1 kHz 16-bit WAV until
+Ctrl-C or a `stop` line on stdin (EOF stops too). On macOS the microphone permission is asked for the parent process (the
+terminal, or the app).
+```
+uv run --no-sync madsister-engine record --out take.wav   # progress: {"stage":"record","pct":0,"elapsedSec":n} every second
+```
 ```
 uv run pytest -m "not slow"   # fast tests (what CI runs)
 uv run pytest -m slow         # needs the model dependency groups and weights
 ```
 The `engine-models` CI workflow runs the slow tests with every model group, on Linux and macOS. Same locally:
 ```
-uv sync --locked --group beats-madmom --group beats-allinone --group chords-btc --group chords-cnnlstm --group separate --group fetch
+uv sync --locked --group beats-madmom --group beats-allinone --group chords-btc --group chords-cnnlstm --group separate --group fetch --group record
 uv run --no-sync pytest -m slow tests/test_model_imports.py   # seconds: each heavy dep imports and runs one native call
 uv run --no-sync pytest -m slow                               # minutes: downloads weights on the first run
 ```

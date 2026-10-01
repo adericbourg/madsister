@@ -9,8 +9,8 @@ def _emit(event: dict) -> None:
     sys.stdout.flush()
 
 
-def progress(stage: str, pct: int) -> None:
-    _emit({"type": "progress", "stage": stage, "pct": pct})
+def progress(stage: str, pct: int, **extra) -> None:
+    _emit({"type": "progress", "stage": stage, "pct": pct, **extra})
 
 
 def result(path: str) -> None:

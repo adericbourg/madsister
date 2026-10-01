@@ -127,10 +127,12 @@ madsister-engine record --out <file.wav>              # stops on SIGINT / stdin 
 stdout: one JSON object per line:
 ```json
 {"type":"progress","stage":"beats","pct":40}
+{"type":"progress","stage":"record","pct":0,"elapsedSec":3}
 {"type":"result","path":"/…/song.json"}
 {"type":"error","message":"…"}
 ```
 Exit code 0 on success, non-zero on error (with an `error` line emitted first).
+`record` has no known end: its progress keeps `pct` at 0 and adds `elapsedSec` (whole seconds recorded), once at start then every second.
 `--meter 6/8`: the trackers run at the dotted-quarter pulse (2 beats per bar); the Song is written in eighths (`meta.meter` 6/8, slot beats ×3, `tempoBpm` = dotted-quarter BPM).
 
 ### 3.3 Transcription pipeline

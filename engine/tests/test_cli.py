@@ -1,7 +1,12 @@
+import io
 import json
+import signal
 import sys
+import threading
 import types
+import wave
 
+import numpy as np
 import pytest
 
 from madsister_engine import cli, pipeline
@@ -40,13 +45,35 @@ def youtube_dl(monkeypatch):
     return calls
 
 
-def test_main_of_stub_command_emits_error_and_fails(capfd):
-    # When
-    code = cli.main(["record", "--out", "/tmp/r.wav"])
+@pytest.fixture
+def microphone(monkeypatch):
+    """A fake `sounddevice` whose stream feeds `mic["blocks"]` to the callback, then sends SIGINT if `mic["sigint"]`,
+    or whose opening raises `mic["raise"]`."""
+    mic = {"blocks": [], "sigint": False}
 
-    # Then
-    assert code != 0
-    assert _lines(capfd) == [{"type": "error", "message": "not implemented"}]
+    class InputStream:
+        def __init__(self, **params):
+            if "raise" in mic:
+                raise mic["raise"]
+            mic["params"] = params
+
+        def __enter__(self):
+            for block in mic["blocks"]:
+                mic["params"]["callback"](block, len(block), None, None)
+            if mic["sigint"]:
+                signal.getsignal(signal.SIGINT)(signal.SIGINT, None)
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setitem(sys.modules, "sounddevice", types.SimpleNamespace(InputStream=InputStream))
+    monkeypatch.setattr(pipeline, "_installed", lambda module: True)
+    return mic
+
+
+def _half_seconds(count):
+    return [np.full((22050, 1), i, dtype=np.int16) for i in range(count)]
 
 
 def test_main_when_command_raises_emits_error_and_exits_1(capfd, tmp_path):
@@ -110,3 +137,64 @@ def test_main_of_fetch_when_download_fails_emits_its_error(youtube_dl, capfd, tm
     # Then
     assert code == 1
     assert _lines(capfd) == [{"type": "error", "message": "ERROR: Unsupported URL: https://example.com"}]
+
+
+def test_main_of_record_when_stdin_says_stop_writes_the_recorded_wav(microphone, monkeypatch, capfd, tmp_path):
+    # Given 2.5 s of input, then a `stop` line on stdin
+    microphone["blocks"] = _half_seconds(5)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("noise\nstop\n"))
+    out = tmp_path / "take.wav"
+
+    # When
+    code = cli.main(["record", "--out", str(out)])
+
+    # Then a mono 44.1 kHz 16-bit WAV holds every block, with one progress event per elapsed second
+    assert code == 0
+    assert microphone["params"]["samplerate"] == 44100
+    assert microphone["params"]["channels"] == 1
+    assert microphone["params"]["dtype"] == "int16"
+    with wave.open(str(out)) as wav:
+        assert (wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) == (1, 2, 44100)
+        frames = np.frombuffer(wav.readframes(wav.getnframes()), dtype=np.int16)
+    assert np.array_equal(frames, np.concatenate(microphone["blocks"]).ravel())
+    assert _lines(capfd) == [
+        {"type": "progress", "stage": "record", "pct": 0, "elapsedSec": 0},
+        {"type": "progress", "stage": "record", "pct": 0, "elapsedSec": 1},
+        {"type": "progress", "stage": "record", "pct": 0, "elapsedSec": 2},
+        {"type": "result", "path": str(out)},
+    ]
+
+
+def test_main_of_record_when_interrupted_writes_the_wav_and_restores_sigint(microphone, monkeypatch, capfd, tmp_path):
+    # Given 1 s of input, then SIGINT, with stdin left open
+    microphone["blocks"] = _half_seconds(2)
+    microphone["sigint"] = True
+    released = threading.Event()
+    monkeypatch.setattr(sys, "stdin", iter(released.wait, True))
+    out = tmp_path / "take.wav"
+
+    # When
+    code = cli.main(["record", "--out", str(out)])
+    released.set()
+
+    # Then
+    assert code == 0
+    with wave.open(str(out)) as wav:
+        assert wav.getnframes() == 44100
+    assert _lines(capfd)[-1] == {"type": "result", "path": str(out)}
+    assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
+
+
+def test_main_of_record_when_no_input_device_emits_error_without_writing(microphone, capfd, tmp_path):
+    # Given
+    microphone["raise"] = RuntimeError("Error querying device -1")
+    out = tmp_path / "take.wav"
+
+    # When
+    code = cli.main(["record", "--out", str(out)])
+
+    # Then
+    assert code == 1
+    assert not out.exists()
+    assert _lines(capfd) == [{"type": "error", "message": "Error querying device -1"}]
+    assert signal.getsignal(signal.SIGINT) is signal.default_int_handler

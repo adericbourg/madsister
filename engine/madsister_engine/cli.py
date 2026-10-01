@@ -3,7 +3,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from madsister_engine import events, fetch, pipeline
+from madsister_engine import events, fetch, pipeline, record
 
 
 def _transcribe(args: argparse.Namespace) -> int:
@@ -21,9 +21,9 @@ def _fetch(args: argparse.Namespace) -> int:
     return 0
 
 
-def _not_implemented(args: argparse.Namespace) -> int:
-    events.error("not implemented")
-    return 2
+def _record(args: argparse.Namespace) -> int:
+    events.result(str(record.record(args.out).resolve()))
+    return 0
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -49,7 +49,7 @@ def _parser() -> argparse.ArgumentParser:
 
     record = sub.add_parser("record", help="record from the microphone")
     record.add_argument("--out", required=True)
-    record.set_defaults(func=_not_implemented)
+    record.set_defaults(func=_record)
     return parser
 
 

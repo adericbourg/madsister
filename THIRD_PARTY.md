@@ -18,6 +18,8 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | librosa | Audio features for BTC and Chord-CNN-LSTM, chroma for the add2/add4 heuristic | ISC | — | https://github.com/librosa/librosa |
 | PyYAML | BTC's config loading | MIT | — | https://github.com/yaml/pyyaml |
 | yt-dlp | Downloads a URL's audio (`fetch` group), the only network access after setup | Unlicense | — | https://github.com/yt-dlp/yt-dlp |
+| python-sounddevice | Microphone recording (`record` group) | MIT | — | https://github.com/spatialaudio/python-sounddevice |
+| PortAudio | Audio I/O under sounddevice (bundled in its macOS wheels; `libportaudio2` on Linux) | MIT | — | https://www.portaudio.com |
 | FFmpeg | Decoding (called as an external program on `PATH`, not bundled) | LGPL-2.1+ (GPL-2+ for some builds) | — | https://ffmpeg.org |
 | pytest | Tests only (`dev` group), not shipped | MIT | — | https://github.com/pytest-dev/pytest |
 | GuitarSet (Xi et al., ISMIR 2018) | Proxy bench data (`bench/`), downloaded by `bench/fetch_guitarset.py`; not shipped | — | CC BY 4.0 (data) | https://zenodo.org/records/3371780 |
