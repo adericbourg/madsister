@@ -89,8 +89,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M2-6 | [m2-step6-audio-ref-and-perf](m2-step6-audio-ref-and-perf.md) | done | b3eba03 |
 | M2-7 | [m2-step7-developer-docs](m2-step7-developer-docs.md) | todo | |
 | M3-1 | [m3-step1-playback-cursor](m3-step1-playback-cursor.md) | done | 0ca8033 |
-| M3-2 | [m3-step2-click-seek](m3-step2-click-seek.md) | done | this |
-| M3-3 | [m3-step3-phase-nudge](m3-step3-phase-nudge.md) | todo | |
+| M3-2 | [m3-step2-click-seek](m3-step2-click-seek.md) | done | 2bf7c97 |
+| M3-3 | [m3-step3-phase-nudge](m3-step3-phase-nudge.md) | done | this |
 | M3-4 | [m3-step4-tempo-fix](m3-step4-tempo-fix.md) | todo | |
 | M4-1 | [m4-step1-chordpro-grid](m4-step1-chordpro-grid.md) | done | 07bc88f |
 | M4-2 | [m4-step2-musicxml](m4-step2-musicxml.md) | done | 66778ac |

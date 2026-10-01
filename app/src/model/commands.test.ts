@@ -14,6 +14,7 @@ import {
   setBarMeter,
   setChord,
   setRepeat,
+  shiftPhase,
   splitSection,
   splitSlot,
 } from "./commands";
@@ -323,5 +324,107 @@ describe("setBarMeter", () => {
     // Then it keeps 3 eighths of the first chord
     expect(() => parseSong(JSON.parse(JSON.stringify(result)))).not.toThrow();
     expect(result.sections[0].bars[0]).toEqual({ meter: { beats: 3, unit: 8 }, chords: [{ chord: "D:maj", beats: 3 }] });
+  });
+});
+
+describe("shiftPhase", () => {
+  const frozen = (sections: unknown[]): Song => deepFreeze(parseSong({ version: 1, meta: { title: "t", meter: { beats: 4, unit: 4 } }, sections }));
+  const valid = (song: Song) => {
+    expect(() => parseSong(JSON.parse(JSON.stringify(song)))).not.toThrow();
+    return song;
+  };
+  const shape = (song: Song) =>
+    song.sections.map((s) => s.bars.map((b) => `${b.startSec ?? "-"}|${b.chords.map((c) => `${c.chord}:${c.beats}`).join(" ")}`));
+
+  test("shiftPhase_whenChordsChangeOnBeat2_movesTheBarLinesToTheChanges", () => {
+    // Given a song whose chords all change on beat 2 (the bar lines are one beat early)
+    const song = frozen([
+      {
+        id: "v",
+        label: "Verse",
+        bars: [
+          { startSec: 0, chords: [{ chord: "A:min", beats: 1 }, { chord: "C:maj", beats: 3 }] },
+          { startSec: 2, chords: [{ chord: "C:maj", beats: 1 }, { chord: "G:maj", beats: 3 }] },
+          { startSec: 4, chords: [{ chord: "G:maj", beats: 1 }, { chord: "F:maj", beats: 3 }] },
+          { startSec: 6, chords: [{ chord: "F:maj", beats: 4 }] },
+        ],
+      },
+    ]);
+
+    // When shifting the phase by +1 beat
+    const fixed = valid(shiftPhase(song, 1));
+
+    // Then a 1-beat pickup comes first, each chord fills a bar, and the last bar is cut short
+    expect(shape(fixed)).toEqual([["0|A:min:1", "0.5|C:maj:4", "2.5|G:maj:4", "4.5|F:maj:4", "6.5|F:maj:3"]]);
+    expect(fixed.sections[0].bars[0].meter).toEqual({ beats: 1, unit: 4 });
+    expect(fixed.sections[0].bars[1]).not.toHaveProperty("meter");
+    expect(fixed.sections[0].bars[4].meter).toEqual({ beats: 3, unit: 4 });
+    // And -1 undoes +1, +1 undoes -1
+    expect(valid(shiftPhase(fixed, -1))).toEqual(song);
+    expect(shiftPhase(valid(shiftPhase(song, -1)), 1)).toEqual(song);
+  });
+
+  test("shiftPhase_fromABar_leavesEarlierBarsAndAnchorsSectionsToTheShiftedBarLines", () => {
+    // Given a Verse and a Chorus of two bars each, the third bar without a time
+    const song = frozen([
+      { id: "v", label: "Verse", bars: [{ startSec: 0, chords: [{ chord: "C:maj", beats: 4 }] }, { startSec: 2, chords: [{ chord: "D:min", beats: 4 }] }] },
+      { id: "c", label: "Chorus", bars: [{ chords: [{ chord: "G:maj", beats: 4 }] }, { startSec: 6, chords: [{ chord: "F:maj", beats: 4 }] }] },
+    ]);
+    const from = { section: 0, bar: 1 };
+
+    // When shifting by -1 beat from the second bar
+    const shifted = valid(shiftPhase(song, -1, from));
+
+    // Then the first bar is the same object, the Chorus starts one beat earlier, and bars starting in the untimed bar have no time
+    expect(shifted.sections[0].bars[0]).toBe(song.sections[0].bars[0]);
+    expect(shape(shifted)).toEqual([
+      ["0|C:maj:4", "2|D:min:3"],
+      ["3.5|D:min:1 G:maj:3", "-|G:maj:1 F:maj:3", "7.5|F:maj:1"],
+    ]);
+    expect(shifted.sections[1]).toMatchObject({ id: "c", label: "Chorus" });
+
+    // When shifting twice by +1 from the second bar, Then it becomes a 2-beat break bar
+    const twice = valid(shiftPhase(shiftPhase(song, 1, from), 1, from));
+    expect(shape(twice)).toEqual([
+      ["0|C:maj:4", "2|D:min:2", "3|D:min:2 G:maj:2"],
+      ["-|G:maj:2 F:maj:2", "7|F:maj:2"],
+    ]);
+    expect(twice.sections[0].bars[1].meter).toEqual({ beats: 2, unit: 4 });
+  });
+
+  test("shiftPhase_acrossABarWithItsOwnMeter_throws", () => {
+    // Given a 4/4 song with a 2/4 bar in the middle
+    const song = frozen([
+      {
+        id: "v",
+        label: "Verse",
+        bars: [
+          { chords: [{ chord: "C:maj", beats: 4 }] },
+          { meter: { beats: 2, unit: 4 }, chords: [{ chord: "C:maj", beats: 2 }] },
+          { chords: [{ chord: "C:maj", beats: 4 }] },
+        ],
+      },
+    ]);
+
+    // When / Then shifting across it is refused, shifting after it isn't
+    expect(() => shiftPhase(song, 1)).toThrow(/own meter/);
+    expect(() => shiftPhase(song, 1, { section: 0, bar: 2 })).not.toThrow();
+  });
+
+  test("shiftPhase_ofAGuitarSetReferenceShiftedByOneBeat_restoresIt", () => {
+    // Given the first 12 bars of GuitarSet 00_Rock1-130-A_comp (130 BPM), with its bar phase off by one beat
+    const chords = ["A:maj", "A:maj", "A:maj", "A:maj", "D:maj/5", "D:maj/5", "A:maj", "A:maj", "E:maj", "D:sus2/2", "A:maj/5", "A:maj/5"];
+    const reference = frozen([
+      { id: "s", label: "Song", bars: chords.map((chord, i) => ({ startSec: (i * 4 * 60) / 130, chords: [{ chord, beats: 4 }] })) },
+    ]);
+    const wrong = shiftPhase(reference, 1);
+
+    // When fixing the phase in one action
+    const fixed = shiftPhase(wrong, -1);
+
+    // Then every bar is back on its reference chord and time
+    expect(shape(wrong)).not.toEqual(shape(reference));
+    expect(fixed.sections[0].bars.map((b) => b.chords)).toEqual(reference.sections[0].bars.map((b) => b.chords));
+    fixed.sections[0].bars.forEach((b, i) => expect(b.startSec).toBeCloseTo(reference.sections[0].bars[i].startSec ?? NaN, 9));
   });
 });

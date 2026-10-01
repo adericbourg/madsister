@@ -14,3 +14,5 @@ Needs the user reported that no roadmap step covers yet. Newest first.
   and propose "insert a 2-beat bar here" as a one-click fix (close to F-PB-3's phase nudge, M3-3).
 - Until then: M2-5 should make "set this bar to 2 beats" fast (one shortcut), and M3-3's phase nudge should be usable from a
   given bar onward, not only for the whole song, since that's exactly the repair a break bar needs.
+- Done in M3-3: on the first bar after the missed break, `>` (or `<`) twice re-cuts the rest of the song and leaves a
+  2-beat bar there, with chords and times following. Still manual: the break has to be spotted by ear. Left: detection.

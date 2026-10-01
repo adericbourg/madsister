@@ -12,6 +12,7 @@ import {
   resizeSlot,
   setBarMeter,
   setRepeat,
+  shiftPhase,
   splitSection,
   splitSlot,
   type BarRef,
@@ -49,6 +50,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["Mod+Backspace", "Delete the bar"],
   ["Mod+D", "Duplicate the bar"],
   ["Mod+B", "Make the bar a short break bar (2/4, or 3/8 in 6/8) / back to the song meter"],
+  ["< / >", "Move the bar lines one beat earlier / later, from the cursor bar on (twice after a missed 2-beat break)"],
   ["Shift+← / Shift+→", "Select bars"],
   ["Mod+C / Mod+V", "Copy the selected bars / paste after the cursor bar"],
   ["Mod+Z / Mod+Shift+Z", "Undo / redo"],
@@ -194,6 +196,9 @@ const commandFor = (e: KeyInput, state: EditorState): Command | null => {
     }
     case "/":
       return edit((s) => splitSlot(s, cursor));
+    case "<":
+    case ">":
+      return edit((s) => shiftPhase(s, e.key === ">" ? 1 : -1, bar), { ...bar, slot: 0 });
     case "Backspace":
       return edit((s) => mergeSlotWithNext(s, { ...cursor, slot: cursor.slot - 1 }), { ...cursor, slot: cursor.slot - 1 });
     case "?":

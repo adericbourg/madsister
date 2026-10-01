@@ -184,6 +184,36 @@ test("Editor_whenSettingTheBarMeter_overridesTheCursorBar", async () => {
   expect(song?.sections[0].bars[0]).toEqual({ chords: [{ chord: "N", beats: 4 }] });
 });
 
+test("Editor_whenShiftingThePhase_movesTheBarLinesInOneUndoableStep", async () => {
+  // Given a song whose chords change on beat 2
+  const user = userEvent.setup();
+  const original: Song = {
+    version: 1,
+    meta: { title: "Song", meter: { beats: 4, unit: 4 } },
+    sections: [{ id: "v", label: "Verse", bars: [bar(["A:min", 1], ["C:maj", 3]), bar(["C:maj", 1], ["G:maj", 3]), bar(["G:maj", 4])] }],
+  };
+  render(<Harness from={() => original} />);
+  const chords = () => song?.sections[0].bars.map((b) => b.chords.map((c) => `${c.chord}:${c.beats}`).join(" "));
+
+  // When moving the whole song's bar lines one beat later, Then each chord starts a bar
+  await user.click(screen.getByRole("button", { name: "Whole song +1 beat" }));
+  expect(chords()).toEqual(["A:min:1", "C:maj:4", "G:maj:4", "G:maj:3"]);
+
+  // When undoing, Then the song is back in one step
+  screen.getByRole("gridcell", { name: /^Verse, bar 1 in 1\/4/ }).focus();
+  await user.keyboard("{Control>}z{/Control}");
+  expect(song).toBe(original);
+
+  // When moving the bar lines one beat earlier from bar 2, Then bar 1 is untouched
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: C" }));
+  await user.click(screen.getByRole("button", { name: "From this bar −1 beat" }));
+  expect(chords()).toEqual(["A:min:1 C:maj:3", "C:maj:1 G:maj:2", "G:maj:4", "G:maj:1"]);
+
+  // When a bar inside the range has its own meter, Then the shift is refused and says why
+  await user.click(screen.getByRole("button", { name: "Whole song +1 beat" }));
+  expect(screen.getByRole("status").textContent).toBe("the phase can't be shifted across a bar with its own meter");
+});
+
 test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   // Given a transcribed song (bars at 0, 2, 4, 6 s plus a manually added bar) and a fake media element (jsdom has none)
   const user = userEvent.setup();

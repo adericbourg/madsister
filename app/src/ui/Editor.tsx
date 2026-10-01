@@ -1,6 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { parseChord } from "../model/chord";
-import { addSection, deleteSection, moveSection, renameSection, setBarMeter, setChord, setRepeat, type BarRef, type SlotRef } from "../model/commands";
+import { addSection, deleteSection, moveSection, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, type BarRef, type SlotRef } from "../model/commands";
 import type { DisplayStyle } from "../model/display";
 import { barAtTime } from "../model/playback";
 import type { Bar, Song } from "../model/song";
@@ -108,6 +108,17 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
     editSection((s) => deleteSection(s, cursor.section), Math.max(0, cursor.section - 1));
   };
 
+  // Computed before apply: history.apply runs in a reducer, where a refused shift must not throw.
+  const shift = (delta: 1 | -1, from?: BarRef) => {
+    try {
+      const next = shiftPhase(song, delta, from);
+      history.apply(() => next);
+      setNotice("");
+    } catch (e) {
+      setNotice((e as Error).message);
+    }
+  };
+
   const closeHelp = () => {
     setIsHelpOpen(false);
     helpOpener.current?.focus();
@@ -198,6 +209,21 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
           />
         </label>{" "}
         /{barMeter?.unit ?? song.meta.meter.unit}
+      </fieldset>
+      <fieldset className="toolbar">
+        <legend>Bar lines</legend>
+        <button type="button" onClick={() => shift(-1)}>
+          Whole song −1 beat
+        </button>
+        <button type="button" onClick={() => shift(1)}>
+          Whole song +1 beat
+        </button>
+        <button type="button" disabled={cursorBar === undefined} onClick={() => shift(-1, cursor)}>
+          From this bar −1 beat
+        </button>
+        <button type="button" disabled={cursorBar === undefined} onClick={() => shift(1, cursor)}>
+          From this bar +1 beat
+        </button>
       </fieldset>
       {song.audio !== undefined && (
         <fieldset className="toolbar" disabled={!player.isReady}>
