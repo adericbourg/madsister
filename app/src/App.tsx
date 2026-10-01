@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { toChordPro } from "./model/export/chordpro";
 import { emptySong, type Song, type SongMeter } from "./model/song";
 import { Editor } from "./ui/Editor";
 import { Importer } from "./ui/Importer";
 import {
   confirmDiscard,
+  exportSong,
   isDirty,
   pickOpenPath,
   pickSavePath,
@@ -141,6 +143,12 @@ function App() {
         <button type="button" onClick={printSong}>
           Print…
         </button>
+        <span role="group" aria-label="Export">
+          Export{" "}
+          <button type="button" onClick={() => exportSong(song, "ChordPro", "cho", toChordPro).catch(fail)}>
+            ChordPro…
+          </button>
+        </span>
         {recent.length > 0 && (
           <details>
             <summary>Recent</summary>

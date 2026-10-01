@@ -35,6 +35,12 @@ export const readSong = async (path: string): Promise<Song> => parseSong(JSON.pa
 
 export const writeSong = (path: string, song: Song): Promise<void> => writeTextFile(path, serializeSong(song));
 
+/** Asks where to export the song as `<title>.<extension>`, then writes `render(song)` there; does nothing on cancel. */
+export const exportSong = async (song: Song, name: string, extension: string, render: (song: Song) => string): Promise<void> => {
+  const path = await save({ defaultPath: `${song.meta.title}.${extension}`, filters: [{ name, extensions: [extension] }] });
+  if (path !== null) await writeTextFile(path, render(song));
+};
+
 /** On macOS, Tauri replaces window.print with its webview print command (needs core:webview:allow-print). */
 export const printSong = (): void => window.print();
 

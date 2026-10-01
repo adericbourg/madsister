@@ -1,0 +1,14 @@
+{title: Song 1}
+{artist: The Fixtures}
+{key: C}
+{tempo: 120}
+{time: 4/4}
+
+{start_of_grid shape="1+4x4+1" label="Verse"}
+| Cmaj7 . . . | Am . G/B . | % . . . | N.C. . . . |
+| F . . . || x2
+{end_of_grid}
+
+{start_of_grid shape="1+4x4+1" label="Chorus"}
+| Bm7b5 . . . | Emmaj7 . | Dm7 . . . ||
+{end_of_grid}

@@ -210,7 +210,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 3, unit: 4 });
 });
 
-test("App_whenPrinting_printsFromTheButtonAndModP", async () => {
+test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordPro", async () => {
   // Given the app
   const user = userEvent.setup();
   const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
@@ -224,6 +224,14 @@ test("App_whenPrinting_printsFromTheButtonAndModP", async () => {
   // Then the chart is printed twice
   expect(print).toHaveBeenCalledTimes(2);
   print.mockRestore();
+
+  // When exporting ChordPro to a picked path
+  vi.mocked(save).mockResolvedValueOnce("/out/untitled.cho");
+  await user.click(screen.getByRole("button", { name: "ChordPro…" }));
+
+  // Then the dialog proposes a .cho named after the title and the grid is written there
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.cho" }));
+  await vi.waitFor(() => expect(files["/out/untitled.cho"]).toContain('{start_of_grid shape="1+4x4+1" label="Verse"}'));
 });
 
 test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () => {

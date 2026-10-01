@@ -92,7 +92,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M3-2 | [m3-step2-click-seek](m3-step2-click-seek.md) | todo | |
 | M3-3 | [m3-step3-phase-nudge](m3-step3-phase-nudge.md) | todo | |
 | M3-4 | [m3-step4-tempo-fix](m3-step4-tempo-fix.md) | todo | |
-| M4-1 | [m4-step1-chordpro-grid](m4-step1-chordpro-grid.md) | todo | |
+| M4-1 | [m4-step1-chordpro-grid](m4-step1-chordpro-grid.md) | done | this |
 | M4-2 | [m4-step2-musicxml](m4-step2-musicxml.md) | todo | |
 | M4-3 | [m4-step3-midi](m4-step3-midi.md) | todo | |
 | M4b-1 | [m4b-step1-engine-mode-presets](m4b-step1-engine-mode-presets.md) | skipped (D7, user 2026-10-01) | |
