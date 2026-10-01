@@ -1,4 +1,5 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
 import { addSection, deleteSection, doubleTempo, halveTempo, moveSection, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, type BarRef, type SlotRef } from "../model/commands";
 import type { DisplayStyle } from "../model/display";
@@ -11,13 +12,20 @@ import { clampCursor, countFlagged, keyToCommand, MOD_LABEL, nextSlot, selectedB
 import type { useHistory } from "./useHistory";
 import { usePlayer } from "./usePlayer";
 
-type Props = { history: ReturnType<typeof useHistory>; barsPerRow: 2 | 4 | 8; style: DisplayStyle; lowConfidenceThreshold: number };
+type Props = {
+  history: ReturnType<typeof useHistory>;
+  barsPerRow: 2 | 4 | 8;
+  style: DisplayStyle;
+  lowConfidenceThreshold: number;
+  /** Where the section/bar/tempo parameters are rendered; inline when absent. */
+  panel?: HTMLElement | null;
+};
 type Draft = { kind: "chord" | "label"; text: string; error?: string };
 
 const minutes = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: Props) => {
+export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, panel }: Props) => {
   const { song } = history;
   const [rawCursor, setCursor] = useState<SlotRef>({ section: 0, bar: 0, slot: 0 });
   const [anchor, setAnchor] = useState<BarRef | null>(null);
@@ -153,93 +161,99 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold }: P
     </>
   ) : undefined;
 
+  const inPanel = (node: ReactNode) => (panel ? createPortal(node, panel) : node);
+
   return (
     <>
-      <fieldset className="toolbar">
-        <legend>Section</legend>
-        <Field
-          key={section.id}
-          label="Name"
-          value={section.label}
-          check={(t) => (t === "" ? "a section needs a name" : null)}
-          onCommit={(label) => history.apply((s) => renameSection(s, cursor.section, label))}
-        />
-        <label>
-          Repeat{" "}
-          <input
-            type="number"
-            min={1}
-            value={section.repeat ?? 1}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              if (Number.isInteger(n) && n >= 1 && n !== (section.repeat ?? 1)) history.apply((s) => setRepeat(s, cursor.section, n));
-            }}
-          />
-        </label>
-        <button type="button" disabled={cursor.section === 0} onClick={() => editSection((s) => moveSection(s, cursor.section, cursor.section - 1), cursor.section - 1)}>
-          Move up
-        </button>
-        <button
-          type="button"
-          disabled={cursor.section === song.sections.length - 1}
-          onClick={() => editSection((s) => moveSection(s, cursor.section, cursor.section + 1), cursor.section + 1)}
-        >
-          Move down
-        </button>
-        <button type="button" onClick={() => editSection((s) => addSection(s, cursor.section + 1, "New section"), cursor.section + 1)}>
-          Add section
-        </button>
-        <button type="button" onClick={() => void removeSection()}>
-          Delete section
-        </button>
-      </fieldset>
-      <fieldset className="toolbar" disabled={barMeter === undefined}>
-        <legend>Bar</legend>
-        <label>
-          Beats in this bar{" "}
-          <input
-            type="number"
-            min={1}
-            value={barMeter?.beats ?? ""}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              if (barMeter && Number.isInteger(n) && n >= 1 && n !== barMeter.beats)
-                history.apply((s) => setBarMeter(s, cursor, { beats: n, unit: barMeter.unit }));
-            }}
-          />
-        </label>{" "}
-        /{barMeter?.unit ?? song.meta.meter.unit}
-      </fieldset>
-      <fieldset className="toolbar">
-        <legend>Bar lines</legend>
-        <button type="button" onClick={() => shift(-1)}>
-          Whole song −1 beat
-        </button>
-        <button type="button" onClick={() => shift(1)}>
-          Whole song +1 beat
-        </button>
-        <button type="button" disabled={cursorBar === undefined} onClick={() => shift(-1, cursor)}>
-          From this bar −1 beat
-        </button>
-        <button type="button" disabled={cursorBar === undefined} onClick={() => shift(1, cursor)}>
-          From this bar +1 beat
-        </button>
-      </fieldset>
-      <fieldset className="toolbar">
-        <legend>Tempo</legend>
-        <button type="button" onClick={() => history.apply((s) => halveTempo(s))}>
-          Whole song half tempo
-        </button>
-        <button type="button" onClick={() => history.apply((s) => doubleTempo(s))}>
-          Whole song double tempo
-        </button>
-        <button type="button" disabled={cursorBar === undefined} onClick={() => history.apply((s) => halveTempo(s, cursor))}>
-          From this bar half tempo
-        </button>
-        <button type="button" disabled={cursorBar === undefined} onClick={() => history.apply((s) => doubleTempo(s, cursor))}>
-          From this bar double tempo
-        </button>
-      </fieldset>
+      {inPanel(
+        <>
+          <fieldset className="toolbar">
+            <legend>Section</legend>
+            <Field
+              key={section.id}
+              label="Name"
+              value={section.label}
+              check={(t) => (t === "" ? "a section needs a name" : null)}
+              onCommit={(label) => history.apply((s) => renameSection(s, cursor.section, label))}
+            />
+            <label>
+              Repeat{" "}
+              <input
+                type="number"
+                min={1}
+                value={section.repeat ?? 1}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (Number.isInteger(n) && n >= 1 && n !== (section.repeat ?? 1)) history.apply((s) => setRepeat(s, cursor.section, n));
+                }}
+              />
+            </label>
+            <button type="button" disabled={cursor.section === 0} onClick={() => editSection((s) => moveSection(s, cursor.section, cursor.section - 1), cursor.section - 1)}>
+              Move up
+            </button>
+            <button
+              type="button"
+              disabled={cursor.section === song.sections.length - 1}
+              onClick={() => editSection((s) => moveSection(s, cursor.section, cursor.section + 1), cursor.section + 1)}
+            >
+              Move down
+            </button>
+            <button type="button" onClick={() => editSection((s) => addSection(s, cursor.section + 1, "New section"), cursor.section + 1)}>
+              Add section
+            </button>
+            <button type="button" onClick={() => void removeSection()}>
+              Delete section
+            </button>
+          </fieldset>
+          <fieldset className="toolbar" disabled={barMeter === undefined}>
+            <legend>Bar</legend>
+            <label>
+              Beats in this bar{" "}
+              <input
+                type="number"
+                min={1}
+                value={barMeter?.beats ?? ""}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (barMeter && Number.isInteger(n) && n >= 1 && n !== barMeter.beats)
+                    history.apply((s) => setBarMeter(s, cursor, { beats: n, unit: barMeter.unit }));
+                }}
+              />
+            </label>{" "}
+            /{barMeter?.unit ?? song.meta.meter.unit}
+          </fieldset>
+          <fieldset className="toolbar">
+            <legend>Bar lines</legend>
+            <button type="button" onClick={() => shift(-1)}>
+              Whole song −1 beat
+            </button>
+            <button type="button" onClick={() => shift(1)}>
+              Whole song +1 beat
+            </button>
+            <button type="button" disabled={cursorBar === undefined} onClick={() => shift(-1, cursor)}>
+              From this bar −1 beat
+            </button>
+            <button type="button" disabled={cursorBar === undefined} onClick={() => shift(1, cursor)}>
+              From this bar +1 beat
+            </button>
+          </fieldset>
+          <fieldset className="toolbar">
+            <legend>Tempo</legend>
+            <button type="button" onClick={() => history.apply((s) => halveTempo(s))}>
+              Whole song half tempo
+            </button>
+            <button type="button" onClick={() => history.apply((s) => doubleTempo(s))}>
+              Whole song double tempo
+            </button>
+            <button type="button" disabled={cursorBar === undefined} onClick={() => history.apply((s) => halveTempo(s, cursor))}>
+              From this bar half tempo
+            </button>
+            <button type="button" disabled={cursorBar === undefined} onClick={() => history.apply((s) => doubleTempo(s, cursor))}>
+              From this bar double tempo
+            </button>
+          </fieldset>
+        </>,
+      )}
       {song.audio !== undefined && (
         <fieldset className="toolbar" disabled={!player.isReady}>
           <legend>Playback</legend>

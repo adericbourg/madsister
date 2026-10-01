@@ -35,6 +35,8 @@ function App() {
   const [savedSong, setSavedSong] = useState(initial);
   const [path, setPath] = useState<string | null>(null);
   const [hasSong, setHasSong] = useState(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [panel, setPanel] = useState<HTMLElement | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(() => parseSettings(null));
@@ -204,21 +206,32 @@ function App() {
             </ul>
           </details>
         )}
+        {hasSong && (
+          <button type="button" className="panel-toggle" aria-expanded={isPanelOpen} aria-controls="parameters" onClick={() => setIsPanelOpen(!isPanelOpen)}>
+            Parameters
+          </button>
+        )}
       </nav>
       {error !== null && <p role="alert">{error}</p>}
       {hasSong ? (
-        <>
-          <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
-          {audioNotice !== null && (
-            <p role="status">
-              <span>{audioNotice}</span>{" "}
-              <button type="button" onClick={locateAudio}>
-                Locate audio…
-              </button>
-            </p>
-          )}
-          <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} lowConfidenceThreshold={settings.lowConfidenceThreshold} />
-        </>
+        <div className="workspace">
+          <div className="content">
+            {audioNotice !== null && (
+              <p role="status">
+                <span>{audioNotice}</span>{" "}
+                <button type="button" onClick={locateAudio}>
+                  Locate audio…
+                </button>
+              </p>
+            )}
+            {panel && (
+              <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} />
+            )}
+          </div>
+          <aside id="parameters" aria-label="Parameters" hidden={!isPanelOpen} ref={setPanel}>
+            <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
+          </aside>
+        </div>
       ) : (
         <div className="start">
           <section aria-labelledby="new-grid-title">

@@ -187,16 +187,6 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.5rem 1rem;
-  max-width: 60rem;
-  margin: 0.5rem auto;
-  box-sizing: border-box;
-}
-
-.toolbar fieldset {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem;
 }
 
 .field-error {
@@ -222,6 +212,7 @@
   }
 
   nav,
+  aside,
   .toolbar,
   .review-status,
   [role="alert"],

@@ -74,6 +74,28 @@ test("App_onStart_offersANewGridOrAnAudioImportButNoGridNorParameters", async ()
   expect(screen.queryByRole("button", { name: "Create grid" })).toBeNull();
 });
 
+test("App_whenTogglingTheParametersPanel_hidesAndShowsTheParameters", async () => {
+  // Given a grid and its open parameters panel
+  const user = userEvent.setup();
+  render(<App />);
+  await createGrid(user);
+  const toggle = screen.getByRole("button", { name: "Parameters" });
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("combobox", { name: "Chord style" })).toBeDefined();
+  expect(screen.getByRole("group", { name: "Section" })).toBeDefined();
+
+  // When folding the panel, Then the parameters are gone and the grid stays
+  await user.click(toggle);
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByRole("combobox", { name: "Chord style" })).toBeNull();
+  expect(screen.queryByRole("group", { name: "Section" })).toBeNull();
+  expect(screen.getByRole("grid")).toBeDefined();
+
+  // When unfolding it, Then they are back
+  await user.click(toggle);
+  expect(screen.getByRole("combobox", { name: "Chord style" })).toBeDefined();
+});
+
 test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
   // Given a valid and an invalid song file
   const user = userEvent.setup();

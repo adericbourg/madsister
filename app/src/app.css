@@ -1,0 +1,208 @@
+/* App chrome: plain system UI, light gray menus, white chart. The chart's own look is in ui/grid.css. */
+:root {
+  --menu: #f3f3f3;
+  --border: #d0d0d0;
+  --control-border: #767676; /* 4.5:1 on white, 4.1:1 on the menu gray */
+  --text: #1a1a1a;
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  color: var(--text);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+button,
+select {
+  min-height: 1.75rem;
+  padding: 0.1rem 0.6rem;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--control-border);
+  border-radius: 3px;
+}
+
+button:enabled:hover {
+  background: #e6e6e6;
+}
+
+button:disabled {
+  color: #6b6b6b;
+  border-color: var(--border);
+}
+
+input:not([type="checkbox"]) {
+  min-height: 1.75rem;
+  box-sizing: border-box;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--control-border);
+  border-radius: 3px;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--menu);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-toggle {
+  margin-left: auto;
+}
+
+.panel-toggle[aria-expanded="true"] {
+  background: #e0e0e0;
+}
+
+nav details {
+  position: relative;
+}
+
+nav details ul {
+  position: absolute;
+  z-index: 2;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--control-border);
+}
+
+nav details li button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+}
+
+[role="alert"],
+[role="status"]:not(.visually-hidden) {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: #fff;
+}
+
+.content .toolbar {
+  margin: 0.5rem 1rem;
+}
+
+aside {
+  flex: none;
+  box-sizing: border-box;
+  width: 20rem;
+  padding: 0.75rem;
+  overflow: auto;
+  background: var(--menu);
+  border-left: 1px solid var(--border);
+}
+
+aside[hidden] {
+  display: none;
+}
+
+/* Firefox-settings style: each parameter group is a white frame on the gray panel. */
+aside .toolbar {
+  display: block;
+  margin: 0;
+}
+
+aside fieldset {
+  min-width: 0;
+  margin: 0 0 0.75rem;
+  padding: 0 0.75rem 0.75rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* A floated legend sits inside the frame instead of on its border. */
+aside legend {
+  float: left;
+  width: 100%;
+  padding: 0.75rem 0 0.5rem;
+  font-weight: 600;
+}
+
+aside legend + * {
+  clear: both;
+}
+
+aside label,
+aside .field {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+aside input:not([type="checkbox"]),
+aside select {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+aside button {
+  margin: 0 0.25rem 0.25rem 0;
+}
+
+.start {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.start section {
+  flex: 1 1 22rem;
+  box-sizing: border-box;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+}
+
+.start h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.importer > * {
+  margin-bottom: 0.5rem;
+}
+
+@media print {
+  main,
+  .workspace,
+  .content {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+}
