@@ -323,3 +323,34 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   expect(currentTime).toBe(0);
   expect(screen.getByRole("button", { name: "Pause" })).toBeDefined();
 });
+
+test("Editor_whenPickingASectionByName_editsThatSection", async () => {
+  // Given a song with an intro (cursor there) and a verse
+  const user = userEvent.setup();
+  render(
+    <Harness
+      from={() => ({
+        version: 1,
+        meta: { title: "Song", meter: { beats: 4, unit: 4 } },
+        sections: [
+          { id: "i", label: "Intro", bars: [bar(["N", 4])] },
+          { id: "v", label: "Verse", bars: [bar(["C:maj", 4])] },
+        ],
+      })}
+    />,
+  );
+
+  // When picking the verse in the panel and renaming it
+  await user.selectOptions(screen.getByRole("combobox", { name: "Section" }), "Verse");
+  const name = screen.getByRole("textbox", { name: "Name" });
+  expect((name as HTMLInputElement).value).toBe("Verse");
+  await user.clear(name);
+  await user.type(name, "Chorus{Enter}");
+
+  // Then only the verse changed
+  expect(song?.sections.map((s) => s.label)).toEqual(["Intro", "Chorus"]);
+
+  // When clicking the intro's name in the grid, Then the panel follows
+  await user.click(screen.getByText("Intro", { selector: ".section-label" }));
+  expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("Intro");
+});

@@ -57,6 +57,15 @@
   font-weight: 700;
 }
 
+.section-label {
+  cursor: pointer;
+}
+
+.section.is-current .section-label {
+  background: var(--ink);
+  color: var(--paper);
+}
+
 .section-repeat {
   font-weight: 700;
 }
@@ -232,6 +241,11 @@
 
   .section {
     break-inside: avoid;
+  }
+
+  .section.is-current .section-label {
+    background: none;
+    color: inherit;
   }
 
   .slot:focus-visible {

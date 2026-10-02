@@ -18,9 +18,10 @@ type Props = {
   editor?: ReactNode;
   onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
   onCellClick?: (ref: SlotRef) => void;
+  onSectionClick?: (index: number) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, editor, onKeyDown, onCellClick }: Props) => {
+export const Grid = ({ song, barsPerRow, style, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, editor, onKeyDown, onCellClick, onSectionClick }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
@@ -59,6 +60,7 @@ export const Grid = ({ song, barsPerRow, style, cursor, playing = null, lowConfi
             selection={selection}
             editor={editor}
             onCellClick={onCellClick}
+            onSectionClick={onSectionClick}
           />
         ))}
       </div>

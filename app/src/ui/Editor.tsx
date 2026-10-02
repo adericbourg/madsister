@@ -110,6 +110,11 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
     setCursor({ section: to, bar: 0, slot: 0 });
     setAnchor(null);
   };
+  const selectSection = (i: number) => {
+    setCursor({ section: i, bar: 0, slot: 0 });
+    setAnchor(null);
+    setDraft(null);
+  };
   const removeSection = async () => {
     const hasChords = section.bars.some((b) => b.chords.some((c) => c.chord !== "N"));
     if (hasChords && !(await confirmDeleteSection(section.label))) return;
@@ -169,6 +174,14 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
         <>
           <fieldset className="toolbar">
             <legend>Section</legend>
+            <select aria-label="Section" value={cursor.section} onChange={(e) => selectSection(Number(e.target.value))}>
+              {song.sections.map((s, i) => (
+                <option key={s.id} value={i}>
+                  {s.label}
+                  {(s.repeat ?? 1) > 1 ? ` ×${s.repeat}` : ""}
+                </option>
+              ))}
+            </select>
             <Field
               key={section.id}
               label="Name"
@@ -290,6 +303,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
         selection={anchor ? selectedBars({ cursor, anchor }) : undefined}
         editor={editor}
         onKeyDown={onKeyDown}
+        onSectionClick={selectSection}
         onCellClick={(ref) => {
           const startSec = song.sections[ref.section].bars[ref.bar].startSec;
           if (startSec !== undefined) player.seek(startSec);

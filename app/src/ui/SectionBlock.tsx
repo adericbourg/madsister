@@ -17,15 +17,22 @@ type Props = {
   selection: Selection;
   editor: ReactNode;
   onCellClick?: (ref: SlotRef) => void;
+  onSectionClick?: (index: number) => void;
 };
 
-export const SectionBlock = ({ section, index, barsPerRow, ...cell }: Props) => {
+export const SectionBlock = ({ section, index, barsPerRow, onSectionClick, ...cell }: Props) => {
   const repeat = section.repeat ?? 1;
   const rows = Array.from({ length: Math.ceil(section.bars.length / barsPerRow) }, (_, r) => r * barsPerRow);
   return (
-    <div role="rowgroup" className="section" aria-label={repeat > 1 ? `${section.label}, ${repeat} times` : section.label}>
+    <div
+      role="rowgroup"
+      className={cell.tabStop.section === index ? "section is-current" : "section"}
+      aria-label={repeat > 1 ? `${section.label}, ${repeat} times` : section.label}
+    >
       <div className="section-header" aria-hidden="true">
-        <span className="section-label">{section.label}</span>
+        <span className="section-label" onClick={() => onSectionClick?.(index)}>
+          {section.label}
+        </span>
         {repeat > 1 && <span className="section-repeat">x{repeat}</span>}
       </div>
       {rows.map((start) => (
