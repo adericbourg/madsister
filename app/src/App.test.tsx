@@ -269,6 +269,9 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "kalam");
   expect(JSON.parse(files["/config/settings.json"]).font).toBe("kalam");
   expect(screen.getByRole("main").className).toBe("compact-print font-kalam");
+  await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "serif");
+  expect(JSON.parse(files["/config/settings.json"]).font).toBe("serif");
+  expect(screen.getByRole("main").className).toBe("compact-print font-serif");
   await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "patrick-hand");
 
   // When transposing up twice with flats, then undoing once

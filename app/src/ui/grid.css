@@ -22,6 +22,10 @@
   font-family: Kalam, ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 }
 
+.font-serif .chart {
+  font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
 .chart-header {
   margin-bottom: 2rem;
 }

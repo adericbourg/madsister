@@ -8,7 +8,7 @@ import type { useHistory } from "./useHistory";
 /** User preferences (spec F-ED-1, F-DS-1), stored in `<appConfigDir>/settings.json`, not in the song. */
 export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont };
 
-export type ChartFont = "patrick-hand" | "kalam";
+export type ChartFont = "patrick-hand" | "kalam" | "serif";
 
 const isThreshold = (v: unknown): v is number => typeof v === "number" && v >= 0 && v <= 1;
 
@@ -20,7 +20,7 @@ export const parseSettings = (json: unknown): Settings => {
     barsPerRow: raw.barsPerRow === 2 || raw.barsPerRow === 8 ? raw.barsPerRow : 4,
     lowConfidenceThreshold: isThreshold(raw.lowConfidenceThreshold) ? raw.lowConfidenceThreshold : 0.5,
     compactPrint: raw.compactPrint === true,
-    font: raw.font === "kalam" ? "kalam" : "patrick-hand",
+    font: raw.font === "kalam" || raw.font === "serif" ? raw.font : "patrick-hand",
   };
 };
 
@@ -94,6 +94,7 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
           <select value={settings.font} onChange={(e) => onSettingsChange({ ...settings, font: e.target.value as ChartFont })}>
             <option value="patrick-hand">Patrick Hand</option>
             <option value="kalam">Kalam</option>
+            <option value="serif">Serif</option>
           </select>
         </label>
         <label>
