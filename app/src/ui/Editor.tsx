@@ -2,7 +2,7 @@ import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
 import { addSection, deleteSection, doubleTempo, halveTempo, moveSection, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, type BarRef, type SlotRef } from "../model/commands";
-import type { DisplayStyle } from "../model/display";
+import { displayChord, type DisplayStyle } from "../model/display";
 import { barAtTime } from "../model/playback";
 import type { Bar, Song } from "../model/song";
 import { confirmDeleteSection } from "./fileActions";
@@ -20,7 +20,8 @@ type Props = {
   /** Where the section/bar/tempo parameters are rendered; inline when absent. */
   panel?: HTMLElement | null;
 };
-type Draft = { kind: "chord" | "label"; text: string; error?: string };
+// `select` is where the caret lands on focus: "all" selects the whole text, "end" keeps a typed first character.
+type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; error?: string };
 
 const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
@@ -34,6 +35,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const helpOpener = useRef<HTMLElement | null>(null);
+  const isCancelled = useRef(false);
   // Undo/redo and structural edits can leave the cursor dangling: always read it clamped.
   const cursor = clampCursor(song, rawCursor);
   const flaggedCount = countFlagged(song, lowConfidenceThreshold);
@@ -58,10 +60,10 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
         setClipboard(command.bars);
         break;
       case "type":
-        setDraft({ kind: "chord", text: command.text });
+        setDraft({ kind: "chord", text: command.text, select: "end" });
         break;
       case "rename":
-        setDraft({ kind: "label", text: song.sections[cursor.section].label });
+        setDraft({ kind: "label", text: song.sections[cursor.section].label, select: "all" });
         break;
       case "undo":
         history.undo();
@@ -86,16 +88,19 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
     }
   };
 
-  const commit = (draft: Draft) => {
+  // `isBlur`: the input lost focus, so an invalid draft is dropped rather than flagged, and the cursor stays where the click put it.
+  const commit = (draft: Draft, isBlur = false) => {
     if (draft.kind === "label") {
       const label = draft.text.trim();
-      if (label === "") return setDraft({ ...draft, error: "a section needs a name" });
-      history.apply((s) => renameSection(s, cursor.section, label));
+      if (label === "") return isBlur ? setDraft(null) : setDraft({ ...draft, error: "a section needs a name" });
+      if (label !== song.sections[cursor.section].label) history.apply((s) => renameSection(s, cursor.section, label));
     } else {
       const parsed = parseChord(draft.text);
-      if (!parsed.ok) return setDraft({ ...draft, error: parsed.error });
-      history.apply((s) => setChord(s, cursor, parsed.harte));
-      setCursor(nextSlot(song, cursor, 1));
+      if (!parsed.ok) return isBlur ? setDraft(null) : setDraft({ ...draft, error: parsed.error });
+      const current = song.sections[cursor.section].bars[cursor.bar].chords[cursor.slot];
+      // Re-typing a flagged chord confirms it (setChord drops the confidence), so only an unflagged no-op is skipped.
+      if (parsed.harte !== current.chord || current.confidence !== undefined) history.apply((s) => setChord(s, cursor, parsed.harte));
+      if (!isBlur) setCursor(nextSlot(song, cursor, 1));
     }
     setAnchor(null);
     setDraft(null);
@@ -146,14 +151,20 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
         aria-describedby={draft.error === undefined ? undefined : "draft-error"}
         value={draft.text}
         autoFocus
-        onFocus={(e) => (draft.kind === "label" ? e.currentTarget.select() : e.currentTarget.setSelectionRange(draft.text.length, draft.text.length))}
-        onChange={(e) => setDraft({ kind: draft.kind, text: e.target.value })}
+        onFocus={(e) => {
+          isCancelled.current = false;
+          if (draft.select === "all") e.currentTarget.select();
+          else e.currentTarget.setSelectionRange(draft.text.length, draft.text.length);
+        }}
+        onBlur={() => !isCancelled.current && commit(draft, true)}
+        onChange={(e) => setDraft({ kind: draft.kind, text: e.target.value, select: draft.select })}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === "Enter" || e.key === "Tab") {
             e.preventDefault();
             commit(draft);
           } else if (e.key === "Escape") {
+            isCancelled.current = true;
             setDraft(null);
           }
         }}
@@ -309,7 +320,8 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
           if (startSec !== undefined) player.seek(startSec);
           setCursor(ref);
           setAnchor(null);
-          setDraft(null);
+          const chord = song.sections[ref.section].bars[ref.bar].chords[ref.slot].chord;
+          setDraft({ kind: "chord", text: displayChord(chord, "intl"), select: "all" });
         }}
       />
       <p aria-live="polite" className="review-status">

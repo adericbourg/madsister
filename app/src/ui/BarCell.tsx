@@ -44,7 +44,7 @@ export const BarCell = ({ bar, at, sectionLabel, style, tabStop, playing, lowCon
             tabIndex={isTabStop ? 0 : -1}
             className={`slot${isLowConfidence ? " is-low-confidence" : ""}${isEditing ? " is-editing" : ""}`}
             style={{ flexGrow: slot.beats }}
-            onClick={() => onCellClick?.({ ...at, slot: i })}
+            onClick={() => !isEditing && onCellClick?.({ ...at, slot: i })}
           >
             {isEditing ? editor : displayChord(slot.chord, style)}
           </div>

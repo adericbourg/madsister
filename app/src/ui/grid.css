@@ -6,6 +6,7 @@
   --hairline: #767676; /* 4.5:1 on paper, 3.7:1 on selection */
   --focus: #1d4ed8; /* 6.7:1 on paper, 5.5:1 on selection */
   --doubt: #a64200; /* 6.2:1 on paper */
+  --editing: #fef9c3;
   --selection: #dbeafe; /* ink stays 17:1 on it */
   --playing: #116329; /* 7.4:1 on paper, 6.1:1 on selection */
   color-scheme: light;
@@ -138,6 +139,10 @@
 .slot.is-editing {
   position: relative;
   overflow: visible;
+  padding: 0;
+  background: var(--editing);
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
 }
 
 .slot-input {
@@ -146,12 +151,15 @@
   min-width: 4ch;
   font: inherit;
   color: inherit;
-  background: var(--paper);
-  border: 1px solid var(--ink);
+  padding: 0.6rem 0.5rem;
+  background: transparent;
+  border: 0;
+  outline: none;
+  caret-color: var(--ink);
 }
 
 .slot-input[aria-invalid="true"] {
-  border: 2px solid var(--doubt);
+  text-decoration: underline wavy var(--doubt);
 }
 
 .slot-error {

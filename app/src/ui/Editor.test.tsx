@@ -74,8 +74,9 @@ test("Editor_whenTypingAChartByKeyboard_buildsTheSong", async () => {
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(document.activeElement).toBe(cursorCell);
 
-  // When clicking a cell, Then it gets the cursor
+  // When clicking a cell and cancelling its edition, Then it keeps the cursor
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
+  await user.keyboard("{Escape}");
   expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
 
   // When merging its first slot with the previous one (impossible), Then the refusal is announced politely
@@ -83,6 +84,59 @@ test("Editor_whenTypingAChartByKeyboard_buildsTheSong", async () => {
   expect(screen.getByRole("status").textContent).toBe("Not possible here");
   await user.keyboard("{ArrowRight}");
   expect(screen.getByRole("status").textContent).toBe("");
+});
+
+test("Editor_whenClickingASlot_editsItInPlaceUntilEnterBlurOrEscape", async () => {
+  // Given a song starting with C then G
+  const user = userEvent.setup();
+  render(<Harness />);
+  await user.keyboard("C{Enter}G{Enter}");
+
+  // When clicking the first slot, Then it is edited in place with its whole text selected
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }));
+  const input = screen.getByRole("textbox", { name: "Chord" }) as HTMLInputElement;
+  expect(input.value).toBe("C");
+  expect([input.selectionStart, input.selectionEnd]).toEqual([0, 1]);
+  expect(input.closest(".slot")?.classList.contains("is-editing")).toBe(true);
+
+  // When clicking inside the input, Then the same input stays open
+  await user.click(input);
+  expect(screen.getByRole("textbox", { name: "Chord" })).toBe(input);
+
+  // When replacing the text and clicking another slot, Then it is saved and the other slot is edited
+  await user.clear(input);
+  await user.keyboard("D");
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
+  expect(song?.sections[0].bars[0].chords[0].chord).toBe("D:maj");
+  expect((screen.getByRole("textbox", { name: "Chord" }) as HTMLInputElement).value).toBe("G");
+
+  // When typing then pressing Escape, Then nothing is saved
+  await user.clear(screen.getByRole("textbox", { name: "Chord" }));
+  await user.keyboard("A{Escape}");
+  expect(screen.queryByRole("textbox", { name: "Chord" })).toBeNull();
+  expect(song?.sections[0].bars[1].chords[0].chord).toBe("G:maj");
+
+  // When typing then clicking outside the grid, Then it is saved
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
+  await user.clear(screen.getByRole("textbox", { name: "Chord" }));
+  await user.keyboard("Em");
+  await user.click(document.body);
+  expect(screen.queryByRole("textbox", { name: "Chord" })).toBeNull();
+  expect(song?.sections[0].bars[1].chords[0].chord).toBe("E:min");
+
+  // When leaving a slot unchanged, Then the song is untouched (no undo entry)
+  const before = song;
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: D" }));
+  await user.click(document.body);
+  expect(song).toBe(before);
+
+  // When leaving with an invalid chord, Then the edition is dropped
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: D" }));
+  await user.clear(screen.getByRole("textbox", { name: "Chord" }));
+  await user.keyboard("Gx");
+  await user.click(document.body);
+  expect(screen.queryByRole("textbox", { name: "Chord" })).toBeNull();
+  expect(song).toBe(before);
 });
 
 test("Editor_whenUsingTheSectionControls_editsTheCursorSection", async () => {
@@ -309,7 +363,7 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
 
   // When clicking the manual bar 4, Then only the edit cursor moves; Shift+Space there doesn't play
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 4, beat 1: C" }));
-  await user.keyboard("{Shift>} {/Shift}");
+  await user.keyboard("{Escape}{Shift>} {/Shift}");
   expect(currentTime).toBe(4.37);
   expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
 

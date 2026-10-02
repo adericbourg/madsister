@@ -192,7 +192,7 @@ test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAud
 
   // When undoing, Then the old path is back with its notice (locating is one history entry)
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
-  await user.keyboard("{Control>}z{/Control}");
+  await user.keyboard("{Escape}{Control>}z{/Control}");
   expect(await screen.findByText("Audio file not found: /music/blues.mp3")).toBeDefined();
 
   // When opening a song whose audio has changed since transcription
@@ -272,7 +272,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(firstSlot().textContent).toBe("D7M");
   expect(document.activeElement).toBe(screen.getByRole("button", { name: "+1 semitone" }));
   await user.click(firstSlot());
-  await user.keyboard("{Control>}z{/Control}");
+  await user.keyboard("{Escape}{Control>}z{/Control}");
 
   // Then each click is one history entry
   expect(firstSlot().textContent).toBe("Db7M");
@@ -317,7 +317,7 @@ test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMus
   // When clicking Print, then pressing Mod+P from the grid
   await user.click(screen.getByRole("button", { name: "Print…" }));
   await user.click(screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ }));
-  await user.keyboard("{Meta>}p{/Meta}");
+  await user.keyboard("{Escape}{Meta>}p{/Meta}");
 
   // Then the chart is printed twice
   expect(print).toHaveBeenCalledTimes(2);
@@ -400,7 +400,7 @@ test("App_whenUndoingATranspose_resetStillRestoresTheInitialKey", async () => {
   await user.click(screen.getByRole("button", { name: "+1 semitone" }));
   await user.click(screen.getByRole("button", { name: "+1 semitone" }));
   await user.click(firstSlot());
-  await user.keyboard("{Control>}z{/Control}");
+  await user.keyboard("{Escape}{Control>}z{/Control}");
   expect(firstSlot().textContent).toBe("C#7M");
 
   // When resetting, Then the chord is back to C
