@@ -109,7 +109,7 @@ test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
 
   // Then the song is loaded and the file is listed as recent
   expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
-  expect(screen.getByRole("button", { name: "/blues.madsister.json" })).toBeDefined();
+  expect(screen.getByRole("button", { name: "blues.madsister.json" })).toBeDefined();
   expect(files["/config/recent.json"]).toBe('["/blues.madsister.json"]');
 
   // When opening the invalid file from the toolbar
@@ -122,11 +122,11 @@ test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
 
   // When the recent file has gone missing and is reopened
   delete files["/blues.madsister.json"];
-  await user.click(screen.getByRole("button", { name: "/blues.madsister.json" }));
+  await user.click(screen.getByRole("button", { name: "blues.madsister.json" }));
 
   // Then it is dropped from the recent list
   await vi.waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/not found/));
-  expect(screen.queryByRole("button", { name: "/blues.madsister.json" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "blues.madsister.json" })).toBeNull();
 
   // When starting a new song with Mod+N
   await user.keyboard("{Control>}n{/Control}");
@@ -150,7 +150,7 @@ test("App_whenImportingAudio_loadsTheResultAndReportsErrors", async () => {
 
   // Then the song is loaded and listed as recent
   expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
-  expect(screen.getByRole("button", { name: "/music/blues.madsister.json" })).toBeDefined();
+  expect(screen.getByRole("button", { name: "blues.madsister.json" })).toBeDefined();
 
   // When a second import fails, started from the start screen
   await user.click(screen.getByRole("button", { name: "New" }));

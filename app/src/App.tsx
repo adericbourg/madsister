@@ -15,6 +15,7 @@ import {
   pickSavePath,
   printSong,
   pushRecent,
+  shortestUniquePaths,
   readConfigJson,
   readSong,
   setWindowTitle,
@@ -196,10 +197,10 @@ function App() {
           <details>
             <summary>Recent</summary>
             <ul>
-              {recent.map((p) => (
-                <li key={p}>
-                  <button type="button" onClick={() => openSong(p)}>
-                    {p}
+              {shortestUniquePaths(recent).map((label, i) => (
+                <li key={recent[i]}>
+                  <button type="button" title={recent[i]} onClick={() => openSong(recent[i])}>
+                    {label}
                   </button>
                 </li>
               ))}

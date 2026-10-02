@@ -11,6 +11,17 @@ const filters = [{ name: "madsister song", extensions: ["json"] }];
 
 export const pushRecent = (list: readonly string[], path: string): string[] => [path, ...list.filter((p) => p !== path)].slice(0, 10);
 
+/** The shortest trailing part of each path (`blues.json`, then `a/blues.json`...) that tells it apart from the others. */
+export const shortestUniquePaths = (paths: readonly string[]): string[] => {
+  const segments = paths.map((p) => p.split(/[\\/]/));
+  const tail = (parts: string[], depth: number) => parts.slice(-depth).join("/");
+  return segments.map((parts, i) => {
+    let depth = 1;
+    while (depth < parts.length && segments.some((other, j) => j !== i && tail(other, depth) === tail(parts, depth))) depth++;
+    return tail(parts, depth);
+  });
+};
+
 export const confirmDiscard = (): Promise<boolean> => confirm("Discard unsaved changes?", { kind: "warning" });
 
 export const confirmDeleteSection = (label: string): Promise<boolean> =>
