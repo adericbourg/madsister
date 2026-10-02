@@ -18,13 +18,14 @@ EOF
 sudo apt update && sudo apt install madsister
 ```
 
-- `Suites: stable` follows the releases; `Suites: snapshot` follows every push to `main` (unreleased, may be broken).
-  Switch by editing the file and running `sudo apt update`.
+- Two packages: `madsister` follows the releases; `madsister-snapshot` follows every push to `main` (unreleased, may be
+  broken). Install either or both: the snapshot has its own command (`madsister-snapshot`), launcher and data dir, so
+  it never touches the stable app's settings, and it downloads its own engine.
 - amd64 only. The first launch downloads the engine (Python, its libraries and the models), once, and again after an update.
 - The `.deb` and the AppImage are also on the [releases page](https://github.com/adericbourg/madsister/releases).
 - For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see `THIRD_PARTY.md`).
-- Uninstall: `sudo apt remove madsister`, then delete `/etc/apt/sources.list.d/madsister.sources` and
-  `/etc/apt/keyrings/madsister.asc`.
+- Uninstall: `sudo apt remove madsister` (or `madsister-snapshot`); to remove the repository, delete
+  `/etc/apt/sources.list.d/madsister.sources` and `/etc/apt/keyrings/madsister.asc`.
 
 ## Development
 
@@ -115,8 +116,10 @@ sidecar), installs the deb in a clean `ubuntu:24.04` container to set up its eng
   the release `X.Y.Z`, kept, and its tag is created on the run's commit. The version is injected with `tauri build --config`,
   so `tauri.conf.json` and `Cargo.toml` aren't bumped.
 
-The `apt` job then rebuilds the signed apt repository on GitHub Pages (suite `stable`: the latest release; suite `snapshot`: the
-latest snapshot) with `apt-ftparchive`, signed by the key in the `APT_GPG_PRIVATE_KEY` secret. Pages must be set to the
+A release is the package `madsister`, a snapshot the package `madsister-snapshot`: the workflow overrides `productName`,
+`mainBinaryName`, `identifier` and the sidecar name (`<package>-uv`) at build time, so the two share no file and no data dir.
+The `apt` job then rebuilds the signed apt repository on GitHub Pages (a single suite, `stable`, with the latest release and
+the latest snapshot) with `apt-ftparchive`, signed by the key in the `APT_GPG_PRIVATE_KEY` secret. Pages must be set to the
 "GitHub Actions" source.
 
 Releases are on the [releases page](https://github.com/adericbourg/madsister/releases).

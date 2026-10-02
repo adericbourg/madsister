@@ -4,8 +4,9 @@ name: release
 # running it by hand (Actions > release > Run workflow, on main) with a patch/minor/major bump publishes the release
 # `vX.Y.Z` that is kept; the tag is created by the publication itself. It doesn't wait for the `app`/`engine` workflows: the clean-install
 # check below gates the publication, and a later push replaces a bad snapshot.
-# The `apt` job then republishes the signed apt repository on GitHub Pages: suite `stable` holds the latest release,
-# suite `snapshot` the latest snapshot.
+# A release is the package `madsister`, a snapshot the package `madsister-snapshot` (own binary, files and data dir: both
+# can be installed together). The `apt` job then republishes the signed apt repository on GitHub Pages: its only suite
+# holds the latest of each.
 on:
   push:
     branches: [main]
@@ -33,6 +34,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
+      package: ${{ steps.version.outputs.package }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,7 +44,9 @@ jobs:
           BUMP: ${{ inputs.bump }}
         run: |
           last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || echo v0.0.0)
+          package=madsister-snapshot
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            package=madsister
             if [ "$GITHUB_REF" != refs/heads/main ]; then
               echo "::error::releases are made from main, not $GITHUB_REF"
               exit 1
@@ -61,6 +65,7 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "package=$package" >> "$GITHUB_OUTPUT"
 
   # One job per platform; a macOS job (M6-3) would build its .dmg the same way and upload a `macos` artifact.
   linux:
@@ -98,21 +103,25 @@ jobs:
           git -C "$RUNNER_TEMP/madmom" submodule update --init --quiet # the model weights
           uv build --wheel --python 3.11 --out-dir engine/wheels "$RUNNER_TEMP/madmom"
       - name: Download the uv sidecar
+        env:
+          PACKAGE: ${{ needs.version.outputs.package }}
         run: |
           triple=$(rustc -vV | sed -n 's/^host: //p')
           mkdir -p app/src-tauri/binaries
           curl -fsSL "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.tar.gz" |
-            tar -xzO "uv-$triple/uv" > "app/src-tauri/binaries/madsister-uv-$triple"
-          chmod +x "app/src-tauri/binaries/madsister-uv-$triple"
+            tar -xzO "uv-$triple/uv" > "app/src-tauri/binaries/$PACKAGE-uv-$triple"
+          chmod +x "app/src-tauri/binaries/$PACKAGE-uv-$triple"
       - run: pnpm install --frozen-lockfile
         working-directory: app
       - name: Build the deb and the AppImage
         working-directory: app
         env:
           VERSION: ${{ needs.version.outputs.version }}
+          PACKAGE: ${{ needs.version.outputs.package }}
+        # The package name is the product name (deb, binary, resources, desktop file), the identifier names the data dir.
         run: >-
           pnpm tauri build --bundles deb,appimage --config src-tauri/tauri.bundle.conf.json
-          --config "{\"version\":\"$VERSION\",\"bundle\":{\"resources\":{\"../../engine/wheels/\":\"engine/wheels/\"}}}"
+          --config "{\"productName\":\"$PACKAGE\",\"mainBinaryName\":\"$PACKAGE\",\"identifier\":\"dev.dericbourg.$PACKAGE\",\"version\":\"$VERSION\",\"bundle\":{\"externalBin\":[\"binaries/$PACKAGE-uv\"],\"resources\":{\"../../engine/wheels/\":\"engine/wheels/\"}}}"
       - uses: actions/upload-artifact@v7
         with:
           name: linux
@@ -132,19 +141,20 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: linux
-      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ./deb/madsister_*.deb
+      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ./deb/*.deb
       - name: Set up the engine as a user, then transcribe a synthetic C major clip
         env:
           VERSION: ${{ needs.version.outputs.version }}
+          PACKAGE: ${{ needs.version.outputs.package }}
         run: |
           useradd --create-home user
           cp app/src-tauri/setup-engine.sh /tmp/ # readable by the user
-          project=$(dirname "$(dpkg -L madsister | grep '/engine/pyproject.toml$')")
+          project=$(dirname "$(dpkg -L "$PACKAGE" | grep '/engine/pyproject.toml$')")
           su user -c "sh -eu" <<EOF
           cd
-          env=\$HOME/.local/share/dev.dericbourg.madsister/engine-env
+          env=\$HOME/.local/share/dev.dericbourg.$PACKAGE/engine-env
           start=\$(date +%s)
-          sh /tmp/setup-engine.sh /usr/bin/madsister-uv $project "\$env" $VERSION
+          sh /tmp/setup-engine.sh /usr/bin/$PACKAGE-uv $project "\$env" $VERSION
           echo "setup: \$((\$(date +%s) - start)) s, env: \$(du -sh "\$env" | cut -f1)"
           ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
           start=\$(date +%s)
@@ -160,6 +170,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       VERSION: ${{ needs.version.outputs.version }}
+      PACKAGE: ${{ needs.version.outputs.package }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -168,12 +179,12 @@ jobs:
       - name: Publish
         run: |
           notes="For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see THIRD_PARTY.md).
-          Linux: \`sudo apt install ./madsister_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
-          To get updates through apt (use \`Suites: snapshot\` for the snapshots):
+          Linux: \`sudo apt install ./${PACKAGE}_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
+          To get updates through apt (the package \`madsister\` follows the releases, \`madsister-snapshot\` the snapshots; they can be installed together):
           \`\`\`
           sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://www.dericbourg.net/madsister/key.asc
           printf 'Types: deb\nURIs: https://www.dericbourg.net/madsister\nSuites: stable\nComponents: main\nSigned-By: /etc/apt/keyrings/madsister.asc\n' | sudo tee /etc/apt/sources.list.d/madsister.sources
-          sudo apt update && sudo apt install madsister
+          sudo apt update && sudo apt install $PACKAGE
           \`\`\`
           The first launch downloads the engine (Python, its libraries and the models), once."
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
@@ -189,7 +200,7 @@ jobs:
               done
           fi
 
-  # Rebuilds the whole site each time (a Pages deployment replaces it): both suites from the releases, so no deb enters git.
+  # Rebuilds the whole site each time (a Pages deployment replaces it): the latest release and the latest snapshot, so no deb enters git.
   apt:
     needs: publish
     runs-on: ubuntu-24.04
@@ -211,19 +222,15 @@ jobs:
       - name: Build the repository
         run: |
           gpg --batch --import <<< "$GPG_KEY"
-          mkdir -p site && cd site
+          mkdir -p site/pool site/dists/stable/main/binary-amd64 && cd site
           release=$(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
           snapshot=$(gh release list --limit 100 --json tagName --jq '[.[].tagName | select(contains("-snapshot."))][0] // empty')
-          for suite in stable snapshot; do
-            mkdir -p "pool/$suite" "dists/$suite/main/binary-amd64"
-            tag=$release; if [ "$suite" = snapshot ]; then tag=$snapshot; fi
-            if [ -n "$tag" ]; then gh release download "$tag" --pattern '*.deb' --dir "pool/$suite"; fi
-            apt-ftparchive packages "pool/$suite" > "dists/$suite/main/binary-amd64/Packages"
-            apt-ftparchive -o "APT::FTPArchive::Release::Suite=$suite" -o "APT::FTPArchive::Release::Codename=$suite" \
-              -o APT::FTPArchive::Release::Components=main -o APT::FTPArchive::Release::Architectures=amd64 \
-              release "dists/$suite" > "dists/$suite/Release"
-            gpg --batch --yes --clearsign -o "dists/$suite/InRelease" "dists/$suite/Release"
-          done
+          for tag in $release $snapshot; do gh release download "$tag" --pattern '*.deb' --dir pool; done
+          apt-ftparchive packages pool > dists/stable/main/binary-amd64/Packages
+          apt-ftparchive -o APT::FTPArchive::Release::Suite=stable -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Components=main -o APT::FTPArchive::Release::Architectures=amd64 \
+            release dists/stable > dists/stable/Release
+          gpg --batch --yes --clearsign -o dists/stable/InRelease dists/stable/Release
           gpg --export --armor > key.asc
       - uses: actions/upload-pages-artifact@v5
         with:

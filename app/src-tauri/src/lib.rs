@@ -105,8 +105,11 @@ fn packaged_engine(app: &tauri::App) -> Option<Packaged> {
     if tauri::is_dev() || std::env::var_os("MADSISTER_ENGINE").is_some() {
         return None;
     }
+    let exe = std::env::current_exe().ok()?;
+    // The sidecar (bundle.externalBin) is named after the binary, so that madsister and madsister-snapshot can be installed together.
+    let uv = exe.with_file_name(format!("{}-uv", exe.file_name()?.to_str()?));
     Some(Packaged {
-        uv: std::env::current_exe().ok()?.with_file_name("madsister-uv"), // the sidecar (bundle.externalBin)
+        uv,
         project: app.path().resource_dir().ok()?.join("engine"),
         env: app.path().app_data_dir().ok()?.join("engine-env"),
         version: app.package_info().version.to_string(),
