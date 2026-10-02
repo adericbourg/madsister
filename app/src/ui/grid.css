@@ -12,7 +12,7 @@
   color-scheme: light;
   color: var(--ink);
   background: var(--paper);
-  font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-family: "Patrick Hand", ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   max-width: 60rem;
   margin: 0 auto;
   padding: 2rem 1.5rem;
