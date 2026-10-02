@@ -4,6 +4,8 @@ name: release
 # running it by hand (Actions > release > Run workflow, on main) with a patch/minor/major bump publishes the release
 # `vX.Y.Z` that is kept; the tag is created by the publication itself. It doesn't wait for the `app`/`engine` workflows: the clean-install
 # check below gates the publication, and a later push replaces a bad snapshot.
+# The `apt` job then republishes the signed apt repository on GitHub Pages: suite `stable` holds the latest release,
+# suite `snapshot` the latest snapshot.
 on:
   push:
     branches: [main]
@@ -167,6 +169,12 @@ jobs:
         run: |
           notes="For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see THIRD_PARTY.md).
           Linux: \`sudo apt install ./madsister_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
+          To get updates through apt (use \`Suites: snapshot\` for the snapshots):
+          \`\`\`
+          sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://${GH_REPO%%/*}.github.io/${GH_REPO##*/}/key.asc
+          printf 'Types: deb\nURIs: https://${GH_REPO%%/*}.github.io/${GH_REPO##*/}\nSuites: stable\nComponents: main\nSigned-By: /etc/apt/keyrings/madsister.asc\n' | sudo tee /etc/apt/sources.list.d/madsister.sources
+          sudo apt update && sudo apt install madsister
+          \`\`\`
           The first launch downloads the engine (Python, its libraries and the models), once."
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             # Creates the tag on this commit (a tag pushed with the workflow's token wouldn't trigger anything anyway).
@@ -180,3 +188,45 @@ jobs:
                 if [ "$old" != "$tag" ]; then gh release delete "$old" --cleanup-tag --yes; fi
               done
           fi
+
+  # Rebuilds the whole site each time (a Pages deployment replaces it): both suites from the releases, so no deb enters git.
+  apt:
+    needs: publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false # a deployment is never cancelled midway
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      GPG_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+    steps:
+      - name: Build the repository
+        run: |
+          gpg --batch --import <<< "$GPG_KEY"
+          mkdir -p site && cd site
+          release=$(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+          snapshot=$(gh release list --limit 100 --json tagName --jq '[.[].tagName | select(contains("-snapshot."))][0] // empty')
+          for suite in stable snapshot; do
+            mkdir -p "pool/$suite" "dists/$suite/main/binary-amd64"
+            tag=$release; if [ "$suite" = snapshot ]; then tag=$snapshot; fi
+            if [ -n "$tag" ]; then gh release download "$tag" --pattern '*.deb' --dir "pool/$suite"; fi
+            apt-ftparchive packages "pool/$suite" > "dists/$suite/main/binary-amd64/Packages"
+            apt-ftparchive -o "APT::FTPArchive::Release::Suite=$suite" -o "APT::FTPArchive::Release::Codename=$suite" \
+              -o APT::FTPArchive::Release::Components=main -o APT::FTPArchive::Release::Architectures=amd64 \
+              release "dists/$suite" > "dists/$suite/Release"
+            gpg --batch --yes --clearsign -o "dists/$suite/InRelease" "dists/$suite/Release"
+          done
+          gpg --export --armor > key.asc
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5
