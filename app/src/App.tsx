@@ -159,7 +159,7 @@ function App() {
   });
 
   return (
-    <main className={[settings.compactPrint && "compact-print", settings.font !== "patrick-hand" && `font-${settings.font}`].filter(Boolean).join(" ") || undefined}>
+    <main className={[settings.compactPrint && "compact-print", `font-${settings.font}`].filter(Boolean).join(" ")}>
       <nav aria-label="File">
         {hasSong && (
           <>

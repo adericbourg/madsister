@@ -31,7 +31,7 @@ export const parseSettings = (json: unknown): Settings => {
     barsPerRow: raw.barsPerRow === 2 || raw.barsPerRow === 8 ? raw.barsPerRow : 4,
     lowConfidenceThreshold: isThreshold(raw.lowConfidenceThreshold) ? raw.lowConfidenceThreshold : 0.5,
     compactPrint: raw.compactPrint === true,
-    font: CHART_FONTS.find(([value]) => value === raw.font)?.[0] ?? "patrick-hand",
+    font: CHART_FONTS.find(([value]) => value === raw.font)?.[0] ?? "petaluma-script",
     minorConvention: raw.minorConvention === "tonic" ? "tonic" : "relative",
   };
 };
