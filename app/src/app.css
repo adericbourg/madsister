@@ -47,7 +47,7 @@ button:disabled {
   border-color: var(--border);
 }
 
-input:not([type="checkbox"]) {
+input:not([type="checkbox"], [type="radio"]) {
   min-height: 1.75rem;
   box-sizing: border-box;
   padding: 0.1rem 0.4rem;
@@ -206,6 +206,82 @@ aside button {
 
 .importer > * {
   margin-bottom: 0.5rem;
+}
+
+/* Tabs read as tabs (the selected one is joined to its panel), and Run is the only filled button. */
+.importer [role="tablist"] {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: -1px;
+}
+
+.importer [role="tab"] {
+  border-color: transparent;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+}
+
+.importer [role="tab"][aria-selected="true"] {
+  position: relative;
+  font-weight: 600;
+  background: #fff;
+  border-color: var(--control-border);
+  border-bottom-color: #fff;
+}
+
+.importer .tabpanels {
+  display: grid;
+}
+
+.importer [role="tabpanel"] {
+  grid-area: 1 / 1;
+  padding: 1rem;
+  border: 1px solid var(--control-border);
+  border-radius: 0 3px 3px 3px;
+}
+
+.importer [role="tabpanel"][aria-hidden="true"] {
+  visibility: hidden;
+}
+
+.importer [role="radiogroup"] {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.importer [role="radiogroup"] label {
+  white-space: nowrap;
+}
+
+/* Grayed legend under a label, indented to the label's text. #595959 is 7:1 on white. */
+.importer .hint {
+  display: block;
+  margin-left: 1.6rem;
+  font-size: 0.9rem;
+  color: #595959;
+}
+
+.importer .hint > span {
+  display: block;
+}
+
+.importer button[type="submit"] {
+  padding: 0.1rem 1.5rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.importer button[type="submit"]:enabled:hover {
+  background: #000;
+}
+
+.importer button[type="submit"]:disabled {
+  color: #6b6b6b;
+  background: var(--menu);
+  border-color: var(--border);
 }
 
 /* Same specificity as the nav/aside rules above, so the print hiding lives here, after them. */

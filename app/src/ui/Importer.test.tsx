@@ -39,15 +39,27 @@ beforeEach(() => {
   vi.mocked(exists).mockResolvedValue(false);
 });
 
-test("Importer_whenDroppingAnAudioFile_showsProgressThenReportsTheResult", async () => {
-  // Given the importer with "Detect sections" checked and the meter forced to 6/8
+test("Importer_whenDroppingAnAudioFile_waitsForRunThenShowsProgressAndReportsTheResult", async () => {
+  // Given the importer
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
-  await user.click(screen.getByRole("checkbox", { name: /Detect sections \(slow/ }));
-  await user.selectOptions(screen.getByRole("combobox", { name: "Meter" }), "6/8");
+
+  // Then "Detect sections" warns about its duration, and not about an install since sections are installed
+  expect(screen.getByRole("checkbox", { name: "Detect sections" }).getAttribute("aria-describedby")).toBe("sections-hint");
+  expect(document.getElementById("sections-hint")!.textContent).toContain("Slower (~6 min for a 4-min song)");
+  expect(screen.queryByText(/Installed on first use/)).toBeNull();
 
   // When dropping an mp3
   await dropFile("/music/song.mp3");
+
+  // Then the file is selected and nothing starts
+  expect(screen.getByText("song.mp3")).toBeDefined();
+  expect(transcribe).not.toHaveBeenCalled();
+
+  // When choosing the options then running
+  await user.click(screen.getByRole("checkbox", { name: "Detect sections" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "Meter" }), "6/8");
+  await user.click(screen.getByRole("button", { name: "Run" }));
 
   // Then the engine starts on it, writing next to it, with that meter and all-in-one
   expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", "6/8", true, expect.any(Function));
@@ -70,10 +82,14 @@ test("Importer_whenSectionsAreNotInstalled_installsThemBeforeTranscribing", asyn
   const user = userEvent.setup();
   vi.mocked(engineHasSections).mockResolvedValue(false);
   render(<Importer onResult={onResult} />);
-  await user.click(screen.getByRole("checkbox", { name: /Detect sections \(slow/ }));
+  await user.click(screen.getByRole("checkbox", { name: "Detect sections" }));
 
-  // When dropping an mp3
+  // Then the install requirement is announced
+  expect(await screen.findByText("Installed on first use, requires a network connection")).toBeDefined();
+
+  // When dropping an mp3 then running
   await dropFile("/music/song.mp3");
+  await user.click(screen.getByRole("button", { name: "Run" }));
 
   // Then the install runs first and nothing is transcribed yet
   expect(setupEngine).toHaveBeenCalledExactlyOnceWith(true, expect.any(Function));
@@ -82,16 +98,20 @@ test("Importer_whenSectionsAreNotInstalled_installsThemBeforeTranscribing", asyn
   // When the install ends, Then the transcription starts with all-in-one
   vi.mocked(engineHasSections).mockResolvedValue(true);
   await emit({ type: "result", path: "/models" }, () => vi.mocked(setupEngine).mock.lastCall![1]);
+  expect(screen.queryByText(/Installed on first use/)).toBeNull();
   expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", null, true, expect.any(Function));
 });
 
 test("Importer_whenCancelling_cancelsTheJob", async () => {
-  // Given a transcription started from the dialog, without sections
+  // Given a file picked from the dialog, then run without sections
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
   vi.mocked(open).mockResolvedValueOnce("/music/take.wav");
   await user.click(screen.getByRole("button", { name: "Import audio…" }));
   expect(open).toHaveBeenCalledWith(expect.objectContaining({ filters: [expect.objectContaining({ extensions: ["mp3", "wav", "flac", "m4a", "ogg"] })] }));
+  expect(screen.getByText("take.wav")).toBeDefined();
+  expect(transcribe).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Run" }));
   expect(transcribe).toHaveBeenCalledWith("/music/take.wav", "/music/take.madsister.json", null, false, expect.any(Function));
 
   // When clicking Cancel, then the engine reports it was cancelled
@@ -107,8 +127,10 @@ test("Importer_whenCancelling_cancelsTheJob", async () => {
 
 test("Importer_whenTheEngineFails_showsTheMessageAndStderr", async () => {
   // Given a running transcription
+  const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
   await dropFile("/music/song.flac");
+  await user.click(screen.getByRole("button", { name: "Run" }));
 
   // When the engine fails
   await emit({ type: "error", message: "no beats installed", stderr: "Traceback: boom" });
@@ -121,7 +143,7 @@ test("Importer_whenTheEngineFails_showsTheMessageAndStderr", async () => {
 
   // When the engine can't even start
   vi.mocked(transcribe).mockRejectedValueOnce("can't start the engine (uv): not found");
-  await dropFile("/music/song.flac");
+  await user.click(screen.getByRole("button", { name: "Run" }));
 
   // Then that is shown too
   await vi.waitFor(() => expect(screen.getByRole("alert").textContent).toContain("can't start the engine"));
@@ -130,16 +152,19 @@ test("Importer_whenTheEngineFails_showsTheMessageAndStderr", async () => {
 
 test("Importer_ofUnsupportedOrDeclinedFiles_doesNotStart", async () => {
   // Given the importer
+  const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
 
-  // When dropping a text file, Then it is rejected
+  // When dropping a text file, Then it is rejected and there is nothing to run
   await dropFile("/music/notes.txt");
   expect(screen.getByRole("alert").textContent).toMatch(/notes\.txt.*mp3, wav, flac, m4a or ogg/);
+  expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", true);
 
   // When dropping an mp3 whose song file exists, and declining to overwrite it
   vi.mocked(exists).mockResolvedValueOnce(true);
   vi.mocked(confirm).mockResolvedValueOnce(false);
   await dropFile("/music/song.MP3");
+  await user.click(screen.getByRole("button", { name: "Run" }));
 
   // Then the user was asked about that file and nothing started
   expect(confirm).toHaveBeenCalledWith(expect.stringContaining("/music/song.madsister.json"), expect.anything());
@@ -151,16 +176,20 @@ test("Importer_whenFetchingAUrl_downloadsThenTranscribesTheFile", async () => {
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
 
-  // When fetching a URL
+  // When fetching a URL from the URL tab
+  expect(screen.getByRole("tab", { name: "From file" }).getAttribute("aria-selected")).toBe("true");
+  await user.click(screen.getByRole("tab", { name: "From URL" }));
+  expect(screen.getByRole("tab", { name: "From URL" }).getAttribute("aria-selected")).toBe("true");
   await user.type(screen.getByRole("textbox", { name: "Audio URL" }), "https://example.org/v?id=1");
-  await user.click(screen.getByRole("button", { name: "Fetch" }));
+  expect(fetchAudio).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Run" }));
 
   // Then it is downloaded into the app data dir, with its progress shown and nothing else startable
   expect(fetchAudio).toHaveBeenCalledWith("https://example.org/v?id=1", "/data/sources", expect.any(Function));
   await emit({ type: "progress", stage: "download", pct: 30 }, fetchEvent);
   expect(screen.getByRole("status").textContent).toBe("download");
   expect(screen.getByRole("progressbar", { name: "download" })).toHaveProperty("value", 30);
-  expect(screen.getByRole("button", { name: "Record" })).toHaveProperty("disabled", true);
+  expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", true);
 
   // When the download ends, Then the downloaded file (any format) is transcribed next to it
   await emit({ type: "result", path: "/data/sources/My song.webm" }, fetchEvent);
@@ -177,8 +206,9 @@ test("Importer_whenCancellingAFetchOrItsTranscription_stopsThere", async () => {
   // Given a download
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
+  await user.click(screen.getByRole("tab", { name: "From URL" }));
   await user.type(screen.getByRole("textbox", { name: "Audio URL" }), "https://example.org/v");
-  await user.click(screen.getByRole("button", { name: "Fetch" }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
 
   // When cancelling it, Then the download job is killed and nothing is transcribed
   await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -188,7 +218,7 @@ test("Importer_whenCancellingAFetchOrItsTranscription_stopsThere", async () => {
   expect(screen.queryByRole("progressbar")).toBeNull();
 
   // When fetching again, then cancelling during the transcription
-  await user.click(screen.getByRole("button", { name: "Fetch" }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
   await emit({ type: "result", path: "/data/sources/v.m4a" }, fetchEvent);
   await vi.waitFor(() => expect(transcribe).toHaveBeenCalled());
   await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -203,8 +233,9 @@ test("Importer_ofANonHttpUrl_doesNotFetch", async () => {
   // Given / When fetching a local path
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
+  await user.click(screen.getByRole("tab", { name: "From URL" }));
   await user.type(screen.getByRole("textbox", { name: "Audio URL" }), "file:///etc/passwd");
-  await user.click(screen.getByRole("button", { name: "Fetch" }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
 
   // Then it is rejected
   expect(screen.getByRole("alert").textContent).toContain("http");
@@ -217,7 +248,10 @@ test("Importer_whenRecording_showsTheElapsedTimeThenTranscribesOnStop", async ()
   render(<Importer onResult={onResult} />);
 
   // When recording for 65 s
-  await user.click(screen.getByRole("button", { name: "Record" }));
+  await user.click(screen.getByRole("tab", { name: "From URL" }));
+  await user.click(screen.getByRole("radio", { name: "Record" }));
+  expect(screen.getByRole("textbox", { name: "Audio URL" })).toHaveProperty("disabled", true);
+  await user.click(screen.getByRole("button", { name: "Run" }));
   await emit({ type: "progress", stage: "record", pct: 0, elapsedSec: 65 }, recordEvent);
 
   // Then a WAV is recorded into the app data dir and the elapsed time is shown
@@ -238,7 +272,9 @@ test("Importer_whenCancellingARecording_doesNotTranscribe", async () => {
   // Given a recording
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
-  await user.click(screen.getByRole("button", { name: "Record" }));
+  await user.click(screen.getByRole("tab", { name: "From URL" }));
+  await user.click(screen.getByRole("radio", { name: "Record" }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
   await emit({ type: "progress", stage: "record", pct: 0, elapsedSec: 2 }, recordEvent);
 
   // When cancelling it

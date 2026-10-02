@@ -11,7 +11,7 @@ import { transcribe } from "./ui/engine";
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), writeFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn(), engineNeedsSetup: async () => false }));
+vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn(), engineNeedsSetup: async () => false, engineHasSections: async () => true }));
 const drop = vi.hoisted(() => ({ handler: (_: { payload: unknown }) => {} }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({
@@ -148,8 +148,9 @@ test("App_whenImportingAudio_loadsTheResultAndReportsErrors", async () => {
   const engineSays = (event: Parameters<Parameters<typeof transcribe>[4]>[0]) =>
     act(() => vi.mocked(transcribe).mock.lastCall![4](event));
 
-  // When dropping the mp3 and the engine reports its result
+  // When dropping the mp3, running the import and the engine reports its result
   await act(() => drop.handler({ payload: { type: "drop", paths: ["/music/blues.mp3"] } }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
   await engineSays({ type: "result", path: "/music/blues.madsister.json" });
 
   // Then the song is loaded and listed as recent
@@ -159,6 +160,7 @@ test("App_whenImportingAudio_loadsTheResultAndReportsErrors", async () => {
   // When a second import fails, started from the start screen
   await user.click(screen.getByRole("button", { name: "New" }));
   await act(() => drop.handler({ payload: { type: "drop", paths: ["/music/other.mp3"] } }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
   await engineSays({ type: "error", message: "boom", stderr: "" });
 
   // Then the error is shown on the start screen
