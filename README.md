@@ -29,13 +29,19 @@ sudo apt update && sudo apt install madsister
 
 ## Install (macOS, Apple silicon)
 
-Download `madsister_<version>_aarch64.dmg` from the [releases page](https://github.com/adericbourg/madsister/releases) and
-copy the app to `/Applications`. It isn't signed or notarized: run `xattr -dr com.apple.quarantine /Applications/madsister.app`
-once, or Gatekeeper blocks it.
+```sh
+brew tap adericbourg/tap
+brew trust --tap adericbourg/tap
+brew install --cask madsister
+```
 
-- `madsister-snapshot_<version>_aarch64.dmg` (the latest pre-release) installs next to `madsister`, with its own data dir.
-- Same first launch as on Linux (the engine and the models download once); ffmpeg must be on `PATH` (`brew install ffmpeg`).
-  Section detection builds NATTEN from source on demand, which needs the Xcode Command Line Tools.
+- `madsister-snapshot` follows every push to `main`, like the apt package, and installs next to `madsister`.
+- The app isn't signed or notarized: the cask clears the quarantine flag, so Gatekeeper doesn't block it. With the `.dmg`
+  from the [releases page](https://github.com/adericbourg/madsister/releases), copy the app to `/Applications` and run
+  `xattr -dr com.apple.quarantine /Applications/madsister.app` once.
+- Same first launch as on Linux (the engine and the models download once); ffmpeg comes with the cask. Section detection
+  builds NATTEN from source on demand, which needs the Xcode Command Line Tools.
+- Uninstall: `brew uninstall --cask madsister` (`--zap` also removes the engine and the data).
 
 ## Development
 
@@ -120,7 +126,9 @@ launch builds madmom from git: it needs git and a C compiler. The deb depends on
 
 `.github/workflows/release.yml` builds the Linux deb and AppImage (on Ubuntu 22.04, with the madmom wheel and the `uv`
 sidecar) and the macOS arm64 dmg (ad-hoc signed), installs each on a clean system to set up its engine and transcribe a clip,
-then publishes:
+then publishes (and the `homebrew` job commits the matching cask to
+[adericbourg/homebrew-tap](https://github.com/adericbourg/homebrew-tap); the `HOMEBREW_TAP_TOKEN` secret is a fine-grained
+token with Contents read/write on that repository only):
 
 - every push to `main`: a pre-release `v<last vX.Y.Z tag or 0.0.0>-snapshot.<run number>`; the previous snapshot (release and
   tag) is deleted once the new one is published, so only the latest is kept;
