@@ -31,18 +31,19 @@ sudo apt update && sudo apt install madsister
 
 ### Prerequisites
 
-Checked on macOS (Apple silicon) with these versions:
+Linux is the main development platform (CI runs there); macOS works too, and nothing ties the toolchain to either. Versions
+below were last checked on macOS (Apple silicon):
 
 - Node.js LTS (26.10) and pnpm 12 (12.8; CI pins 12).
-- Rust stable (1.98) and a C++ toolchain (Xcode Command Line Tools / `build-essential`): Tauri, and NATTEN
-  (section detection), which is built from source on both OSes.
+- Rust stable (1.98) and a C++ toolchain (`build-essential` on Debian/Ubuntu, Xcode Command Line Tools on macOS): Tauri,
+  and NATTEN (section detection), which is built from source on every OS.
 - [uv](https://docs.astral.sh/uv/) (0.12): it installs Python 3.11 (`engine/.python-version`) by itself.
 - ffmpeg on `PATH` (the engine decodes every input with it).
-- Linux only: the [Tauri system packages](https://v2.tauri.app/start/prerequisites/#linux), same list as
-  `.github/workflows/app.yml`:
+- Linux: the [Tauri system packages](https://v2.tauri.app/start/prerequisites/#linux), same list as
+  `.github/workflows/app.yml` (Debian/Ubuntu names; other distributions have equivalents):
   `libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev build-essential curl wget file`;
   for audio playback, `gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav` (see
-  [M3-1](doc/roadmap/m3-step1-playback-cursor.md); not checked here).
+  [M3-1](doc/roadmap/m3-step1-playback-cursor.md)).
 
 ### Engine setup (once)
 
