@@ -166,7 +166,7 @@ jobs:
   # macOS arm64: an unsigned .dmg (ad-hoc signature only); the `homebrew` job below installs it through a cask that clears the quarantine flag.
   macos:
     needs: version
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -221,7 +221,7 @@ jobs:
   # The macOS twin of linux-clean-install: the engine sets up from the installed .app and transcribes, with ffmpeg as the only prerequisite.
   macos-clean-install:
     needs: [version, macos]
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7 # setup-engine.sh, the script the app runs on first launch
