@@ -508,23 +508,23 @@ test("App_whenOpeningASong_startsInViewModeUntilSwitchedToEdit", async () => {
   vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
   await user.keyboard("{Control>}o{/Control}");
   await screen.findByRole("heading", { name: "Blues" });
-  const editButton = () => screen.getByRole("button", { name: "Edit" });
+  const editButton = () => screen.getByRole("switch", { name: "Edit mode" }) as HTMLInputElement;
 
   // Then it is read-only: clicking a bar opens no input
-  expect(editButton().getAttribute("aria-pressed")).toBe("false");
+  expect(editButton().checked).toBe(false);
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
   expect(screen.queryByRole("textbox", { name: "Chord" })).toBeNull();
 
   // When pressing Mod+E, Then clicking a bar edits it, and Mod+E switches back
   await user.keyboard("{Control>}e{/Control}");
-  expect(editButton().getAttribute("aria-pressed")).toBe("true");
+  expect(editButton().checked).toBe(true);
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
   expect(screen.getByRole("textbox", { name: "Chord" })).toBeDefined();
   await user.keyboard("{Escape}{Control>}e{/Control}");
-  expect(editButton().getAttribute("aria-pressed")).toBe("false");
+  expect(editButton().checked).toBe(false);
 
   // When creating a new grid, Then it starts in edit mode
   await user.keyboard("{Control>}n{/Control}");
   await createGrid(user);
-  expect(editButton().getAttribute("aria-pressed")).toBe("true");
+  expect(editButton().checked).toBe(true);
 });

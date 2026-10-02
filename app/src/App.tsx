@@ -224,9 +224,11 @@ function App() {
         )}
         <FontCredits />
         {hasSong && (
-          <button type="button" aria-pressed={mode === "edit"} onClick={toggleMode}>
+          <label className="mode-switch">
+            View
+            <input type="checkbox" role="switch" aria-label="Edit mode" checked={mode === "edit"} onChange={toggleMode} />
             Edit
-          </button>
+          </label>
         )}
         {hasSong && (
           <button type="button" className="panel-toggle" aria-expanded={isPanelOpen} aria-controls="parameters" onClick={() => setIsPanelOpen(!isPanelOpen)}>
