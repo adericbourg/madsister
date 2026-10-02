@@ -273,12 +273,8 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(JSON.parse(files["/config/settings.json"]).style).toBe("latin");
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
 
-  // When raising the low-confidence threshold, Then the setting is saved; an out-of-range value is ignored
-  const threshold = screen.getByRole("spinbutton", { name: "Review chords below confidence" });
-  fireEvent.change(threshold, { target: { value: "0.7" } });
-  fireEvent.change(threshold, { target: { value: "2" } });
-  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.7, compactPrint: false, font: "petaluma-script", minorConvention: "relative" }));
-  expect((threshold as HTMLInputElement).value).toBe("0.7");
+  // Then the review threshold is hidden, as the grid went through no chord recognition
+  expect(screen.queryByRole("spinbutton", { name: "Review chords below confidence" })).toBeNull();
 
   // When ticking Compact print, Then the setting is saved and the app root carries the print class
   await user.click(screen.getByRole("checkbox", { name: "Compact print (2 columns)" }));
@@ -340,6 +336,28 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   // Then the new song has that meter
   await vi.waitFor(() => expect(files["/waltz.madsister.json"]).toBeDefined());
   expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 7, unit: 8 });
+});
+
+test("App_whenTheSongHasRecognizedChords_offersTheReviewThresholdAndPersistsIt", async () => {
+  // Given a song whose first chord carries a recognition confidence
+  const user = userEvent.setup();
+  const [first, ...others] = song.sections;
+  const [firstBar, ...bars] = first.bars;
+  const recognized = { ...song, sections: [{ ...first, bars: [{ ...firstBar, chords: firstBar.chords.map((c) => ({ ...c, confidence: 0.4 })) }, ...bars] }, ...others] };
+  files["/blues.madsister.json"] = serializeSong(recognized);
+  render(<App />);
+  vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
+  await user.keyboard("{Control>}o{/Control}");
+  await screen.findByRole("heading", { name: "Blues" });
+  expect(screen.getByText("1 chord to review")).toBeDefined();
+
+  // When raising the low-confidence threshold, Then the setting is saved; an out-of-range value is ignored
+  const threshold = screen.getByRole("spinbutton", { name: "Review chords below confidence" });
+  fireEvent.change(threshold, { target: { value: "0.7" } });
+  fireEvent.change(threshold, { target: { value: "2" } });
+  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"]).lowConfidenceThreshold).toBe(0.7));
+  expect((threshold as HTMLInputElement).value).toBe("0.7");
+
 });
 
 test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMusicXmlAndMidi", async () => {

@@ -93,6 +93,9 @@ const isFlagged = (song: Song, { section, bar, slot }: SlotRef, threshold: numbe
   return confidence !== undefined && confidence < threshold;
 };
 
+/** Whether any chord comes with an engine confidence, i.e. the song went through chord recognition. */
+export const hasConfidence = (song: Song): boolean => song.sections.some((s) => s.bars.some((b) => b.chords.some((c) => c.confidence !== undefined)));
+
 /** Number of slots whose engine confidence is below the threshold (spec F-ED-8). */
 export const countFlagged = (song: Song, threshold: number): number => positions(song).filter((p) => isFlagged(song, p, threshold)).length;
 

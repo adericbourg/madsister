@@ -5,6 +5,7 @@ import { setKey, setNotation } from "../model/commands";
 import type { MinorConvention } from "../model/nashville";
 import type { Notation, Song } from "../model/song";
 import { transposeSong, type Spelling } from "../model/transpose";
+import { hasConfidence } from "./keymap";
 import type { useHistory } from "./useHistory";
 
 /** User preferences (spec F-ED-1, F-DS-1), stored in `<appConfigDir>/settings.json`, not in the song. */
@@ -131,20 +132,22 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
             <option>8</option>
           </select>
         </label>
-        <label>
-          Review chords below confidence{" "}
-          <input
-            type="number"
-            min={0}
-            max={1}
-            step={0.05}
-            value={settings.lowConfidenceThreshold}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              if (e.target.value !== "" && isThreshold(n)) onSettingsChange({ ...settings, lowConfidenceThreshold: n });
-            }}
-          />
-        </label>
+        {hasConfidence(history.song) && (
+          <label>
+            Review chords below confidence{" "}
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={settings.lowConfidenceThreshold}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (e.target.value !== "" && isThreshold(n)) onSettingsChange({ ...settings, lowConfidenceThreshold: n });
+              }}
+            />
+          </label>
+        )}
         <label>
           <input type="checkbox" checked={settings.compactPrint} onChange={(e) => onSettingsChange({ ...settings, compactPrint: e.target.checked })} /> Compact print (2 columns)
         </label>

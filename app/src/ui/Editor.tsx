@@ -9,7 +9,7 @@ import type { Bar, Song } from "../model/song";
 import { confirmDeleteSection } from "./fileActions";
 import { Grid } from "./Grid";
 import { Field } from "./Toolbar";
-import { clampCursor, countFlagged, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
+import { clampCursor, countFlagged, hasConfidence, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
 import type { useHistory } from "./useHistory";
 import { usePlayer } from "./usePlayer";
 
@@ -353,9 +353,11 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
           setDraft({ kind: "chord", text: show(chord), select: "all" });
         }}
       />
-      <p aria-live="polite" className="review-status">
-        {flaggedCount === 0 ? "No chords to review" : `${flaggedCount} chord${flaggedCount === 1 ? "" : "s"} to review`}
-      </p>
+      {hasConfidence(song) && (
+        <p aria-live="polite" className="review-status">
+          {flaggedCount === 0 ? "No chords to review" : `${flaggedCount} chord${flaggedCount === 1 ? "" : "s"} to review`}
+        </p>
+      )}
       <p role="status" className="visually-hidden">
         {notice}
       </p>
