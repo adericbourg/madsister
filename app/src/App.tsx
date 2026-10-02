@@ -244,23 +244,19 @@ function App() {
         </div>
       ) : (
         <div className="start">
-          <section aria-labelledby="new-grid-title">
+          <section aria-labelledby="new-grid-title" className="new-grid">
             <h2 id="new-grid-title">New grid</h2>
-            <label>
-              New song meter{" "}
-              <select value={newMeter} onChange={(e) => setNewMeter(e.target.value)}>
-                {Object.keys(METERS).map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
-            </label>{" "}
-            <label>
-              Notation{" "}
-              <select value={newNotation} onChange={(e) => setNewNotation(e.target.value as Notation)}>
-                <option value="chords">Chords</option>
-                <option value="nashville">Nashville numbers</option>
-              </select>
-            </label>{" "}
+            <label htmlFor="new-meter">New song meter</label>
+            <select id="new-meter" value={newMeter} onChange={(e) => setNewMeter(e.target.value)}>
+              {Object.keys(METERS).map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+            </select>
+            <label htmlFor="new-notation">Notation</label>
+            <select id="new-notation" value={newNotation} onChange={(e) => setNewNotation(e.target.value as Notation)}>
+              <option value="chords">Chords</option>
+              <option value="nashville">Nashville numbers</option>
+            </select>
             <button type="button" onClick={createGrid}>
               Create grid
             </button>

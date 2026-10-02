@@ -204,6 +204,25 @@ aside button {
   font-size: 1.1rem;
 }
 
+/* Label | select rows, then the button on its own row. */
+.new-grid {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  align-content: start;
+}
+
+.new-grid h2,
+.new-grid button {
+  grid-column: 1 / -1;
+}
+
+.new-grid button {
+  justify-self: start;
+  margin-top: 0.5rem;
+}
+
 .importer > * {
   margin-bottom: 0.5rem;
 }
