@@ -329,16 +329,17 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(screen.getByText("♩ = 96")).toBeDefined();
   expect(screen.queryByRole("alert")).toBeNull();
 
-  // When starting a new 3/4 song and saving it
+  // When starting a new 7/8 song and saving it
   await user.click(screen.getByRole("button", { name: "New" }));
-  await user.selectOptions(screen.getByRole("combobox", { name: "New song meter" }), "3/4");
+  await user.selectOptions(screen.getByRole("combobox", { name: "Beats per bar" }), "7");
+  await user.selectOptions(screen.getByRole("combobox", { name: "Beat unit" }), "8");
   await createGrid(user);
   vi.mocked(save).mockResolvedValueOnce("/waltz.madsister.json");
   await user.click(screen.getByRole("button", { name: "Save as…" }));
 
   // Then the new song has that meter
   await vi.waitFor(() => expect(files["/waltz.madsister.json"]).toBeDefined());
-  expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 3, unit: 4 });
+  expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 7, unit: 8 });
 });
 
 test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMusicXmlAndMidi", async () => {

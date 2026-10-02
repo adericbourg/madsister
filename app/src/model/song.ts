@@ -1,7 +1,7 @@
 // The Song file format (spec §4). Unknown fields are kept on every object so a load/save never drops them (NF-7).
 
-export type Meter = { readonly beats: number; readonly unit: 4 | 8 };
-export type SongMeter = { readonly beats: 3 | 4 | 6; readonly unit: 4 | 8 };
+export type Meter = { readonly beats: number; readonly unit: 2 | 4 | 8 };
+export type SongMeter = Meter;
 
 export type ChordSlot = {
   readonly chord: string; // Harte, e.g. "C:maj7/3", "A:min", "N"; syntax is checked by the chord parser, not here
@@ -64,7 +64,7 @@ const oneOf = <T>(value: unknown, allowed: readonly T[], path: string): T =>
 
 const parseMeter = (value: unknown, path: string): Meter => {
   const raw = object(value, path);
-  return { ...raw, beats: positiveInt(raw.beats, `${path}.beats`), unit: oneOf(raw.unit, [4, 8] as const, `${path}.unit`) };
+  return { ...raw, beats: positiveInt(raw.beats, `${path}.beats`), unit: oneOf(raw.unit, [2, 4, 8] as const, `${path}.unit`) };
 };
 
 const parseSlot = (value: unknown, path: string): ChordSlot => {
@@ -110,8 +110,8 @@ export const parseSong = (json: unknown): Song => {
   const rawMeter = object(rawMeta.meter, "meta.meter");
   const meter: SongMeter = {
     ...rawMeter,
-    beats: oneOf(rawMeter.beats, [3, 4, 6] as const, "meta.meter.beats"),
-    unit: oneOf(rawMeter.unit, [4, 8] as const, "meta.meter.unit"),
+    beats: positiveInt(rawMeter.beats, "meta.meter.beats"),
+    unit: oneOf(rawMeter.unit, [2, 4, 8] as const, "meta.meter.unit"),
   };
   const audio = optional(raw.audio, (v) => {
     const rawAudio = object(v, "audio");

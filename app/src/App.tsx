@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toChordPro } from "./model/export/chordpro";
 import { toMidi } from "./model/export/midi";
 import { toMusicXml } from "./model/export/musicxml";
-import { emptySong, type Notation, type Song, type SongMeter } from "./model/song";
+import { emptySong, type Notation, type Song } from "./model/song";
 import { Editor } from "./ui/Editor";
 import { EngineSetup } from "./ui/EngineSetup";
 import { Importer } from "./ui/Importer";
@@ -29,7 +29,8 @@ import { useHistory } from "./ui/useHistory";
 
 const RECENT = "recent.json";
 const SETTINGS = "settings.json";
-const METERS: Record<string, SongMeter> = { "3/4": { beats: 3, unit: 4 }, "4/4": { beats: 4, unit: 4 }, "6/8": { beats: 6, unit: 8 } };
+const BEATS_OPTIONS = Array.from({ length: 16 }, (_, i) => i + 1);
+const UNIT_OPTIONS = [2, 4, 8] as const;
 
 function App() {
   const [initial] = useState(emptySong);
@@ -44,7 +45,8 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(() => parseSettings(null));
   // ponytail: the meter is only chosen for new songs; changing it on an existing song would invalidate every bar.
-  const [newMeter, setNewMeter] = useState("4/4");
+  const [newBeats, setNewBeats] = useState(4);
+  const [newUnit, setNewUnit] = useState<2 | 4 | 8>(4);
   const [newNotation, setNewNotation] = useState<Notation>("chords");
   const [audioNotice, setAudioNotice] = useState<string | null>(null);
   const isSongDirty = song !== savedSong;
@@ -69,7 +71,7 @@ function App() {
   };
   const canDiscard = async () => !isSongDirty || (await confirmDiscard());
 
-  const createGrid = () => load(emptySong(METERS[newMeter], newNotation === "nashville" ? "nashville" : undefined), null);
+  const createGrid = () => load(emptySong({ beats: newBeats, unit: newUnit }, newNotation === "nashville" ? "nashville" : undefined), null);
   // Back to the start screen; the song is reset so that it isn't dirty or autosaved behind it.
   const newSong = async () => {
     if (!(await canDiscard())) return;
@@ -248,10 +250,16 @@ function App() {
         <div className="start">
           <section aria-labelledby="new-grid-title" className="new-grid">
             <h2 id="new-grid-title">New grid</h2>
-            <label htmlFor="new-meter">New song meter</label>
-            <select id="new-meter" value={newMeter} onChange={(e) => setNewMeter(e.target.value)}>
-              {Object.keys(METERS).map((m) => (
-                <option key={m}>{m}</option>
+            <label htmlFor="new-beats">Beats per bar</label>
+            <select id="new-beats" value={newBeats} onChange={(e) => setNewBeats(Number(e.target.value))}>
+              {BEATS_OPTIONS.map((n) => (
+                <option key={n}>{n}</option>
+              ))}
+            </select>
+            <label htmlFor="new-unit">Beat unit</label>
+            <select id="new-unit" value={newUnit} onChange={(e) => setNewUnit(Number(e.target.value) as 2 | 4 | 8)}>
+              {UNIT_OPTIONS.map((n) => (
+                <option key={n}>{n}</option>
               ))}
             </select>
             <label htmlFor="new-notation">Notation</label>

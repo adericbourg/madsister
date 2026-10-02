@@ -39,9 +39,11 @@ const harmony = (harte: string): string | undefined => {
   );
 };
 
-const slash = (unit: 4 | 8): string =>
+const NOTE_TYPES = { 2: "half", 4: "quarter", 8: "eighth" } as const;
+
+const slash = (unit: 2 | 4 | 8): string =>
   `<note><pitch><step>B</step><octave>4</octave></pitch><duration>${(DIVISIONS * 4) / unit}</duration><voice>1</voice>` +
-  `<type>${unit === 4 ? "quarter" : "eighth"}</type><stem>none</stem><notehead>slash</notehead></note>`;
+  `<type>${NOTE_TYPES[unit]}</type><stem>none</stem><notehead>slash</notehead></note>`;
 
 const time = (meter: Meter): string => `<time><beats>${meter.beats}</beats><beat-type>${meter.unit}</beat-type></time>`;
 

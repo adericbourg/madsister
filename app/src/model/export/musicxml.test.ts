@@ -31,3 +31,19 @@ test("toMusicXml_ofASong_matchesTheGoldenFile", () => {
   // Then
   expect(xml).toBe(golden);
 });
+
+test("toMusicXml_ofAHalfNoteUnitMeter_writesHalfNoteSlashes", () => {
+  // Given a 3/2 song with one bar
+  const song: Song = {
+    version: 1,
+    meta: { title: "T", meter: { beats: 3, unit: 2 } },
+    sections: [{ id: "a", label: "A", bars: [{ chords: [{ chord: "C:maj", beats: 3 }] }] }],
+  } as Song;
+
+  // When
+  const xml = toMusicXml(song);
+
+  // Then
+  expect(xml).toContain("<beats>3</beats><beat-type>2</beat-type>");
+  expect(xml.match(/<type>half<\/type>/g)).toHaveLength(3);
+});

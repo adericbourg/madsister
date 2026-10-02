@@ -40,6 +40,8 @@ describe("parseSong", () => {
     ["zero beats", (f: any) => (f.sections[0].bars[1].chords[1].beats = 0), "sections[0].bars[1].chords[1].beats"],
     ["empty chord", (f: any) => (f.sections[0].bars[0].chords[0].chord = ""), "sections[0].bars[0].chords[0].chord"],
     ["missing sections", (f: any) => delete f.sections, "sections"],
+    ["unsupported meter unit", (f: any) => (f.meta.meter.unit = 16), "meta.meter.unit"],
+    ["zero meter beats", (f: any) => (f.meta.meter.beats = 0), "meta.meter.beats"],
   ])("parseSong_whenInvalid_throwsWithPath (%s)", (_, mutate, message) => {
     // Given
     const file = validFile();
@@ -64,6 +66,15 @@ describe("emptySong", () => {
     expect(song.sections[0].bars).toEqual(Array(4).fill({ chords: [{ chord: "N", beats: 3 }] }));
     expect(barBeats(song, song.sections[0].bars[0])).toBe(3);
     expect(emptySong().meta.meter).toEqual({ beats: 4, unit: 4 });
+  });
+
+  test("emptySong_ofAnUncommonMeter_roundTripsWithBarsSummingToTheMeter", () => {
+    // Given / When
+    const song = emptySong({ beats: 5, unit: 2 });
+
+    // Then
+    expect(parseSong(JSON.parse(serializeSong(song)))).toEqual(song);
+    expect(barBeats(song, song.sections[0].bars[0])).toBe(5);
   });
 
   test("emptySong_ofNashville_hasTheNotationAndNoKey", () => {
