@@ -20,12 +20,19 @@ export const usePlayer = (path: string | undefined) => {
     setTime(0);
     setDuration(0);
     if (path === undefined) return;
+    const audio = ref.current; // React has already nulled the ref when this cleanup runs after the <audio> unmounted
     let url: string | undefined;
     let isCurrent = true;
     audioObjectUrl(path).then((u) => (isCurrent ? setSrc((url = u)) : URL.revokeObjectURL(u)), fail);
     return () => {
       isCurrent = false;
-      ref.current?.pause();
+      if (audio !== null) {
+        // The same <audio> plays the next song: unload the blob before revoking it. WebKit reads it lazily, and a revoked blob
+        // still in use fails the element's next load at random ("unsupported format", no duration). Removing `src` alone doesn't unload.
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+      }
       if (url !== undefined) URL.revokeObjectURL(url);
     };
   }, [path]);

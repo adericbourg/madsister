@@ -14,11 +14,11 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 afterEach(cleanup);
 
 let song: Song | undefined;
-const Harness = ({ from = emptySong, mode }: { from?: () => Song; mode?: "view" | "edit" }) => {
+const Harness = ({ from = emptySong, mode, audioPath }: { from?: () => Song; mode?: "view" | "edit"; audioPath?: string }) => {
   const [initial] = useState(from);
   const history = useHistory(initial);
   song = history.song;
-  return <Editor history={history} mode={mode} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={initial.audio?.path} />;
+  return <Editor history={history} mode={mode} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={audioPath ?? initial.audio?.path} />;
 };
 
 const bar = (...chords: [string, number][]) => ({ chords: chords.map(([chord, beats]) => ({ chord, beats })) });
@@ -373,16 +373,13 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   URL.revokeObjectURL = vi.fn();
   vi.mocked(invoke).mockResolvedValue(new ArrayBuffer(8));
   const timed = (startSec?: number) => ({ startSec, chords: [{ chord: "C:maj", beats: 4 }] });
-  render(
-    <Harness
-      from={() => ({
-        version: 1,
-        meta: { title: "Song", meter: { beats: 4, unit: 4 } },
-        audio: { path: "/music/song.mp3", sha256: "x" },
-        sections: [{ id: "v", label: "Verse", bars: [timed(0), timed(2), timed(4.37), timed(), timed(6)] }],
-      })}
-    />,
-  );
+  const from = (): Song => ({
+    version: 1,
+    meta: { title: "Song", meter: { beats: 4, unit: 4 } },
+    audio: { path: "/music/song.mp3", sha256: "x" },
+    sections: [{ id: "v", label: "Verse", bars: [timed(0), timed(2), timed(4.37), timed(), timed(6)] }],
+  });
+  const { rerender, unmount } = render(<Harness from={from} />);
   const barOf = (n: number) => screen.getByRole("gridcell", { name: `Verse, bar ${n}, beat 1: C` }).parentElement!;
   const transport = screen.getByRole("group", { name: "Playback" }) as HTMLFieldSetElement;
   await vi.waitFor(() => expect(transport.disabled).toBe(false));
@@ -439,6 +436,24 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }));
   expect(currentTime).toBe(0);
   expect(screen.getByRole("button", { name: "Pause" })).toBeDefined();
+
+  // When opening another song's audio while playing, Then the element lets go of the old blob before it is revoked
+  // (WebKit reads blobs lazily: revoking one still in use fails the element's next load) and the playback stops
+  const audio = document.querySelector("audio")!;
+  vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+  let srcWhenRevoked: string | null = "never revoked";
+  URL.revokeObjectURL = vi.fn(() => (srcWhenRevoked = audio.getAttribute("src")));
+  rerender(<Harness from={from} audioPath="/music/other.mp3" />);
+  expect(srcWhenRevoked).toBeNull();
+  expect(audio.load).toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
+  await vi.waitFor(() => expect(transport.disabled).toBe(false));
+
+  // When the editor goes away while playing, Then the audio stops too
+  await user.click(screen.getByRole("button", { name: "Play" }));
+  vi.mocked(HTMLMediaElement.prototype.pause).mockClear();
+  unmount();
+  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
 });
 
 test("Editor_whenPickingASectionByName_editsThatSection", async () => {
