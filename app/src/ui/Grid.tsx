@@ -16,6 +16,8 @@ type Props = {
   playing?: BarRef | null;
   lowConfidenceThreshold?: number;
   selection?: Selection;
+  /** Edit mode: hovered bars are framed to show they can be edited. */
+  isEditable?: boolean;
   /** Rendered in the cursor cell instead of its chord (inline input). */
   editor?: ReactNode;
   onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
@@ -23,7 +25,7 @@ type Props = {
   onSectionClick?: (index: number) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, editor, onKeyDown, onCellClick, onSectionClick }: Props) => {
+export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, onKeyDown, onCellClick, onSectionClick }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
@@ -48,7 +50,7 @@ export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, l
           {tempoBpm !== undefined && <span>♩ = {tempoBpm}</span>}
         </p>
       </header>
-      <div role="grid" aria-label={`${title} chord chart`} className="grid" ref={gridRef} onKeyDown={onKeyDown}>
+      <div role="grid" aria-label={`${title} chord chart`} className={isEditable ? "grid is-editable" : "grid"} ref={gridRef} onKeyDown={onKeyDown}>
         {song.sections.map((section, i) => (
           <SectionBlock
             key={section.id}

@@ -345,6 +345,7 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
         playing={barAtTime(song, player.time)}
         lowConfidenceThreshold={lowConfidenceThreshold}
         selection={anchor ? selectedBars({ cursor, anchor }) : undefined}
+        isEditable={isEditable}
         editor={editor}
         onKeyDown={onKeyDown}
         onSectionClick={selectSection}

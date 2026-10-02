@@ -23,12 +23,19 @@ const Harness = ({ from = emptySong, mode, audioPath }: { from?: () => Song; mod
 
 const bar = (...chords: [string, number][]) => ({ chords: chords.map(([chord, beats]) => ({ chord, beats })) });
 
+test("Editor_inEditMode_marksTheGridEditable", () => {
+  // Given a song in edit mode, Then the grid carries the class that frames hovered bars
+  render(<Harness mode="edit" />);
+  expect(screen.getByRole("grid").classList.contains("is-editable")).toBe(true);
+});
+
 test("Editor_inViewMode_navigatesWithoutEditing", async () => {
   // Given a song starting with C then G, in view mode
   const user = userEvent.setup();
   render(<Harness mode="view" from={() => ({ ...emptySong(), sections: [{ id: "v", label: "Verse", bars: [bar(["C:maj", 4]), bar(["G:maj", 4])] }] })} />);
   const before = song;
   expect(screen.queryByRole("group", { name: "Section" })).toBeNull();
+  expect(screen.getByRole("grid").classList.contains("is-editable")).toBe(false);
 
   // When clicking a bar, Then the cursor moves there and no input opens
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
