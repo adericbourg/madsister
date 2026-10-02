@@ -2,6 +2,30 @@
 
 Offline desktop app that turns a song into an editable, printable chord grid.
 
+## Install (Debian, Ubuntu)
+
+Add the apt repository once, and `apt upgrade` then keeps madsister up to date:
+
+```sh
+sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://adericbourg.github.io/madsister/key.asc
+sudo tee /etc/apt/sources.list.d/madsister.sources <<'EOF'
+Types: deb
+URIs: https://adericbourg.github.io/madsister
+Suites: stable
+Components: main
+Signed-By: /etc/apt/keyrings/madsister.asc
+EOF
+sudo apt update && sudo apt install madsister
+```
+
+- `Suites: stable` follows the releases; `Suites: snapshot` follows every push to `main` (unreleased, may be broken).
+  Switch by editing the file and running `sudo apt update`.
+- amd64 only. The first launch downloads the engine (Python, its libraries and the models), once, and again after an update.
+- The `.deb` and the AppImage are also on the [releases page](https://github.com/adericbourg/madsister/releases).
+- For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see `THIRD_PARTY.md`).
+- Uninstall: `sudo apt remove madsister`, then delete `/etc/apt/sources.list.d/madsister.sources` and
+  `/etc/apt/keyrings/madsister.asc`.
+
 ## Development
 
 ### Prerequisites
@@ -90,5 +114,9 @@ sidecar), installs the deb in a clean `ubuntu:24.04` container to set up its eng
 - a manual run on `main` (Actions > release > Run workflow) with a `patch`, `minor` or `major` bump of the last `vX.Y.Z` tag:
   the release `X.Y.Z`, kept, and its tag is created on the run's commit. The version is injected with `tauri build --config`,
   so `tauri.conf.json` and `Cargo.toml` aren't bumped.
+
+The `apt` job then rebuilds the signed apt repository on GitHub Pages (suite `stable`: the latest release; suite `snapshot`: the
+latest snapshot) with `apt-ftparchive`, signed by the key in the `APT_GPG_PRIVATE_KEY` secret. Pages must be set to the
+"GitHub Actions" source.
 
 Releases are on the [releases page](https://github.com/adericbourg/madsister/releases).
