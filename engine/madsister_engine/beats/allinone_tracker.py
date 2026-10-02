@@ -29,7 +29,10 @@ def track(wav_path: str | Path, meter: int | None = None) -> BeatResult:
     """all-in-one has no meter input: a forced `meter` is ignored and the detected downbeats are kept."""
     # Demucs stems and spectrograms are per-song byproducts: keep them out of the cwd, allin1 deletes them afterwards.
     with tempfile.TemporaryDirectory() as tmp:
-        result = allin1.analyze(Path(wav_path), demix_dir=Path(tmp, "demix"), spec_dir=Path(tmp, "spec"))
+        # No spectrogram pool: macOS spawns its workers, which re-import allin1 without the natten shim and hang.
+        result = allin1.analyze(
+            Path(wav_path), demix_dir=Path(tmp, "demix"), spec_dir=Path(tmp, "spec"), multiprocess=False
+        )
     return BeatResult(
         beats=[float(t) for t in result.beats],
         downbeats=[float(t) for t in result.downbeats],
