@@ -384,3 +384,21 @@ test("App_whenResettingTheTranspose_restoresTheInitialKey", async () => {
   expect(firstSlot().textContent).toBe("C7M");
   expect((reset as HTMLButtonElement).disabled).toBe(true);
 });
+
+test("App_whenUndoingATranspose_resetStillRestoresTheInitialKey", async () => {
+  // Given Cmaj7 transposed up twice, then one transpose undone
+  const user = userEvent.setup();
+  render(<App />);
+  await createGrid(user);
+  await user.keyboard("Cmaj7{Enter}");
+  const firstSlot = () => screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ });
+  await user.click(screen.getByRole("button", { name: "+1 semitone" }));
+  await user.click(screen.getByRole("button", { name: "+1 semitone" }));
+  await user.click(firstSlot());
+  await user.keyboard("{Control>}z{/Control}");
+  expect(firstSlot().textContent).toBe("C#7M");
+
+  // When resetting, Then the chord is back to C
+  await user.click(screen.getByRole("button", { name: "Reset" }));
+  expect(firstSlot().textContent).toBe("C7M");
+});

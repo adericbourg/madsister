@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { setTransposition, transposition } from "../model/history";
 import type { DisplayStyle } from "../model/display";
 import type { Song } from "../model/song";
 import { transposeSong, type Spelling } from "../model/transpose";
@@ -69,11 +70,9 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
   const [spelling, setSpelling] = useState<Spelling>("sharp");
   const { meta } = history.song;
   const setMeta = (patch: Partial<Song["meta"]>) => history.apply((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
-  const [offset, setOffset] = useState(0); // net semitones since the song was opened, so Reset can undo them
-  const transpose = (semitones: number) => {
-    setOffset((o) => o + semitones);
-    history.apply((s) => transposeSong(s, semitones, spelling));
-  };
+  const offset = transposition(history.song); // net semitones since the song was opened, so Reset can undo them
+  const transpose = (semitones: number) =>
+    history.apply((s) => setTransposition(transposeSong(s, semitones, spelling), transposition(s) + semitones));
   return (
     <div className="toolbar">
       <fieldset>
