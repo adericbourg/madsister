@@ -209,6 +209,11 @@
   @page {
     size: A4;
     margin: 12mm;
+
+    /* Margin boxes: Chromium webviews only; elsewhere the page number is simply absent. */
+    @bottom-right {
+      content: counter(page) " / " counter(pages);
+    }
   }
 
   nav,

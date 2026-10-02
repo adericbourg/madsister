@@ -197,7 +197,13 @@ aside button {
   margin-bottom: 0.5rem;
 }
 
+/* Same specificity as the nav/aside rules above, so the print hiding lives here, after them. */
 @media print {
+  nav,
+  aside {
+    display: none;
+  }
+
   main,
   .workspace,
   .content {
