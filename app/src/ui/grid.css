@@ -264,4 +264,35 @@
     color: inherit;
     text-decoration: none;
   }
+
+  /* Compact print: two columns per page, smaller type; bars per row unchanged. */
+  .compact-print .chart-header {
+    margin-bottom: 1rem;
+  }
+
+  .compact-print .chart-header h1 {
+    font-size: 1.4rem;
+  }
+
+  .compact-print .grid {
+    columns: 2;
+    column-gap: 8mm;
+  }
+
+  .compact-print .section {
+    margin-bottom: 1rem;
+  }
+
+  .compact-print .bar {
+    min-height: 2rem;
+  }
+
+  .compact-print .slot {
+    padding: 0.3rem;
+    font-size: 0.95rem;
+  }
+
+  .compact-print .bar-meter {
+    font-size: 0.7rem;
+  }
 }

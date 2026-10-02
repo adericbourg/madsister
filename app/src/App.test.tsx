@@ -245,7 +245,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   // When switching to the French style, Then the chord is re-rendered and the setting saved
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
   expect(firstSlot().textContent).toBe("C7M");
-  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5 });
+  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false });
 
   // When switching to the Latin style, Then the root is spelled Do and the setting saved
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "latin");
@@ -257,8 +257,13 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   const threshold = screen.getByRole("spinbutton", { name: "Review chords below confidence" });
   fireEvent.change(threshold, { target: { value: "0.7" } });
   fireEvent.change(threshold, { target: { value: "2" } });
-  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.7 }));
+  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.7, compactPrint: false }));
   expect((threshold as HTMLInputElement).value).toBe("0.7");
+
+  // When ticking Compact print, Then the setting is saved and the app root carries the print class
+  await user.click(screen.getByRole("checkbox", { name: "Compact print (2 columns)" }));
+  expect(JSON.parse(files["/config/settings.json"]).compactPrint).toBe(true);
+  expect(screen.getByRole("main").className).toBe("compact-print");
 
   // When transposing up twice with flats, then undoing once
   await user.selectOptions(screen.getByRole("combobox", { name: "Spelling" }), "flat");

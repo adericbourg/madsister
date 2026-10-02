@@ -6,7 +6,7 @@ import { transposeSong, type Spelling } from "../model/transpose";
 import type { useHistory } from "./useHistory";
 
 /** User preferences (spec F-ED-1, F-DS-1), stored in `<appConfigDir>/settings.json`, not in the song. */
-export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number };
+export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean };
 
 const isThreshold = (v: unknown): v is number => typeof v === "number" && v >= 0 && v <= 1;
 
@@ -17,6 +17,7 @@ export const parseSettings = (json: unknown): Settings => {
     style: raw.style === "intl" || raw.style === "latin" ? raw.style : "fr",
     barsPerRow: raw.barsPerRow === 2 || raw.barsPerRow === 8 ? raw.barsPerRow : 4,
     lowConfidenceThreshold: isThreshold(raw.lowConfidenceThreshold) ? raw.lowConfidenceThreshold : 0.5,
+    compactPrint: raw.compactPrint === true,
   };
 };
 
@@ -109,6 +110,9 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
               if (e.target.value !== "" && isThreshold(n)) onSettingsChange({ ...settings, lowConfidenceThreshold: n });
             }}
           />
+        </label>
+        <label>
+          <input type="checkbox" checked={settings.compactPrint} onChange={(e) => onSettingsChange({ ...settings, compactPrint: e.target.checked })} /> Compact print (2 columns)
         </label>
       </fieldset>
       <fieldset>

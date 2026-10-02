@@ -155,7 +155,7 @@ function App() {
   });
 
   return (
-    <main>
+    <main className={settings.compactPrint ? "compact-print" : undefined}>
       <nav aria-label="File">
         {hasSong && (
           <>
