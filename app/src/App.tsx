@@ -204,7 +204,10 @@ function App() {
             <ul>
               {shortestUniquePaths(recent).map((label, i) => (
                 <li key={recent[i]}>
-                  <button type="button" title={recent[i]} onClick={() => openSong(recent[i])}>
+                  <button type="button" title={recent[i]} onClick={(e) => {
+                      e.currentTarget.closest("details")!.open = false;
+                      openSong(recent[i]);
+                    }}>
                     {label}
                   </button>
                 </li>

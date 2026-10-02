@@ -120,11 +120,15 @@ test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
   expect((await screen.findByRole("alert")).textContent).toMatch(/meta/);
   expect(screen.getByRole("heading", { name: "Blues" })).toBeDefined();
 
-  // When the recent file has gone missing and is reopened
+  // When the recent file has gone missing and is reopened from the open menu
   delete files["/blues.madsister.json"];
+  const recentMenu = screen.getByText("Recent").closest("details")!;
+  await user.click(screen.getByText("Recent"));
+  expect(recentMenu.open).toBe(true);
   await user.click(screen.getByRole("button", { name: "blues.madsister.json" }));
 
-  // Then it is dropped from the recent list
+  // Then the menu closes and the file is dropped from the recent list
+  expect(recentMenu.open).toBe(false);
   await vi.waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/not found/));
   expect(screen.queryByRole("button", { name: "blues.madsister.json" })).toBeNull();
 
