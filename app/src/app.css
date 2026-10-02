@@ -82,6 +82,9 @@ nav details ul {
   z-index: 2;
   margin: 0.25rem 0 0;
   padding: 0.25rem;
+  width: max-content;
+  min-width: 16rem;
+  max-width: 80vw;
   list-style: none;
   background: #fff;
   border: 1px solid var(--control-border);
