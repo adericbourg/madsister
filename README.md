@@ -24,6 +24,8 @@ runs on your machine; nothing is sent anywhere.
 
 ## Quick start
 
+![The start screen: create an empty grid or import audio](doc/images/import.png)
+
 1. Import a song (or start a new chart with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>N</kbd>) and click **Run**.
 2. Correct the chords: move with the arrow keys, type a chord, <kbd>Enter</kbd>.
 3. Review the highlighted chords with <kbd>F8</kbd>, using playback (<kbd>Space</kbd>) to check by ear.
