@@ -139,6 +139,39 @@ test("Editor_whenClickingASlot_editsItInPlaceUntilEnterBlurOrEscape", async () =
   expect(song).toBe(before);
 });
 
+test("Editor_whenPressingModSlashInTheChordInput_setsTheChordAndSplitsTheSlot", async () => {
+  // Given a typed C in the first slot of an empty song
+  const user = userEvent.setup();
+  render(<Harness />);
+  await user.keyboard("C");
+
+  // When pressing Ctrl+/ and typing G, Then the slot is split 2+2 and the new half is edited with the chord preselected
+  await user.keyboard("{Control>}/{/Control}");
+  const input = screen.getByRole("textbox", { name: "Chord" }) as HTMLInputElement;
+  expect(input.value).toBe("C");
+  expect([input.selectionStart, input.selectionEnd]).toEqual([0, 1]);
+  await user.keyboard("G{Enter}");
+  expect(song?.sections[0].bars[0]).toEqual(bar(["C:maj", 2], ["G:maj", 2]));
+
+  // When undoing, Then C and the split are one step (the split copies C to both halves), after the last G
+  await user.keyboard("{Control>}z{/Control}");
+  expect(song?.sections[0].bars[0]).toEqual(bar(["C:maj", 2], ["C:maj", 2]));
+  await user.keyboard("{Control>}z{/Control}");
+  expect(song?.sections[0].bars[0]).toEqual(bar(["N", 4]));
+
+  // When the chord is invalid, Then the error is shown and nothing is split
+  await user.keyboard("Gx{Control>}/{/Control}");
+  expect(screen.getByRole("alert").textContent).toBe('unknown chord quality "x"');
+  expect(song?.sections[0].bars[0]).toEqual(bar(["N", 4]));
+
+  // When the slot is a single beat, Then the split is refused and the input stays open
+  await user.clear(screen.getByRole("textbox", { name: "Chord" }));
+  await user.keyboard("C{Control>}/{/Control}A{Control>}/{/Control}"); // C 2 | A 1 | A 1, editing the last A
+  await user.keyboard("{Control>}/{/Control}");
+  expect(screen.getByRole("textbox", { name: "Chord" })).toBeDefined();
+  expect(screen.getByRole("status").textContent).toBe("Not possible here");
+});
+
 test("Editor_whenUsingTheSectionControls_editsTheCursorSection", async () => {
   // Given an empty intro (cursor there) and a verse with a chord
   const user = userEvent.setup();

@@ -46,6 +46,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["Type a chord, Enter or Tab", "Set the chord and go to the next slot (Escape cancels)"],
   ["F8 / Shift+F8", "Next / previous low-confidence chord"],
   ["/", "Split the slot"],
+  ["Mod+/", "While typing a chord: set it and split the slot"],
   ["Backspace", "Merge the slot with the previous one"],
   ["Alt+← / Alt+→", "Shrink / grow the slot by one beat"],
   ["Mod+Enter / Mod+Shift+Enter", "Insert a bar after / before"],

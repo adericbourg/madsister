@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
-import { addSection, deleteSection, doubleTempo, halveTempo, moveSection, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, type BarRef, type SlotRef } from "../model/commands";
+import { addSection, deleteSection, doubleTempo, halveTempo, moveSection, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, splitSlot, type BarRef, type SlotRef } from "../model/commands";
 import { displayChord, type DisplayStyle } from "../model/display";
 import { barAtTime } from "../model/playback";
 import type { Bar, Song } from "../model/song";
@@ -106,6 +106,23 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
     setDraft(null);
   };
 
+  // Mod+/ while typing: sets the chord, splits the slot and edits the new half, in one undo step.
+  const commitAndSplit = (draft: Draft) => {
+    const parsed = parseChord(draft.text);
+    if (!parsed.ok) return setDraft({ ...draft, error: parsed.error });
+    // Computed before apply: splitSlot refuses a 1-beat slot and must not throw inside the reducer.
+    let next: Song;
+    try {
+      next = splitSlot(setChord(song, cursor, parsed.harte), cursor);
+    } catch {
+      return setNotice("Not possible here");
+    }
+    isCancelled.current = true;
+    history.apply(() => next);
+    setCursor({ ...cursor, slot: cursor.slot + 1 });
+    setDraft({ kind: "chord", text: displayChord(parsed.harte, "intl"), select: "all" });
+  };
+
   // Mouse/labelled equivalents of the section shortcuts (F-ED-6), acting on the cursor's section.
   const section = song.sections[cursor.section];
   const cursorBar = section.bars[cursor.bar];
@@ -160,7 +177,10 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
         onChange={(e) => setDraft({ kind: draft.kind, text: e.target.value, select: draft.select })}
         onKeyDown={(e) => {
           e.stopPropagation();
-          if (e.key === "Enter" || e.key === "Tab") {
+          if (draft.kind === "chord" && (e.metaKey || e.ctrlKey) && e.key === "/") {
+            e.preventDefault();
+            commitAndSplit(draft);
+          } else if (e.key === "Enter" || e.key === "Tab") {
             e.preventDefault();
             commit(draft);
           } else if (e.key === "Escape") {
