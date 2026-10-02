@@ -69,7 +69,11 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
   const [spelling, setSpelling] = useState<Spelling>("sharp");
   const { meta } = history.song;
   const setMeta = (patch: Partial<Song["meta"]>) => history.apply((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
-  const transpose = (semitones: number) => history.apply((s) => transposeSong(s, semitones, spelling));
+  const [offset, setOffset] = useState(0); // net semitones since the song was opened, so Reset can undo them
+  const transpose = (semitones: number) => {
+    setOffset((o) => o + semitones);
+    history.apply((s) => transposeSong(s, semitones, spelling));
+  };
   return (
     <div className="toolbar">
       <fieldset>
@@ -122,6 +126,9 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
         </button>
         <button type="button" onClick={() => transpose(1)}>
           +1 semitone
+        </button>
+        <button type="button" disabled={offset % 12 === 0} onClick={() => transpose(-offset)}>
+          Reset
         </button>
       </fieldset>
       <fieldset>
