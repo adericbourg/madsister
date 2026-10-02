@@ -183,7 +183,7 @@ test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAud
 
   // Then the song is shown, with a notice that the audio is missing
   expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
-  expect(await screen.findByText("Audio file not found: /music/blues.mp3")).toBeDefined();
+  expect(await screen.findByText("Audio file not found next to the song: /music/blues.mp3. The song can't be played until you locate it.")).toBeDefined();
 
   // When locating the audio
   vi.mocked(open).mockResolvedValueOnce("/music/found.mp3");
@@ -199,7 +199,7 @@ test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAud
   // When undoing, Then the old path is back with its notice (locating is one history entry)
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
   await user.keyboard("{Escape}{Control>}z{/Control}");
-  expect(await screen.findByText("Audio file not found: /music/blues.mp3")).toBeDefined();
+  expect(await screen.findByText("Audio file not found next to the song: /music/blues.mp3. The song can't be played until you locate it.")).toBeDefined();
 
   // When opening a song whose audio has changed since transcription
   vi.mocked(open).mockResolvedValueOnce("/changed.madsister.json");

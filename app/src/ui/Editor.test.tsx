@@ -18,7 +18,7 @@ const Harness = ({ from = emptySong }: { from?: () => Song }) => {
   const [initial] = useState(from);
   const history = useHistory(initial);
   song = history.song;
-  return <Editor history={history} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} />;
+  return <Editor history={history} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={initial.audio?.path} />;
 };
 
 const bar = (...chords: [string, number][]) => ({ chords: chords.map(([chord, beats]) => ({ chord, beats })) });

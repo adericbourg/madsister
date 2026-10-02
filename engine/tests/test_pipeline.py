@@ -63,8 +63,8 @@ def test_main_of_transcribe_emits_stages_in_order_and_writes_song(fakes, make_wa
     assert [s["label"] for s in song["sections"]] == ["Verse", "Chorus"]
     bars = [bar for s in song["sections"] for bar in s["bars"]]
     assert [bar["chords"][0]["chord"] for bar in bars] == PROGRESSION
-    # And it references the original audio file
-    assert song["audio"] == {"path": str(wav.resolve()), "sha256": hashlib.sha256(wav.read_bytes()).hexdigest()}
+    # And it references the original audio file, as its file name (the song is saved next to it)
+    assert song["audio"] == {"path": wav.name, "sha256": hashlib.sha256(wav.read_bytes()).hexdigest()}
 
     # When sections are disabled and the meter forced
     code = cli.main(["transcribe", str(wav), "--out", str(out), "--no-sections", "--meter", "3"])

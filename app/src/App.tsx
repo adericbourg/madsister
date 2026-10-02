@@ -18,6 +18,7 @@ import {
   shortestUniquePaths,
   readConfigJson,
   readSong,
+  resolveAudioPath,
   setWindowTitle,
   writeConfigJson,
   writeSong,
@@ -119,14 +120,15 @@ function App() {
     const audio = song.audio;
     if (audio === undefined) return;
     let isCurrent = true;
-    void audioSha256(audio.path).then((sha256) => {
+    const audioPath = resolveAudioPath(path, audio.path);
+    void audioSha256(audioPath).then((sha256) => {
       if (!isCurrent || sha256 === audio.sha256) return;
-      setAudioNotice(sha256 === null ? `Audio file not found: ${audio.path}` : `Audio file has changed since the transcription: ${audio.path}`);
+      setAudioNotice(sha256 === null ? `Audio file not found next to the song: ${audioPath}. The song can't be played until you locate it.` : `Audio file has changed since the transcription: ${audioPath}`);
     });
     return () => {
       isCurrent = false;
     };
-  }, [song.audio]);
+  }, [song.audio, path]);
 
   useEffect(() => {
     readConfigJson(SETTINGS).then((json) => setSettings(parseSettings(json)));
@@ -235,7 +237,7 @@ function App() {
               </p>
             )}
             {panel && (
-              <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} />
+              <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} audioPath={song.audio && resolveAudioPath(path, song.audio.path)} />
             )}
           </div>
           <aside id="parameters" aria-label="Parameters" hidden={!isPanelOpen} ref={setPanel}>

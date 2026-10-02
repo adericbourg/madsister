@@ -22,6 +22,12 @@ export const shortestUniquePaths = (paths: readonly string[]): string[] => {
   });
 };
 
+/** The audio file's path as the OS sees it: a relative `audio.path` is relative to the song file's directory. */
+export const resolveAudioPath = (songPath: string | null, audioPath: string): string => {
+  if (songPath === null || /^([/\\]|[A-Za-z]:)/.test(audioPath)) return audioPath;
+  return `${songPath.replace(/[^/\\]*$/, "")}${audioPath}`;
+};
+
 export const confirmDiscard = (): Promise<boolean> => confirm("Discard unsaved changes?", { kind: "warning" });
 
 export const confirmDeleteSection = (label: string): Promise<boolean> =>

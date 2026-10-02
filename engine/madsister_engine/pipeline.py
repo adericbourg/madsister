@@ -152,6 +152,6 @@ def transcribe(
 
     with open(audio, "rb") as f:
         sha256 = hashlib.file_digest(f, "sha256").hexdigest()
-    song = dataclasses.replace(song, audio=Audio(str(Path(audio).resolve()), sha256))
+    song = dataclasses.replace(song, audio=Audio(Path(audio).name, sha256))
     events.progress("write", 100)
     write(song, Path(out))

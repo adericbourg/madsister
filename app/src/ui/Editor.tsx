@@ -21,6 +21,8 @@ type Props = {
   lowConfidenceThreshold: number;
   /** Where the section/bar/tempo parameters are rendered; inline when absent. */
   panel?: HTMLElement | null;
+  /** The audio file to play, already resolved against the song's location. */
+  audioPath?: string;
 };
 // `select` is where the caret lands on focus: "all" selects the whole text, "end" keeps a typed first character.
 type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; error?: string };
@@ -28,7 +30,7 @@ type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; err
 const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfidenceThreshold, panel }: Props) => {
+export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfidenceThreshold, panel, audioPath }: Props) => {
   const { song } = history;
   // Nashville: chords are typed and shown as degrees of this tonic; undefined = chord names.
   const tonic = song.meta.notation === "nashville" ? tonicPc(song.meta.key, minorConvention) : undefined;
@@ -45,7 +47,7 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
   // Undo/redo and structural edits can leave the cursor dangling: always read it clamped.
   const cursor = clampCursor(song, rawCursor);
   const flaggedCount = countFlagged(song, lowConfidenceThreshold);
-  const player = usePlayer(song.audio?.path);
+  const player = usePlayer(audioPath);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const command = keyToCommand(e, { song, cursor, anchor, clipboard, barsPerRow, lowConfidenceThreshold });

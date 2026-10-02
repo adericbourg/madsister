@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { pushRecent, shortestUniquePaths } from "./fileActions";
+import { pushRecent, resolveAudioPath, shortestUniquePaths } from "./fileActions";
 
 test("pushRecent_movesThePathToTheFrontWithoutDuplicatesAndKeepsTen", () => {
   // Given a full list of 10 paths
@@ -23,4 +23,14 @@ test("shortestUniquePaths_keepsJustTheFileNameUnlessSeveralPathsShareIt", () => 
 
   // Then each one keeps only as many trailing parts as needed to be unique
   expect(labels).toEqual(["a/blues.json", "b/blues.json", "rock.json", "c/blues.json", "solo.json"]);
+});
+
+test("resolveAudioPath_resolvesRelativePathsAgainstTheSongDirectoryAndKeepsAbsoluteOnes", () => {
+  // Given a relative audio path, When the song is saved, Then it is resolved next to the song
+  expect(resolveAudioPath("/music/s.madsister.json", "a.mp3")).toBe("/music/a.mp3");
+  expect(resolveAudioPath("C:\\music\\s.madsister.json", "../a.mp3")).toBe("C:\\music\\../a.mp3");
+  // And absolute paths, or an unsaved song, are left alone
+  expect(resolveAudioPath("/music/s.madsister.json", "/other/a.mp3")).toBe("/other/a.mp3");
+  expect(resolveAudioPath("/music/s.madsister.json", "D:\\a.mp3")).toBe("D:\\a.mp3");
+  expect(resolveAudioPath(null, "a.mp3")).toBe("a.mp3");
 });
