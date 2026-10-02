@@ -65,13 +65,19 @@ export const usePlayer = (path: string | undefined) => {
     return true;
   };
 
-  const syncDuration = () => setDuration(ref.current!.duration || 0); // NaN until the metadata is loaded
+  // WebKitGTK can report the metadata with a 0 duration and set the real one moments later without another durationchange:
+  // retry for up to 2 s while the element has metadata.
+  const syncDuration = (retries = 40) => {
+    const audio = ref.current;
+    if (audio === null) return;
+    if (audio.duration > 0) setDuration(audio.duration);
+    else if (retries > 0 && audio.readyState > HTMLMediaElement.HAVE_NOTHING) setTimeout(() => syncDuration(retries - 1), 50);
+  };
   const audioProps = {
     ref,
     src,
     onPlay: () => setIsPlaying(true),
-    onDurationChange: syncDuration,
-    onLoadedMetadata: syncDuration,
+    onDurationChange: () => syncDuration(),
     onPause: () => setIsPlaying(false),
     onError: () => fail(ref.current?.error?.message || "unsupported format"),
   };

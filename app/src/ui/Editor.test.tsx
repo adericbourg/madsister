@@ -392,9 +392,14 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   await vi.waitFor(() => expect(transport.disabled).toBe(false));
   expect(invoke).toHaveBeenCalledWith("read_audio", { path: "/music/song.mp3" });
 
-  // When the webview only reports the metadata (no durationchange), Then the total length shows
-  vi.spyOn(HTMLMediaElement.prototype, "duration", "get").mockReturnValue(125);
+  // When the webview reports the metadata with a 0 duration and fills it in moments later without another event (WebKitGTK),
+  // Then the total length shows
+  let duration = 0;
+  vi.spyOn(HTMLMediaElement.prototype, "duration", "get").mockImplementation(() => duration);
+  vi.spyOn(HTMLMediaElement.prototype, "readyState", "get").mockReturnValue(HTMLMediaElement.HAVE_ENOUGH_DATA);
+  document.querySelector("audio")!.dispatchEvent(new Event("durationchange"));
   document.querySelector("audio")!.dispatchEvent(new Event("loadedmetadata"));
+  duration = 125;
   await vi.waitFor(() => expect(transport.textContent).toContain("00:00/02:05"));
 
   // When pressing Play with the audio at 2.5 s
