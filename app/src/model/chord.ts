@@ -27,6 +27,12 @@ const NOTE = /^[A-G][#b]?$/;
 export const semitone = (note: string): number =>
   NATURALS[note[0]] + (note[1] === "#" ? 1 : note[1] === "b" ? -1 : 0);
 
+/** A key is "C", "Am", "F#m"; Harte ("A:min") is read too. */
+export const parseKey = (key: string): { root: string; isMinor: boolean } => ({
+  root: /^[A-G][#b]?/.exec(key)?.[0] ?? "C",
+  isMinor: /(m|:min)$/.test(key),
+});
+
 export const parseChord = (input: string): ParseResult => {
   const text = input.trim().replace(/♭/g, "b").replace(/♯/g, "#");
   if (text === "N" || text === "N.C." || text === "NC") return { ok: true, harte: "N" };

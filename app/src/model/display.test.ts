@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseChord, QUALITIES } from "./chord";
-import { displayChord, speakChord } from "./display";
+import { displayChord, displayKey, speakChord } from "./display";
 
 // [harte, fr, intl]
 const rows: [string, string, string][] = [
@@ -86,5 +86,19 @@ describe("speakChord", () => {
     expect(speakChord("C:maj")).toBe("C");
     expect(speakChord("N")).toBe("no chord");
     expect(speakChord("%")).toBe("repeat previous bar");
+  });
+});
+
+describe("displayKey", () => {
+  test.each([
+    ["F#m", "latin", "Fa#m"],
+    ["F#m", "fr", "F#m"],
+    ["Bb", "latin", "Sib"],
+    ["Am", "intl", "Am"],
+    ["C", "fr", "C"],
+    ["C:min", "fr", "Cm"],
+  ] as const)("displayKey_of%s_%s_returns%s", (key, style, expected) => {
+    // Given / When / Then
+    expect(displayKey(key, style)).toBe(expected);
   });
 });

@@ -22,12 +22,15 @@ export type Section = {
   readonly bars: readonly Bar[];
 };
 
+export type Notation = "chords" | "nashville";
+
 export type Song = {
   readonly version: 1;
   readonly meta: {
     readonly title: string;
     readonly artist?: string;
     readonly key?: string;
+    readonly notation?: Notation; // absent = "chords"; a Nashville song without a key keeps its chords relative to C
     readonly tempoBpm?: number;
     readonly meter: SongMeter;
   };
@@ -122,6 +125,7 @@ export const parseSong = (json: unknown): Song => {
       title: string(rawMeta.title, "meta.title"),
       artist: optional(rawMeta.artist, (v) => string(v, "meta.artist")),
       key: optional(rawMeta.key, (v) => string(v, "meta.key")),
+      notation: optional(rawMeta.notation, (v) => oneOf(v, ["chords", "nashville"] as const, "meta.notation")),
       tempoBpm: optional(rawMeta.tempoBpm, (v) => number(v, "meta.tempoBpm")),
       meter,
     },
@@ -135,9 +139,9 @@ export const serializeSong = (song: Song): string => JSON.stringify(song, null, 
 
 export const newSectionId = (): string => crypto.randomUUID().slice(0, 8);
 
-export const emptySong = (meter: SongMeter = { beats: 4, unit: 4 }): Song => ({
+export const emptySong = (meter: SongMeter = { beats: 4, unit: 4 }, notation?: Notation): Song => ({
   version: 1,
-  meta: { title: "Untitled", meter },
+  meta: { title: "Untitled", notation, meter },
   sections: [
     {
       id: newSectionId(),

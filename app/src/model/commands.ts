@@ -1,5 +1,7 @@
 // Pure editing commands (spec F-ED-3/4/5/6/8): each returns a new Song and shares every untouched object with the input.
-import { newSectionId, type Bar, type ChordSlot, type Meter, type Section, type Song } from "./song";
+import { spellingFor, tonicPc, type MinorConvention } from "./nashville";
+import { newSectionId, type Bar, type ChordSlot, type Meter, type Notation, type Section, type Song } from "./song";
+import { transposeSong } from "./transpose";
 
 export type BarRef = { readonly section: number; readonly bar: number };
 export type SlotRef = BarRef & { readonly slot: number };
@@ -26,6 +28,19 @@ export const updateBar = (song: Song, ref: BarRef, fn: (bar: Bar) => Bar): Song 
 
 const updateSlots = (song: Song, ref: SlotRef, fn: (slots: readonly ChordSlot[], slot: ChordSlot) => readonly ChordSlot[]): Song =>
   updateBar(song, ref, (bar) => ({ ...bar, chords: fn(bar.chords, at(bar.chords, ref.slot, "slot")) }));
+
+/** In Nashville notation the numbers stay and the chords move: degree 1 goes from the old tonic (C without a key) to the new one. */
+export const setKey = (song: Song, key: string | undefined, convention: MinorConvention): Song => {
+  if (song.meta.notation !== "nashville") return { ...song, meta: { ...song.meta, key } };
+  const to = tonicPc(key, convention);
+  const moved = transposeSong(song, to - tonicPc(song.meta.key, convention), spellingFor(to));
+  return { ...moved, meta: { ...moved.meta, key } };
+};
+
+export const setNotation = (song: Song, notation: Notation): Song => {
+  if (song.meta.key === undefined) throw new Error("a key is required to switch the notation");
+  return { ...song, meta: { ...song.meta, notation } };
+};
 
 export const setChord = (song: Song, ref: SlotRef, harte: string): Song =>
   updateSlots(song, ref, (slots, { confidence: _, ...rest }) => slots.toSpliced(ref.slot, 1, { ...rest, chord: harte }));

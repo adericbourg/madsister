@@ -1,4 +1,4 @@
-import { DEGREES, parseHarte, semitone } from "./chord";
+import { DEGREES, parseHarte, parseKey, semitone } from "./chord";
 
 export type DisplayStyle = "fr" | "intl" | "latin";
 
@@ -7,13 +7,19 @@ const FR: Record<string, string> = {
   "7": "7", maj7: "7M", min7: "m7", minmaj7: "m7M", maj6: "6", min6: "m6", dim7: "°7", hdim7: "m7b5",
   "9": "9", maj9: "7M9", min9: "m9", "11": "11", "13": "13",
 };
-const SUFFIXES: Record<DisplayStyle, Record<string, string>> = {
+export const SUFFIXES: Record<DisplayStyle, Record<string, string>> = {
   fr: FR,
   latin: FR,
   intl: { ...FR, maj7: "maj7", minmaj7: "m(maj7)", dim: "dim", dim7: "dim7", hdim7: "ø7", maj9: "maj9" },
 };
 
 const LATIN: Record<string, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
+
+/** The key as written in the chart header: "F#m" → "Fa#m" in the latin style. */
+export const displayKey = (key: string, style: DisplayStyle): string => {
+  const { root, isMinor } = parseKey(key);
+  return displayChord(`${root}:${isMinor ? "min" : "maj"}`, style);
+};
 
 const SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const FLATS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
@@ -33,7 +39,7 @@ export const displayChord = (harte: string, style: DisplayStyle): string => {
   return `${chord}/${spell(noteName(semitone(root) + DEGREES.indexOf(bass), isFlat))}`;
 };
 
-const SPOKEN: Record<string, string> = {
+export const SPOKEN: Record<string, string> = {
   maj: "", min: " minor", aug: " augmented", dim: " diminished", sus2: " suspended 2", sus4: " suspended 4",
   add2: " add 2", add4: " add 4", "7": " 7", maj7: " major 7", min7: " minor 7", minmaj7: " minor major 7",
   maj6: " 6", min6: " minor 6", dim7: " diminished 7", hdim7: " half-diminished 7",

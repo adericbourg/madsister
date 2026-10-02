@@ -15,6 +15,8 @@ import {
   resizeSlot,
   setBarMeter,
   setChord,
+  setKey,
+  setNotation,
   setRepeat,
   shiftPhase,
   splitSection,
@@ -79,6 +81,101 @@ describe("setChord", () => {
     expect(bars[0].chords[0]).toStrictEqual({ chord: "D:min7", beats: 3 });
     expect(bars[0].startSec).toBe(0);
     expect(bars[1]).toBe(song.sections[0].bars[1]);
+  });
+});
+
+describe("setKey", () => {
+  // Nashville "1 4/3 5⁷": in G by default, or relative to C when it has no key.
+  const nashville = (key?: string): Song => {
+    const [one, four, five] = key === undefined ? ["C:maj", "F:maj/3", "G:7"] : ["G:maj", "C:maj/3", "D:7"];
+    return parseSong({
+      version: 1,
+      meta: { title: "Song", key, notation: "nashville", meter: { beats: 4, unit: 4 } },
+      sections: [{ id: "s1", label: "Verse", bars: [{ chords: [{ chord: one, beats: 2 }, { chord: four, beats: 1 }, { chord: five, beats: 1 }] }] }],
+    });
+  };
+  const slots = (song: Song) => song.sections[0].bars[0].chords.map((s) => s.chord);
+
+  test("setKey_inChordsNotation_onlySetsTheKey", () => {
+    // Given
+    const song = fixture();
+
+    // When
+    const result = checkSong(song, setKey(song, "Am", "relative"));
+
+    // Then
+    expect(result.meta.key).toBe("Am");
+    expect(result.sections).toBe(song.sections);
+  });
+
+  test("setKey_inNashvilleFromNoKey_transposesFromCToTheNewTonic", () => {
+    // Given the numbers 1 4 5 stored relative to C
+    const song = nashville();
+
+    // When
+    const result = setKey(song, "G", "relative");
+
+    // Then the numbers stay, the chords move
+    expect(result.meta.key).toBe("G");
+    expect(slots(result)).toEqual(["G:maj", "C:maj/3", "D:7"]);
+  });
+
+  test("setKey_inNashvilleFromAnotherKey_keepsTheNumbers", () => {
+    // Given 1 4 5 in G
+    const song = nashville("G");
+
+    // When
+    const result = setKey(song, "Bb", "relative");
+
+    // Then 1 4 5 in Bb
+    expect(slots(result)).toEqual(["Bb:maj", "Eb:maj/3", "F:7"]);
+    expect(result.meta.key).toBe("Bb");
+  });
+
+  test("setKey_inNashvilleToNoKey_transposesBackToC", () => {
+    // Given
+    const song = nashville("G");
+
+    // When
+    const result = setKey(song, undefined, "relative");
+
+    // Then
+    expect(slots(result)).toEqual(["C:maj", "F:maj/3", "G:7"]);
+    expect(result.meta.key).toBeUndefined();
+  });
+
+  test("setKey_inNashvilleWithMinorKey_followsTheMinorConvention", () => {
+    // Given 1 4 5 relative to C
+    const song = nashville();
+
+    // When Am with the relative convention, degree 1 is C
+    const relative = setKey(song, "Am", "relative");
+    // And with the tonic convention, degree 1 is A
+    const tonic = setKey(song, "Am", "tonic");
+
+    // Then
+    expect(slots(relative)).toEqual(["C:maj", "F:maj/3", "G:7"]);
+    expect(slots(tonic)).toEqual(["A:maj", "D:maj/3", "E:7"]);
+  });
+});
+
+describe("setNotation", () => {
+  test("setNotation_withAKey_switchesWithoutTouchingTheChords", () => {
+    // Given
+    const song = setKey(fixture(), "Am", "relative");
+
+    // When
+    const result = checkSong(fixture(), setNotation(song, "nashville"));
+
+    // Then
+    expect(result.meta.notation).toBe("nashville");
+    expect(result.sections).toBe(song.sections);
+    expect(setNotation(result, "chords").meta.notation).toBe("chords");
+  });
+
+  test("setNotation_withoutKey_throws", () => {
+    // Given / When / Then
+    expect(() => setNotation(fixture(), "nashville")).toThrow("a key is required");
   });
 });
 

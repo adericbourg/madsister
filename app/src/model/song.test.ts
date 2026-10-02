@@ -65,4 +65,31 @@ describe("emptySong", () => {
     expect(barBeats(song, song.sections[0].bars[0])).toBe(3);
     expect(emptySong().meta.meter).toEqual({ beats: 4, unit: 4 });
   });
+
+  test("emptySong_ofNashville_hasTheNotationAndNoKey", () => {
+    // Given / When
+    const song = emptySong({ beats: 4, unit: 4 }, "nashville");
+
+    // Then
+    expect(song.meta.notation).toBe("nashville");
+    expect(song.meta.key).toBeUndefined();
+    expect(parseSong(JSON.parse(serializeSong(song)))).toEqual(song);
+    expect(emptySong().meta.notation).toBeUndefined();
+  });
+});
+
+describe("parseSong notation", () => {
+  test("parseSong_ofFileWithoutNotation_leavesItUndefined", () => {
+    // Given / When / Then
+    expect(parseSong(validFile()).meta.notation).toBeUndefined();
+  });
+
+  test("parseSong_ofUnknownNotation_throwsWithPath", () => {
+    // Given
+    const file = validFile();
+    (file.meta as Record<string, unknown>).notation = "roman";
+
+    // When / Then
+    expect(() => parseSong(file)).toThrow("meta.notation");
+  });
 });
