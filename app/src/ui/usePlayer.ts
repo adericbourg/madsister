@@ -3,7 +3,7 @@ import { audioObjectUrl } from "./fileActions";
 
 /**
  * Plays the song's audio (spec F-PB-1); spread `audioProps` on an `<audio>`. While playing, `time` follows the audio through a
- * requestAnimationFrame loop, rounded to 0.1 s: enough for a bar cursor without re-rendering the grid on every frame.
+ * requestAnimationFrame loop, rounded up to 0.1 s: enough for a bar cursor without re-rendering the grid on every frame.
  */
 export const usePlayer = (path: string | undefined) => {
   const ref = useRef<HTMLAudioElement>(null);
@@ -33,7 +33,7 @@ export const usePlayer = (path: string | undefined) => {
   useEffect(() => {
     if (!isPlaying) return;
     let frame = requestAnimationFrame(function tick() {
-      setTime(Math.floor(ref.current!.currentTime * 10) / 10);
+      setTime(Math.ceil(ref.current!.currentTime * 10) / 10);
       frame = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(frame);
@@ -54,7 +54,7 @@ export const usePlayer = (path: string | undefined) => {
     const audio = ref.current;
     if (audio === null || src === undefined) return false;
     audio.currentTime = sec;
-    setTime(Math.floor(sec * 10) / 10);
+    setTime(Math.ceil(sec * 10) / 10);
     return true;
   };
 

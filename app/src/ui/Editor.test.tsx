@@ -267,7 +267,7 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
         version: 1,
         meta: { title: "Song", meter: { beats: 4, unit: 4 } },
         audio: { path: "/music/song.mp3", sha256: "x" },
-        sections: [{ id: "v", label: "Verse", bars: [timed(0), timed(2), timed(4), timed(), timed(6)] }],
+        sections: [{ id: "v", label: "Verse", bars: [timed(0), timed(2), timed(4.37), timed(), timed(6)] }],
       })}
     />,
   );
@@ -303,14 +303,14 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
 
   // When clicking bar 3 while paused, Then the audio seeks to its start and the highlight moves, without playing
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 3, beat 1: C" }));
-  expect(currentTime).toBe(4);
+  expect(currentTime).toBe(4.37);
   expect(barOf(3).classList).toContain("is-playing");
   expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
 
   // When clicking the manual bar 4, Then only the edit cursor moves; Shift+Space there doesn't play
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 4, beat 1: C" }));
   await user.keyboard("{Shift>} {/Shift}");
-  expect(currentTime).toBe(4);
+  expect(currentTime).toBe(4.37);
   expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
 
   // When pressing Shift+Space on bar 5, Then it plays from that bar
