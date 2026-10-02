@@ -7,10 +7,10 @@ Offline desktop app that turns a song into an editable, printable chord grid.
 Add the apt repository once, and `apt upgrade` then keeps madsister up to date:
 
 ```sh
-sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://adericbourg.github.io/madsister/key.asc
+sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://www.dericbourg.net/madsister/key.asc
 sudo tee /etc/apt/sources.list.d/madsister.sources <<'EOF'
 Types: deb
-URIs: https://adericbourg.github.io/madsister
+URIs: https://www.dericbourg.net/madsister
 Suites: stable
 Components: main
 Signed-By: /etc/apt/keyrings/madsister.asc

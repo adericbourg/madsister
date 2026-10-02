@@ -171,8 +171,8 @@ jobs:
           Linux: \`sudo apt install ./madsister_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
           To get updates through apt (use \`Suites: snapshot\` for the snapshots):
           \`\`\`
-          sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://${GH_REPO%%/*}.github.io/${GH_REPO##*/}/key.asc
-          printf 'Types: deb\nURIs: https://${GH_REPO%%/*}.github.io/${GH_REPO##*/}\nSuites: stable\nComponents: main\nSigned-By: /etc/apt/keyrings/madsister.asc\n' | sudo tee /etc/apt/sources.list.d/madsister.sources
+          sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://www.dericbourg.net/madsister/key.asc
+          printf 'Types: deb\nURIs: https://www.dericbourg.net/madsister\nSuites: stable\nComponents: main\nSigned-By: /etc/apt/keyrings/madsister.asc\n' | sudo tee /etc/apt/sources.list.d/madsister.sources
           sudo apt update && sudo apt install madsister
           \`\`\`
           The first launch downloads the engine (Python, its libraries and the models), once."
