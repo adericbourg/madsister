@@ -18,8 +18,35 @@
   padding: 2rem 1.5rem;
 }
 
+@font-face {
+  font-family: "Petaluma Script";
+  src: url("../fonts/PetalumaScript.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Petaluma Text";
+  src: url("../fonts/PetalumaText.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Golden Age";
+  src: url("../fonts/GoldenAge.otf") format("opentype");
+}
+
 .font-kalam .chart {
   font-family: Kalam, ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+.font-petaluma-script .chart {
+  font-family: "Petaluma Script", ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+.font-petaluma-text .chart {
+  font-family: "Petaluma Text", ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+.font-golden-age .chart {
+  font-family: "Golden Age", ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 }
 
 .font-serif .chart {
