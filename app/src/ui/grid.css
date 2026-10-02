@@ -279,8 +279,18 @@
     column-gap: 8mm;
   }
 
+  /* A section kept whole would stay in the first column (a song without detected sections is a single one), so split between rows. */
   .compact-print .section {
+    break-inside: auto;
     margin-bottom: 1rem;
+  }
+
+  .compact-print .section-header {
+    break-after: avoid;
+  }
+
+  .compact-print .bar-row {
+    break-inside: avoid;
   }
 
   .compact-print .bar {
