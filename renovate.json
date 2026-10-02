@@ -8,6 +8,12 @@
   "prHourlyLimit": 10,
   "packageRules": [
     {
+      "description": "Auto-merge minor/patch/digest updates once checks pass. 0.x versions are excluded: their minors may be breaking.",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchCurrentVersion": "!/^0\\./",
+      "automerge": true
+    },
+    {
       "description": "Pinned on purpose: the engine stays on Python 3.11 for madmom and allin1 (engine/.python-version, requires-python).",
       "matchDepNames": ["python"],
       "enabled": false
