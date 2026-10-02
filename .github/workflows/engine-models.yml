@@ -47,7 +47,9 @@ jobs:
       - name: Import smoke test
         run: uv run --no-sync pytest -m slow tests/test_model_imports.py
       - name: Slow tests, offline after setup (NF-1)
+        timeout-minutes: 20  # a hang (seen on macos-14) must not burn the whole job budget
         env:  # an unreachable proxy: any download fails
           HTTP_PROXY: http://127.0.0.1:9
           HTTPS_PROXY: http://127.0.0.1:9
-        run: uv run --no-sync pytest -m slow --ignore tests/test_model_imports.py
+        # faulthandler_timeout dumps every thread's stack when a test runs over 2 min
+        run: uv run --no-sync pytest -m slow --ignore tests/test_model_imports.py -v -o faulthandler_timeout=120
