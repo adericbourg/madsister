@@ -31,7 +31,7 @@ env:
 
 jobs:
   version:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       package: ${{ steps.version.outputs.package }}
@@ -70,7 +70,7 @@ jobs:
   # One job per platform, each uploading its artifact (`linux`, `macos`) to `publish`.
   linux:
     needs: version
-    runs-on: ubuntu-22.04 # the oldest glibc the deb and the AppImage then run on
+    runs-on: ubuntu-26.04 # the oldest glibc the deb and the AppImage then run on
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -147,7 +147,7 @@ jobs:
   # M6 "done when" on Linux: the deb installs on a clean system and its engine sets up and transcribes, with no compiler.
   linux-clean-install:
     needs: [version, linux]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container: ubuntu:26.04
     timeout-minutes: 30
     steps:
@@ -271,7 +271,7 @@ jobs:
 
   publish:
     needs: [version, linux, linux-clean-install, macos, macos-clean-install]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -310,7 +310,7 @@ jobs:
   # Rebuilds the whole site each time (a Pages deployment replaces it): the latest release and the latest snapshot, so no deb enters git.
   apt:
     needs: publish
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pages: write
@@ -349,7 +349,7 @@ jobs:
   # GITHUB_TOKEN can't write to another repository: HOMEBREW_TAP_TOKEN is a fine-grained PAT with contents:write on the tap only.
   homebrew:
     needs: [version, publish]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     concurrency:
       group: homebrew
       cancel-in-progress: false # two runs in a row would otherwise race on the push
