@@ -328,6 +328,7 @@ jobs:
     steps:
       - name: Build the repository
         run: |
+          sudo apt-get update && sudo apt-get install -y apt-utils  # apt-ftparchive; not on the ubuntu-26.04 image
           gpg --batch --import <<< "$GPG_KEY"
           mkdir -p site/pool site/dists/stable/main/binary-amd64 && cd site
           release=$(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
