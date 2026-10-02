@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
 import { addSection, deleteSection, doubleTempo, halveTempo, moveSection, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, splitSlot, type BarRef, type SlotRef } from "../model/commands";
 import { displayChord, type DisplayStyle } from "../model/display";
+import { displayNashville, parseNashville, tonicPc, type MinorConvention } from "../model/nashville";
 import { barAtTime } from "../model/playback";
 import type { Bar, Song } from "../model/song";
 import { confirmDeleteSection } from "./fileActions";
@@ -16,6 +17,7 @@ type Props = {
   history: ReturnType<typeof useHistory>;
   barsPerRow: 2 | 4 | 8;
   style: DisplayStyle;
+  minorConvention: MinorConvention;
   lowConfidenceThreshold: number;
   /** Where the section/bar/tempo parameters are rendered; inline when absent. */
   panel?: HTMLElement | null;
@@ -26,8 +28,12 @@ type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; err
 const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, panel }: Props) => {
+export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfidenceThreshold, panel }: Props) => {
   const { song } = history;
+  // Nashville: chords are typed and shown as degrees of this tonic; undefined = chord names.
+  const tonic = song.meta.notation === "nashville" ? tonicPc(song.meta.key, minorConvention) : undefined;
+  const parse = (text: string) => (tonic === undefined ? parseChord(text) : parseNashville(text, tonic));
+  const show = (harte: string) => (tonic === undefined ? displayChord(harte, "intl") : displayNashville(harte, tonic, "intl"));
   const [rawCursor, setCursor] = useState<SlotRef>({ section: 0, bar: 0, slot: 0 });
   const [anchor, setAnchor] = useState<BarRef | null>(null);
   const [clipboard, setClipboard] = useState<readonly Bar[]>([]);
@@ -95,7 +101,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
       if (label === "") return isBlur ? setDraft(null) : setDraft({ ...draft, error: "a section needs a name" });
       if (label !== song.sections[cursor.section].label) history.apply((s) => renameSection(s, cursor.section, label));
     } else {
-      const parsed = parseChord(draft.text);
+      const parsed = parse(draft.text);
       if (!parsed.ok) return isBlur ? setDraft(null) : setDraft({ ...draft, error: parsed.error });
       const current = song.sections[cursor.section].bars[cursor.bar].chords[cursor.slot];
       // Re-typing a flagged chord confirms it (setChord drops the confidence), so only an unflagged no-op is skipped.
@@ -108,7 +114,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
 
   // Mod+/ while typing: sets the chord, splits the slot and edits the new half, in one undo step.
   const commitAndSplit = (draft: Draft) => {
-    const parsed = parseChord(draft.text);
+    const parsed = parse(draft.text);
     if (!parsed.ok) return setDraft({ ...draft, error: parsed.error });
     // Computed before apply: splitSlot refuses a 1-beat slot and must not throw inside the reducer.
     let next: Song;
@@ -120,7 +126,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
     isCancelled.current = true;
     history.apply(() => next);
     setCursor({ ...cursor, slot: cursor.slot + 1 });
-    setDraft({ kind: "chord", text: displayChord(parsed.harte, "intl"), select: "all" });
+    setDraft({ kind: "chord", text: show(parsed.harte), select: "all" });
   };
 
   // Mouse/labelled equivalents of the section shortcuts (F-ED-6), acting on the cursor's section.
@@ -328,6 +334,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
         song={song}
         barsPerRow={barsPerRow}
         style={style}
+        tonic={tonic}
         cursor={cursor}
         playing={barAtTime(song, player.time)}
         lowConfidenceThreshold={lowConfidenceThreshold}
@@ -341,7 +348,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
           setCursor(ref);
           setAnchor(null);
           const chord = song.sections[ref.section].bars[ref.bar].chords[ref.slot].chord;
-          setDraft({ kind: "chord", text: displayChord(chord, "intl"), select: "all" });
+          setDraft({ kind: "chord", text: show(chord), select: "all" });
         }}
       />
       <p aria-live="polite" className="review-status">

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toChordPro } from "./model/export/chordpro";
 import { toMidi } from "./model/export/midi";
 import { toMusicXml } from "./model/export/musicxml";
-import { emptySong, type Song, type SongMeter } from "./model/song";
+import { emptySong, type Notation, type Song, type SongMeter } from "./model/song";
 import { Editor } from "./ui/Editor";
 import { EngineSetup } from "./ui/EngineSetup";
 import { Importer } from "./ui/Importer";
@@ -43,8 +43,11 @@ function App() {
   const [settings, setSettings] = useState<Settings>(() => parseSettings(null));
   // ponytail: the meter is only chosen for new songs; changing it on an existing song would invalidate every bar.
   const [newMeter, setNewMeter] = useState("4/4");
+  const [newNotation, setNewNotation] = useState<Notation>("chords");
   const [audioNotice, setAudioNotice] = useState<string | null>(null);
   const isSongDirty = song !== savedSong;
+  // The exports write real notes, which a key-less Nashville song (chords relative to C) doesn't have.
+  const isExportLocked = song.meta.notation === "nashville" && song.meta.key === undefined;
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
   const updateRecent = (next: string[]) => {
@@ -64,7 +67,7 @@ function App() {
   };
   const canDiscard = async () => !isSongDirty || (await confirmDiscard());
 
-  const createGrid = () => load(emptySong(METERS[newMeter]), null);
+  const createGrid = () => load(emptySong(METERS[newMeter], newNotation === "nashville" ? "nashville" : undefined), null);
   // Back to the start screen; the song is reset so that it isn't dirty or autosaved behind it.
   const newSong = async () => {
     if (!(await canDiscard())) return;
@@ -176,13 +179,14 @@ function App() {
             </button>
             <span role="group" aria-label="Export">
               Export{" "}
-              <button type="button" onClick={() => exportSong(song, "ChordPro", "cho", toChordPro).catch(fail)}>
+              {isExportLocked && <span id="export-hint">(set a key to export)</span>}{" "}
+              <button type="button" disabled={isExportLocked} aria-describedby={isExportLocked ? "export-hint" : undefined} onClick={() => exportSong(song, "ChordPro", "cho", toChordPro).catch(fail)}>
                 ChordPro…
               </button>
-              <button type="button" onClick={() => exportSong(song, "MusicXML", "musicxml", toMusicXml).catch(fail)}>
+              <button type="button" disabled={isExportLocked} aria-describedby={isExportLocked ? "export-hint" : undefined} onClick={() => exportSong(song, "MusicXML", "musicxml", toMusicXml).catch(fail)}>
                 MusicXML…
               </button>
-              <button type="button" onClick={() => exportSong(song, "MIDI", "mid", toMidi).catch(fail)}>
+              <button type="button" disabled={isExportLocked} aria-describedby={isExportLocked ? "export-hint" : undefined} onClick={() => exportSong(song, "MIDI", "mid", toMidi).catch(fail)}>
                 MIDI…
               </button>
             </span>
@@ -226,7 +230,7 @@ function App() {
               </p>
             )}
             {panel && (
-              <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} />
+              <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} />
             )}
           </div>
           <aside id="parameters" aria-label="Parameters" hidden={!isPanelOpen} ref={setPanel}>
@@ -243,6 +247,13 @@ function App() {
                 {Object.keys(METERS).map((m) => (
                   <option key={m}>{m}</option>
                 ))}
+              </select>
+            </label>{" "}
+            <label>
+              Notation{" "}
+              <select value={newNotation} onChange={(e) => setNewNotation(e.target.value as Notation)}>
+                <option value="chords">Chords</option>
+                <option value="nashville">Nashville numbers</option>
               </select>
             </label>{" "}
             <button type="button" onClick={createGrid}>

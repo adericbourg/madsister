@@ -1,12 +1,14 @@
 import { useEffect, useId, useState } from "react";
 import { setTransposition, transposition } from "../model/history";
 import type { DisplayStyle } from "../model/display";
-import type { Song } from "../model/song";
+import { setKey, setNotation } from "../model/commands";
+import type { MinorConvention } from "../model/nashville";
+import type { Notation, Song } from "../model/song";
 import { transposeSong, type Spelling } from "../model/transpose";
 import type { useHistory } from "./useHistory";
 
 /** User preferences (spec F-ED-1, F-DS-1), stored in `<appConfigDir>/settings.json`, not in the song. */
-export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont };
+export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont; minorConvention: MinorConvention };
 
 export type ChartFont = "patrick-hand" | "kalam" | "serif";
 
@@ -21,6 +23,7 @@ export const parseSettings = (json: unknown): Settings => {
     lowConfidenceThreshold: isThreshold(raw.lowConfidenceThreshold) ? raw.lowConfidenceThreshold : 0.5,
     compactPrint: raw.compactPrint === true,
     font: raw.font === "kalam" || raw.font === "serif" ? raw.font : "patrick-hand",
+    minorConvention: raw.minorConvention === "tonic" ? "tonic" : "relative",
   };
 };
 
@@ -74,6 +77,8 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
   const [spelling, setSpelling] = useState<Spelling>("sharp");
   const { meta } = history.song;
   const setMeta = (patch: Partial<Song["meta"]>) => history.apply((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
+  // A key-less Nashville song keeps its chords relative to C: transposing would break that.
+  const isTransposeLocked = meta.notation === "nashville" && meta.key === undefined;
   const offset = transposition(history.song); // net semitones since the song was opened, so Reset can undo them
   const transpose = (semitones: number) =>
     history.apply((s) => setTransposition(transposeSong(s, semitones, spelling), transposition(s) + semitones));
@@ -95,6 +100,13 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
             <option value="patrick-hand">Patrick Hand</option>
             <option value="kalam">Kalam</option>
             <option value="serif">Serif</option>
+          </select>
+        </label>
+        <label>
+          Nashville numbers in minor keys{" "}
+          <select value={settings.minorConvention} onChange={(e) => onSettingsChange({ ...settings, minorConvention: e.target.value as MinorConvention })}>
+            <option value="relative">From the relative major (Am: 6m)</option>
+            <option value="tonic">From the minor tonic (Am: 1m)</option>
           </select>
         </label>
         <label>
@@ -126,7 +138,7 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
           <input type="checkbox" checked={settings.compactPrint} onChange={(e) => onSettingsChange({ ...settings, compactPrint: e.target.checked })} /> Compact print (2 columns)
         </label>
       </fieldset>
-      <fieldset>
+      <fieldset disabled={isTransposeLocked}>
         <legend>Transpose</legend>
         <label>
           Spelling{" "}
@@ -153,8 +165,25 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
           label="Key"
           value={meta.key ?? ""}
           check={(t) => (t === "" || /^[A-G][#b]?m?$/.test(t) ? null : "a key is a note, optionally followed by m (e.g. F#m)")}
-          onCommit={(t) => setMeta({ key: t || undefined })}
+          onCommit={(t) => history.apply((s) => setKey(s, t || undefined, settings.minorConvention))}
         />
+        <label>
+          Notation{" "}
+          <select
+            value={meta.notation ?? "chords"}
+            disabled={meta.key === undefined}
+            aria-describedby={meta.key === undefined ? "notation-hint" : undefined}
+            onChange={(e) => history.apply((s) => setNotation(s, e.target.value as Notation))}
+          >
+            <option value="chords">Chords</option>
+            <option value="nashville">Nashville numbers</option>
+          </select>
+        </label>
+        {meta.key === undefined && (
+          <span id="notation-hint" className="field-hint">
+            {meta.notation === "nashville" ? "Set a key to see the chords" : "Set a key to switch to Nashville numbers"}
+          </span>
+        )}
         <Field
           label="Tempo (BPM)"
           type="number"

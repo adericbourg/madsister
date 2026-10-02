@@ -245,7 +245,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   // When switching to the French style, Then the chord is re-rendered and the setting saved
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
   expect(firstSlot().textContent).toBe("C7M");
-  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false, font: "patrick-hand" });
+  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false, font: "patrick-hand", minorConvention: "relative" });
 
   // When switching to the Latin style, Then the root is spelled Do and the setting saved
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "latin");
@@ -257,7 +257,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   const threshold = screen.getByRole("spinbutton", { name: "Review chords below confidence" });
   fireEvent.change(threshold, { target: { value: "0.7" } });
   fireEvent.change(threshold, { target: { value: "2" } });
-  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.7, compactPrint: false, font: "patrick-hand" }));
+  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.7, compactPrint: false, font: "patrick-hand", minorConvention: "relative" }));
   expect((threshold as HTMLInputElement).value).toBe("0.7");
 
   // When ticking Compact print, Then the setting is saved and the app root carries the print class
@@ -375,7 +375,7 @@ test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () =>
   }
 
   // Then every enabled control and the grid's single tab stop were focused
-  const controls = document.querySelectorAll('button:not([disabled]), input, select, summary, [tabindex="0"]');
+  const controls = document.querySelectorAll('button:not([disabled]), input, select:not([disabled]), summary, [tabindex="0"]');
   expect(controls.length).toBeGreaterThan(15);
   for (const control of controls) expect(reached).toContain(control);
 });
@@ -415,4 +415,42 @@ test("App_whenUndoingATranspose_resetStillRestoresTheInitialKey", async () => {
   // When resetting, Then the chord is back to C
   await user.click(screen.getByRole("button", { name: "Reset" }));
   expect(firstSlot().textContent).toBe("C7M");
+});
+
+test("App_whenCreatingANashvilleGrid_needsAKeyToSwitchNotationOrExport", async () => {
+  // Given a blank Nashville grid, which has no key
+  const user = userEvent.setup();
+  render(<App />);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Notation" }), "nashville");
+  await createGrid(user);
+  const cell = (bar: number) => screen.getByRole("gridcell", { name: new RegExp(`^Verse, bar ${bar}, beat 1`) }).textContent;
+  const notation = () => screen.getByRole("combobox", { name: "Notation" }) as HTMLSelectElement;
+
+  // Then notation can't be switched and nothing can be exported
+  expect(notation().value).toBe("nashville");
+  expect(notation().disabled).toBe(true);
+  expect(screen.getByText("Set a key to see the chords")).toBeDefined();
+  expect((screen.getByRole("button", { name: "ChordPro…" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: "+1 semitone" }).matches(":disabled")).toBe(true);
+
+  // When typing degrees
+  await user.keyboard("1{Enter}4m{Enter}b7{Enter}");
+
+  // Then they are shown as typed; a letter chord is refused
+  expect([cell(1), cell(2), cell(3)]).toEqual(["1", "4m", "b7"]);
+  await user.keyboard("Am{Enter}");
+  expect(screen.getByRole("alert").textContent).toBe('"Am" isn\'t a degree (1–7, optional b or #)');
+  await user.keyboard("{Escape}");
+
+  // When setting the key to G
+  await user.type(screen.getByRole("textbox", { name: "Key" }), "G{Enter}");
+
+  // Then the numbers stay and switching and exporting are possible
+  expect([cell(1), cell(2), cell(3)]).toEqual(["1", "4m", "b7"]);
+  expect(notation().disabled).toBe(false);
+  expect((screen.getByRole("button", { name: "ChordPro…" }) as HTMLButtonElement).disabled).toBe(false);
+
+  // When switching to chords, Then they are G, Cm and F (b7 of G)
+  await user.selectOptions(notation(), "chords");
+  expect([cell(1), cell(2), cell(3)]).toEqual(["G", "Cm", "F"]);
 });

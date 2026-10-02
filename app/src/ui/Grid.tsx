@@ -1,6 +1,6 @@
 import { useEffect, useRef, type KeyboardEventHandler, type ReactNode } from "react";
 import type { BarRef, SlotRef } from "../model/commands";
-import { displayChord, type DisplayStyle } from "../model/display";
+import { displayKey, type DisplayStyle } from "../model/display";
 import type { Song } from "../model/song";
 import { SectionBlock, type Selection } from "./SectionBlock";
 import "./grid.css";
@@ -9,6 +9,8 @@ type Props = {
   song: Song;
   barsPerRow: 2 | 4 | 8;
   style: DisplayStyle;
+  /** Pitch class of degree 1 when the chart is in Nashville notation. */
+  tonic?: number;
   cursor: SlotRef | null;
   /** The bar being played (spec F-PB-1). */
   playing?: BarRef | null;
@@ -21,7 +23,7 @@ type Props = {
   onSectionClick?: (index: number) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, editor, onKeyDown, onCellClick, onSectionClick }: Props) => {
+export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, editor, onKeyDown, onCellClick, onSectionClick }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
@@ -40,7 +42,7 @@ export const Grid = ({ song, barsPerRow, style, cursor, playing = null, lowConfi
         <p className="chart-facts">
           {key !== undefined && (
             <span>
-              Key <b>{displayChord(key, style)}</b>
+              Key <b>{displayKey(key, style)}</b>
             </span>
           )}
           {tempoBpm !== undefined && <span>♩ = {tempoBpm}</span>}
@@ -54,6 +56,7 @@ export const Grid = ({ song, barsPerRow, style, cursor, playing = null, lowConfi
             index={i}
             barsPerRow={barsPerRow}
             style={style}
+            tonic={tonic}
             tabStop={tabStop}
             playing={playing}
             lowConfidenceThreshold={lowConfidenceThreshold}

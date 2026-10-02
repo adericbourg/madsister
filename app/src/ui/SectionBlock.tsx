@@ -11,6 +11,7 @@ type Props = {
   index: number;
   barsPerRow: 2 | 4 | 8;
   style: DisplayStyle;
+  tonic?: number;
   tabStop: SlotRef;
   playing: BarRef | null;
   lowConfidenceThreshold: number;

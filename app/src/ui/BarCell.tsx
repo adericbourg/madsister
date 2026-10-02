@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { BarRef, SlotRef } from "../model/commands";
 import { displayChord, speakChord, type DisplayStyle } from "../model/display";
+import { displayNashville, speakNashville } from "../model/nashville";
 import type { Bar } from "../model/song";
 import type { Selection } from "./SectionBlock";
 
@@ -9,6 +10,8 @@ type Props = {
   at: { section: number; bar: number };
   sectionLabel: string;
   style: DisplayStyle;
+  /** Pitch class of degree 1 when the chart is in Nashville notation. */
+  tonic?: number;
   tabStop: SlotRef;
   playing: BarRef | null;
   lowConfidenceThreshold: number;
@@ -17,7 +20,7 @@ type Props = {
   onCellClick?: (ref: SlotRef) => void;
 };
 
-export const BarCell = ({ bar, at, sectionLabel, style, tabStop, playing, lowConfidenceThreshold, selection, editor, onCellClick }: Props) => {
+export const BarCell = ({ bar, at, sectionLabel, style, tonic, tabStop, playing, lowConfidenceThreshold, selection, editor, onCellClick }: Props) => {
   const isSelected = selection?.section === at.section && at.bar >= selection.from && at.bar <= selection.to;
   const isPlaying = playing?.section === at.section && playing.bar === at.bar;
   const meter = bar.meter && `${bar.meter.beats}/${bar.meter.unit}`;
@@ -33,7 +36,7 @@ export const BarCell = ({ bar, at, sectionLabel, style, tabStop, playing, lowCon
         const isLowConfidence = slot.confidence !== undefined && slot.confidence < lowConfidenceThreshold;
         const isTabStop = tabStop.section === at.section && tabStop.bar === at.bar && tabStop.slot === i;
         const isEditing = isTabStop && editor !== undefined;
-        const name = `${sectionLabel}, bar ${at.bar + 1}${meter ? ` in ${meter}` : ""}, beat ${beat}: ${speakChord(slot.chord)}${isLowConfidence ? ", low confidence" : ""}`;
+        const name = `${sectionLabel}, bar ${at.bar + 1}${meter ? ` in ${meter}` : ""}, beat ${beat}: ${tonic === undefined ? speakChord(slot.chord) : speakNashville(slot.chord, tonic)}${isLowConfidence ? ", low confidence" : ""}`;
         beat += slot.beats;
         return (
           <div
@@ -46,7 +49,7 @@ export const BarCell = ({ bar, at, sectionLabel, style, tabStop, playing, lowCon
             style={{ flexGrow: slot.beats }}
             onClick={() => !isEditing && onCellClick?.({ ...at, slot: i })}
           >
-            {isEditing ? editor : displayChord(slot.chord, style)}
+            {isEditing ? editor : tonic === undefined ? displayChord(slot.chord, style) : displayNashville(slot.chord, tonic, style)}
           </div>
         );
       })}
