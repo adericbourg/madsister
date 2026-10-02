@@ -4,6 +4,8 @@
     "config:recommended"
   ],
   "minimumReleaseAge": "3 days",
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 10,
   "packageRules": [
     {
       "description": "Pinned on purpose: the engine stays on Python 3.11 for madmom and allin1 (engine/.python-version, requires-python).",
