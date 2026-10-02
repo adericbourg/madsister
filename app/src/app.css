@@ -116,6 +116,14 @@ nav details li button {
   margin: 0.5rem 1rem;
 }
 
+/* Stays in view while the chart scrolls; hidden when printing via .toolbar. */
+.content .playback {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+}
+
 aside {
   flex: none;
   box-sizing: border-box;

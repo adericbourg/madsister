@@ -268,7 +268,7 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
         </>,
       )}
       {song.audio !== undefined && (
-        <fieldset className="toolbar" disabled={!player.isReady}>
+        <fieldset className="toolbar playback" disabled={!player.isReady}>
           <legend>Playback</legend>
           <audio {...player.audioProps} />
           <button type="button" onClick={player.toggle}>
