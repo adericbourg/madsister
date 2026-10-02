@@ -248,9 +248,8 @@ test("Importer_whenRecording_showsTheElapsedTimeThenTranscribesOnStop", async ()
   render(<Importer onResult={onResult} />);
 
   // When recording for 65 s
-  await user.click(screen.getByRole("tab", { name: "From URL" }));
-  await user.click(screen.getByRole("radio", { name: "Record" }));
-  expect(screen.getByRole("textbox", { name: "Audio URL" })).toHaveProperty("disabled", true);
+  await user.click(screen.getByRole("tab", { name: "Record" }));
+  expect(screen.getByRole("tab", { name: "Record" }).getAttribute("aria-selected")).toBe("true");
   await user.click(screen.getByRole("button", { name: "Run" }));
   await emit({ type: "progress", stage: "record", pct: 0, elapsedSec: 65 }, recordEvent);
 
@@ -272,8 +271,7 @@ test("Importer_whenCancellingARecording_doesNotTranscribe", async () => {
   // Given a recording
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
-  await user.click(screen.getByRole("tab", { name: "From URL" }));
-  await user.click(screen.getByRole("radio", { name: "Record" }));
+  await user.click(screen.getByRole("tab", { name: "Record" }));
   await user.click(screen.getByRole("button", { name: "Run" }));
   await emit({ type: "progress", stage: "record", pct: 0, elapsedSec: 2 }, recordEvent);
 

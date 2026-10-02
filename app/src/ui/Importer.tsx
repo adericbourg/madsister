@@ -14,9 +14,8 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
   const [shouldDetectSections, setShouldDetectSections] = useState(false);
   const [meter, setMeter] = useState<ForcedMeter | null>(null);
   const [url, setUrl] = useState("");
-  const [tab, setTab] = useState<"file" | "url">("file");
+  const [tab, setTab] = useState<"file" | "url" | "record">("file");
   const [audioPath, setAudioPath] = useState<string | null>(null);
-  const [urlAction, setUrlAction] = useState<"fetch" | "record">("fetch");
   const [hasSections, setHasSections] = useState(true); // false only once the engine says sections aren't installed
 
   /** Runs one engine job; its result goes to `onDone`. */
@@ -102,7 +101,7 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
 
   const runSelected = async () => {
     if (tab === "file") await transcribeFile(audioPath!);
-    else if (urlAction === "fetch") await fetchUrl();
+    else if (tab === "url") await fetchUrl();
     else await startRecording();
   };
 
@@ -125,8 +124,11 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
           <button type="button" role="tab" id="import-tab-url" aria-selected={tab === "url"} aria-controls="import-panel-url" onClick={() => setTab("url")}>
             From URL
           </button>
+          <button type="button" role="tab" id="import-tab-record" aria-selected={tab === "record"} aria-controls="import-panel-record" onClick={() => setTab("record")}>
+            Record
+          </button>
         </div>
-        {/* Both panels share one grid cell, so the box keeps the height of the taller one; the inactive one is hidden. */}
+        {/* The panels share one grid cell, so the box keeps the height of the tallest one; the inactive ones are hidden. */}
         <div className="tabpanels">
           <div role="tabpanel" id="import-panel-file" aria-labelledby="import-tab-file" aria-hidden={tab !== "file"}>
             <button type="button" onClick={importAudio} disabled={job !== null}>
@@ -136,16 +138,11 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
           </div>
           <div role="tabpanel" id="import-panel-url" aria-labelledby="import-tab-url" aria-hidden={tab !== "url"}>
             <label>
-              Audio URL <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} disabled={urlAction === "record"} />
-            </label>{" "}
-            <span role="radiogroup" aria-label="Audio URL action">
-              <label>
-                <input type="radio" name="url-action" checked={urlAction === "fetch"} onChange={() => setUrlAction("fetch")} disabled={job !== null} /> Fetch
-              </label>{" "}
-              <label>
-                <input type="radio" name="url-action" checked={urlAction === "record"} onChange={() => setUrlAction("record")} disabled={job !== null} /> Record
-              </label>
-            </span>
+              Audio URL <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} />
+            </label>
+          </div>
+          <div role="tabpanel" id="import-panel-record" aria-labelledby="import-tab-record" aria-hidden={tab !== "record"}>
+            Records the default audio input. Press Run, then Stop.
           </div>
         </div>
         <p>
@@ -169,7 +166,7 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
             {!hasSections && <span>Installed on first use, requires a network connection</span>}
           </span>
         </p>
-        <button type="submit" disabled={job !== null || (tab === "file" && audioPath === null) || (tab === "url" && urlAction === "fetch" && url === "")}>
+        <button type="submit" disabled={job !== null || (tab === "file" && audioPath === null) || (tab === "url" && url === "")}>
           Run
         </button>
       </form>
