@@ -66,6 +66,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["Alt+Shift+↑ / Alt+Shift+↓", "Move the section up / down"],
   ["Space", "Play / pause the source audio"],
   ["Shift+Space", "Play from the cursor bar"],
+  ["Mod+E", "Switch between view (read-only) and edit mode"],
   ["Mod+N / Mod+O", "New song / open a file"],
   ["Mod+S / Mod+Shift+S", "Save / save as"],
   ["Mod+P", "Print"],

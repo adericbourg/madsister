@@ -40,6 +40,7 @@ function App() {
   const [path, setPath] = useState<string | null>(null);
   const [hasSong, setHasSong] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const [panel, setPanel] = useState<HTMLElement | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -62,16 +63,18 @@ function App() {
     setSettings(next);
     writeConfigJson(SETTINGS, next).catch(fail);
   };
-  const load = (next: Song, nextPath: string | null) => {
+  const load = (next: Song, nextPath: string | null, nextMode: "view" | "edit" = "view") => {
     history.reset(next);
+    setMode(nextMode);
     setSavedSong(next);
     setPath(nextPath);
     setHasSong(true);
     setError(null);
   };
+  const toggleMode = () => setMode((m) => (m === "edit" ? "view" : "edit"));
   const canDiscard = async () => !isSongDirty || (await confirmDiscard());
 
-  const createGrid = () => load(emptySong({ beats: newBeats, unit: newUnit }, newNotation === "nashville" ? "nashville" : undefined), null);
+  const createGrid = () => load(emptySong({ beats: newBeats, unit: newUnit }, newNotation === "nashville" ? "nashville" : undefined), null, "edit");
   // Back to the start screen; the song is reset so that it isn't dirty or autosaved behind it.
   const newSong = async () => {
     if (!(await canDiscard())) return;
@@ -153,8 +156,8 @@ function App() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       const key = e.key.toLowerCase();
-      const action = { n: newSong, o: () => openSong(), p: printSong, s: e.shiftKey ? saveAs : saveSong }[key];
-      if (action === undefined || (!hasSong && "ps".includes(key))) return;
+      const action = { e: toggleMode, n: newSong, o: () => openSong(), p: printSong, s: e.shiftKey ? saveAs : saveSong }[key];
+      if (action === undefined || (!hasSong && "eps".includes(key))) return;
       e.preventDefault();
       void action();
     };
@@ -221,6 +224,11 @@ function App() {
         )}
         <FontCredits />
         {hasSong && (
+          <button type="button" aria-pressed={mode === "edit"} onClick={toggleMode}>
+            Edit
+          </button>
+        )}
+        {hasSong && (
           <button type="button" className="panel-toggle" aria-expanded={isPanelOpen} aria-controls="parameters" onClick={() => setIsPanelOpen(!isPanelOpen)}>
             Parameters
           </button>
@@ -239,7 +247,7 @@ function App() {
               </p>
             )}
             {panel && (
-              <Editor history={history} barsPerRow={settings.barsPerRow} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} audioPath={song.audio && resolveAudioPath(path, song.audio.path)} />
+              <Editor history={history} mode={mode} barsPerRow={settings.barsPerRow} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} audioPath={song.audio && resolveAudioPath(path, song.audio.path)} />
             )}
           </div>
           <aside id="parameters" aria-label="Parameters" hidden={!isPanelOpen} ref={setPanel}>

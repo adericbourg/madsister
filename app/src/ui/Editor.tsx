@@ -23,6 +23,8 @@ type Props = {
   panel?: HTMLElement | null;
   /** The audio file to play, already resolved against the song's location. */
   audioPath?: string;
+  /** View is read-only: clicking a bar only moves the cursor and the audio. */
+  mode?: "view" | "edit";
 };
 // `select` is where the caret lands on focus: "all" selects the whole text, "end" keeps a typed first character.
 type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; error?: string };
@@ -30,8 +32,9 @@ type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; err
 const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfidenceThreshold, panel, audioPath }: Props) => {
+export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfidenceThreshold, panel, audioPath, mode = "edit" }: Props) => {
   const { song } = history;
+  const isEditable = mode === "edit";
   // Nashville: chords are typed and shown as degrees of this tonic; undefined = chord names.
   const tonic = song.meta.notation === "nashville" ? tonicPc(song.meta.key, minorConvention) : undefined;
   const parse = (text: string) => (tonic === undefined ? parseChord(text) : parseNashville(text, tonic));
@@ -53,6 +56,7 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
     const command = keyToCommand(e, { song, cursor, anchor, clipboard, barsPerRow, lowConfidenceThreshold });
     if (command === null) return;
     e.preventDefault();
+    if (!isEditable && ["edit", "type", "rename", "undo", "redo"].includes(command.kind)) return setNotice(`Read-only: press ${MOD_LABEL}+E to edit`);
     setNotice(command.kind === "refused" ? "Not possible here" : "");
     switch (command.kind) {
       case "move":
@@ -209,7 +213,7 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
 
   return (
     <>
-      {inPanel(
+      {isEditable && inPanel(
         <>
           <fieldset className="toolbar">
             <legend>Section</legend>
@@ -349,6 +353,7 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
           if (startSec !== undefined) player.seek(startSec);
           setCursor(ref);
           setAnchor(null);
+          if (!isEditable) return;
           const chord = song.sections[ref.section].bars[ref.bar].chords[ref.slot].chord;
           setDraft({ kind: "chord", text: show(chord), select: "all" });
         }}

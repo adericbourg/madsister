@@ -14,14 +14,39 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 afterEach(cleanup);
 
 let song: Song | undefined;
-const Harness = ({ from = emptySong }: { from?: () => Song }) => {
+const Harness = ({ from = emptySong, mode }: { from?: () => Song; mode?: "view" | "edit" }) => {
   const [initial] = useState(from);
   const history = useHistory(initial);
   song = history.song;
-  return <Editor history={history} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={initial.audio?.path} />;
+  return <Editor history={history} mode={mode} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={initial.audio?.path} />;
 };
 
 const bar = (...chords: [string, number][]) => ({ chords: chords.map(([chord, beats]) => ({ chord, beats })) });
+
+test("Editor_inViewMode_navigatesWithoutEditing", async () => {
+  // Given a song starting with C then G, in view mode
+  const user = userEvent.setup();
+  render(<Harness mode="view" from={() => ({ ...emptySong(), sections: [{ id: "v", label: "Verse", bars: [bar(["C:maj", 4]), bar(["G:maj", 4])] }] })} />);
+  const before = song;
+  expect(screen.queryByRole("group", { name: "Section" })).toBeNull();
+
+  // When clicking a bar, Then the cursor moves there and no input opens
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
+  expect(screen.queryByRole("textbox", { name: "Chord" })).toBeNull();
+  expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }));
+
+  // When typing, using an edit shortcut or undoing, Then the song is untouched and the refusal is announced
+  await user.keyboard("A");
+  expect(screen.queryByRole("textbox", { name: "Chord" })).toBeNull();
+  await user.keyboard("{Control>}d{/Control}");
+  await user.keyboard("{Control>}z{/Control}");
+  expect(song).toBe(before);
+  expect(screen.getByRole("status").textContent).toMatch(/^Read-only/);
+
+  // When moving with the arrows, Then navigation still works
+  await user.keyboard("{ArrowLeft}");
+  expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }));
+});
 
 test("Editor_whenTypingAChartByKeyboard_buildsTheSong", async () => {
   // Given an empty song (Verse, 4 empty bars) with the cursor on the first slot

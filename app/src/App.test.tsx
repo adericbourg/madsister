@@ -196,7 +196,8 @@ test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAud
   await vi.waitFor(() => expect(files["/blues2.madsister.json"]).toBeDefined());
   expect(JSON.parse(files["/blues2.madsister.json"]).audio).toEqual({ path: "/music/found.mp3", sha256: "abc" });
 
-  // When undoing, Then the old path is back with its notice (locating is one history entry)
+  // When switching to edit mode and undoing, Then the old path is back with its notice (locating is one history entry)
+  await user.keyboard("{Control>}e{/Control}");
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
   await user.keyboard("{Escape}{Control>}z{/Control}");
   expect(await screen.findByText("Audio file not found next to the song: /music/blues.mp3. The song can't be played until you locate it.")).toBeDefined();
@@ -497,4 +498,33 @@ test("App_whenCreatingANashvilleGrid_needsAKeyToSwitchNotationOrExport", async (
   // When switching to chords, Then they are G, Cm and F (b7 of G)
   await user.selectOptions(notation(), "chords");
   expect([cell(1), cell(2), cell(3)]).toEqual(["G", "Cm", "F"]);
+});
+
+test("App_whenOpeningASong_startsInViewModeUntilSwitchedToEdit", async () => {
+  // Given a saved song opened from disk
+  const user = userEvent.setup();
+  files["/blues.madsister.json"] = serializeSong(song);
+  render(<App />);
+  vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
+  await user.keyboard("{Control>}o{/Control}");
+  await screen.findByRole("heading", { name: "Blues" });
+  const editButton = () => screen.getByRole("button", { name: "Edit" });
+
+  // Then it is read-only: clicking a bar opens no input
+  expect(editButton().getAttribute("aria-pressed")).toBe("false");
+  await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
+  expect(screen.queryByRole("textbox", { name: "Chord" })).toBeNull();
+
+  // When pressing Mod+E, Then clicking a bar edits it, and Mod+E switches back
+  await user.keyboard("{Control>}e{/Control}");
+  expect(editButton().getAttribute("aria-pressed")).toBe("true");
+  await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
+  expect(screen.getByRole("textbox", { name: "Chord" })).toBeDefined();
+  await user.keyboard("{Escape}{Control>}e{/Control}");
+  expect(editButton().getAttribute("aria-pressed")).toBe("false");
+
+  // When creating a new grid, Then it starts in edit mode
+  await user.keyboard("{Control>}n{/Control}");
+  await createGrid(user);
+  expect(editButton().getAttribute("aria-pressed")).toBe("true");
 });
