@@ -22,7 +22,7 @@ type Props = {
 };
 type Draft = { kind: "chord" | "label"; text: string; error?: string };
 
-const minutes = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
 export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, panel }: Props) => {
@@ -261,7 +261,18 @@ export const Editor = ({ history, barsPerRow, style, lowConfidenceThreshold, pan
           <button type="button" onClick={player.toggle}>
             {player.isPlaying ? "Pause" : "Play"}
           </button>
-          <span>{minutes(player.time)}</span>
+          <input
+            type="range"
+            aria-label="Seek"
+            min={0}
+            max={player.duration}
+            step={0.1}
+            value={Math.min(player.time, player.duration)}
+            onChange={(e) => player.seek(Number(e.target.value))}
+          />
+          <span>
+            {minutes(player.time)}/{minutes(player.duration)}
+          </span>
           {player.error !== null && (
             <span role="alert" className="field-error">
               {player.error}

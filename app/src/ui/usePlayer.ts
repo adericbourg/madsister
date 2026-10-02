@@ -10,6 +10,7 @@ export const usePlayer = (path: string | undefined) => {
   const [src, setSrc] = useState<string>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fail = (e: unknown) => setError(`Can't play this audio: ${String(e)}`);
 
@@ -17,6 +18,7 @@ export const usePlayer = (path: string | undefined) => {
     setSrc(undefined);
     setError(null);
     setTime(0);
+    setDuration(0);
     if (path === undefined) return;
     let url: string | undefined;
     let isCurrent = true;
@@ -60,8 +62,9 @@ export const usePlayer = (path: string | undefined) => {
     ref,
     src,
     onPlay: () => setIsPlaying(true),
+    onDurationChange: () => setDuration(ref.current!.duration || 0), // NaN until the metadata is loaded
     onPause: () => setIsPlaying(false),
     onError: () => fail(ref.current?.error?.message || "unsupported format"),
   };
-  return { audioProps, isReady: src !== undefined, isPlaying, time, error, toggle, seek };
+  return { audioProps, isReady: src !== undefined, isPlaying, time, duration, error, toggle, seek };
 };
