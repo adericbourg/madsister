@@ -148,7 +148,7 @@ fn audio_sha256(path: String) -> Option<String> {
     )
 }
 
-/// The audio file's bytes, played as a blob in the webview (WebKitGTK's GStreamer can't read the asset protocol).
+/// The audio file's bytes, played as a data: URL in the webview (WebKitGTK's GStreamer can't read the asset protocol).
 /// It reads outside the fs scope, so only audio files (the extensions of the app's audio dialogs).
 #[tauri::command(async)]
 fn read_audio(path: String) -> Result<Response, String> {

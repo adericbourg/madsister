@@ -33,7 +33,7 @@ export const confirmDiscard = (): Promise<boolean> => confirm("Discard unsaved c
 export const confirmDeleteSection = (label: string): Promise<boolean> =>
   confirm(`Delete the section "${label}" and its chords?`, { kind: "warning" });
 
-// The MIME type lets WKWebView (AVFoundation) play a blob; keep the extensions in sync with `read_audio` (lib.rs).
+// The MIME type lets WKWebView (AVFoundation) play a data: URL; keep the extensions in sync with `read_audio` (lib.rs).
 const AUDIO_TYPES: Record<string, string> = { mp3: "audio/mpeg", wav: "audio/wav", flac: "audio/flac", m4a: "audio/mp4", ogg: "audio/ogg", webm: "audio/webm" };
 export const AUDIO_EXTENSIONS = Object.keys(AUDIO_TYPES);
 
@@ -43,12 +43,17 @@ export const pickAudioPath = async (): Promise<string | null> => open({ filters:
 export const audioSha256 = (path: string): Promise<string | null> => invoke("audio_sha256", { path });
 
 /**
- * An object URL for playing the audio file in `<audio>` (revoke it when done). Read in Rust and played as a blob rather than
- * through the asset protocol: WebKitGTK's GStreamer can't read `asset://` URLs.
+ * A data: URL for playing the audio file in `<audio>`, read in Rust. WebKitGTK's GStreamer can't read `asset://` URLs, and
+ * intermittently reads blob: URLs corrupted (errors like "R6:" or "unsupported format").
  */
-export const audioObjectUrl = async (path: string): Promise<string> => {
+export const audioDataUrl = async (path: string): Promise<string> => {
   const bytes = await invoke<ArrayBuffer>("read_audio", { path });
-  return URL.createObjectURL(new Blob([bytes], { type: AUDIO_TYPES[path.split(".").pop()!.toLowerCase()] }));
+  const reader = new FileReader();
+  reader.readAsDataURL(new Blob([bytes], { type: AUDIO_TYPES[path.split(".").pop()!.toLowerCase()] }));
+  return new Promise((resolve, reject) => {
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+  });
 };
 
 /** True when there's no file at `path` yet, or the user agrees to overwrite it. */

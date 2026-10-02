@@ -376,8 +376,6 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(function (this: HTMLMediaElement) {
     this.dispatchEvent(new Event("pause"));
   });
-  URL.createObjectURL = vi.fn(() => "blob:song");
-  URL.revokeObjectURL = vi.fn();
   vi.mocked(invoke).mockResolvedValue(new ArrayBuffer(8));
   const timed = (startSec?: number) => ({ startSec, chords: [{ chord: "C:maj", beats: 4 }] });
   const from = (): Song => ({
@@ -391,6 +389,8 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   const transport = screen.getByRole("group", { name: "Playback" }) as HTMLFieldSetElement;
   await vi.waitFor(() => expect(transport.disabled).toBe(false));
   expect(invoke).toHaveBeenCalledWith("read_audio", { path: "/music/song.mp3" });
+  // Not a blob: URL, which WebKitGTK intermittently reads corrupted ("R6:", "unsupported format")
+  expect(document.querySelector("audio")!.getAttribute("src")).toMatch(/^data:audio\/mpeg;base64,/);
 
   // When the webview reports the metadata with a 0 duration and fills it in moments later without another event (WebKitGTK),
   // Then the total length shows
@@ -449,14 +449,10 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   expect(currentTime).toBe(0);
   expect(screen.getByRole("button", { name: "Pause" })).toBeDefined();
 
-  // When opening another song's audio while playing, Then the element lets go of the old blob before it is revoked
-  // (WebKit reads blobs lazily: revoking one still in use fails the element's next load) and the playback stops
+  // When opening another song's audio while playing, Then the playback stops and the element unloads the old file
   const audio = document.querySelector("audio")!;
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
-  let srcWhenRevoked: string | null = "never revoked";
-  URL.revokeObjectURL = vi.fn(() => (srcWhenRevoked = audio.getAttribute("src")));
   rerender(<Harness from={from} audioPath="/music/other.mp3" />);
-  expect(srcWhenRevoked).toBeNull();
   expect(audio.load).toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
   await vi.waitFor(() => expect(transport.disabled).toBe(false));
