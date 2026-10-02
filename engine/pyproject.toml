@@ -18,15 +18,14 @@ madsister-engine = "madsister_engine.cli:main"
 beats-allinone = [
     "allin1",
     "madmom",
-    "natten==0.17.4",  # last release with the legacy ops allin1 1.1.0 calls (allin1 only requires it on macOS)
-    "torch==2.5.1",
-    "torchaudio==2.5.1",
+    "torch==2.11.0",
+    "torchaudio==2.11.0",
 ]
 chords-btc = [
     "librosa",
     "mir-eval",  # imported by BTC's feature code
     "pyyaml",
-    "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
+    "torch==2.11.0",  # same pin as beats-allinone (one lockfile)
 ]
 chords-cnnlstm = [
     "h5py",  # the imports below are pulled in by upstream's `mir` package, not used for inference
@@ -34,14 +33,14 @@ chords-cnnlstm = [
     "librosa",
     "pretty-midi",
     "pydub",
-    "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
+    "torch==2.11.0",  # same pin as beats-allinone (one lockfile)
 ]
 beats-madmom = [
     "madmom",
 ]
 separate = [
     "demucs",
-    "torch==2.5.1",  # same pin as beats-allinone (one lockfile)
+    "torch==2.11.0",  # same pin as beats-allinone (one lockfile)
 ]
 fetch = ["yt-dlp"]
 record = ["sounddevice"]
@@ -54,11 +53,8 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-root = ""
 
-[tool.uv.extra-build-dependencies]
-natten = ["torch==2.5.1", "cmake", "setuptools"]
-
-[tool.uv.extra-build-variables]
-natten = { CXXFLAGS = "-Wno-invalid-specialization" }  # torch 2.5 headers vs recent clang
+[tool.uv]
+exclude-dependencies = ["natten"]  # allin1 requires it on macOS; beats/neighborhood_attention.py replaces its legacy ops
 
 [tool.uv.sources]
 madmom = { git = "https://github.com/CPJKU/madmom", rev = "27f032e8947204902c675e5e341a3faf5dc86dae" }

@@ -1,6 +1,6 @@
 # Installs the packaged engine (M6-2), run by the app with `sh` (and by the release workflow's clean-install check).
 # Usage: setup-engine.sh <uv> <engine project dir> <env dir> <app version> [sections]
-# `sections` adds all-in-one (section detection: a natten source build, slow), installed on demand.
+# `sections` adds all-in-one (section detection: a large download, slow), installed on demand.
 # Prints the engine's JSON Lines (one synthetic `install` progress, then `madsister-engine setup`'s); uv's output goes to
 # stderr. Idempotent: an update re-runs it, uv and setup then only fetch what changed.
 set -eu

@@ -1,6 +1,6 @@
 name: engine-models
 
-# The model dependency groups (torch, torchaudio, natten, madmom, allin1, demucs…) and their slow tests, which the
+# The model dependency groups (torch, torchaudio, madmom, allin1, demucs…) and their slow tests, which the
 # `engine` workflow skips. Required for dependency updates: a torch/torchaudio ABI mismatch only shows up here.
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-14]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90  # cold run: NATTEN source build + model downloads
+    timeout-minutes: 90  # cold run: model downloads + madmom build
     env:
       MADSISTER_MODELS_DIR: ${{ github.workspace }}/.models
     defaults:
@@ -30,7 +30,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0  # no floating major tag upstream
         with:
           enable-cache: true
-          cache-suffix: models  # keeps the NATTEN wheel built from source (`uv cache prune --ci` keeps built wheels)
+          cache-suffix: models  # keeps the madmom wheel built from source (`uv cache prune --ci` keeps built wheels)
       - uses: actions/cache@v6
         with:
           path: .models

@@ -9,9 +9,11 @@ from madsister_engine.models import models_dir
 # Read at import time by huggingface_hub, here and in the Demucs subprocess: all-in-one and htdemucs weights.
 os.environ.setdefault("HF_HUB_CACHE", str(models_dir() / "huggingface"))
 
-import allin1  # noqa: E402
-
 from madsister_engine.beats import BeatResult  # noqa: E402
+from madsister_engine.beats.neighborhood_attention import install_as_natten  # noqa: E402
+
+install_as_natten()  # allin1 imports its attention ops from NATTEN, which is not installed
+import allin1  # noqa: E402
 
 
 def prepare() -> None:

@@ -83,7 +83,7 @@ fn engine_needs_setup(engine: State<Engine>) -> bool {
 }
 
 /// Installs the packaged engine (`setup-engine.sh`): same events as the engine commands. `sections`: also all-in-one
-/// (slow: natten builds from source).
+/// (slow: a large download).
 #[tauri::command]
 fn setup_engine(
     jobs: State<Jobs>,

@@ -19,14 +19,6 @@ def test_torchaudio_resample_of_tiny_tensor_halves_its_length():
     assert torchaudio.functional.resample(torch.zeros(1, 160), 16000, 8000).shape == (1, 80)
 
 
-def test_natten_1d_attention_of_tiny_tensors_returns_one_weight_per_neighbour():
-    import torch
-    from natten.functional import natten1dqkrpb  # the legacy op allin1 calls
-
-    q = k = torch.zeros(1, 1, 8, 4)  # batch, heads, length, dim
-    assert natten1dqkrpb(q, k, torch.zeros(1, 5), 3, 1).shape == (1, 1, 8, 3)
-
-
 def test_madmom_dbn_processor_builds_its_cython_hmm():
     from madmom.features.downbeats import DBNDownBeatTrackingProcessor
 

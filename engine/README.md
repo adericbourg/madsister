@@ -40,5 +40,4 @@ uv sync --locked --group beats-madmom --group beats-allinone --group chords-btc 
 uv run --no-sync pytest -m slow tests/test_model_imports.py   # seconds: each heavy dep imports and runs one native call
 uv run --no-sync pytest -m slow                               # minutes: downloads weights on the first run
 ```
-On Linux, torch and torchaudio come from the PyTorch CPU index (PyPI's are the CUDA builds), and NATTEN is built from
-source (needs a C++ compiler).
+On Linux, torch and torchaudio come from the PyTorch CPU index (PyPI's are the CUDA builds).

@@ -39,8 +39,7 @@ brew install --cask madsister
 - The app isn't signed or notarized: the cask clears the quarantine flag, so Gatekeeper doesn't block it. With the `.dmg`
   from the [releases page](https://github.com/adericbourg/madsister/releases), copy the app to `/Applications` and run
   `xattr -dr com.apple.quarantine /Applications/madsister.app` once.
-- Same first launch as on Linux (the engine and the models download once); ffmpeg comes with the cask. Section detection
-  builds NATTEN from source on demand, which needs the Xcode Command Line Tools.
+- Same first launch as on Linux (the engine and the models download once); ffmpeg comes with the cask.
 - Uninstall: `brew uninstall --cask madsister` (`--zap` also removes the engine and the data).
 
 ## Development
@@ -51,8 +50,8 @@ Linux is the main development platform (CI runs there); macOS works too, and not
 below were last checked on macOS (Apple silicon):
 
 - Node.js LTS (26.10) and pnpm 12 (12.8; CI pins 12).
-- Rust stable (1.98) and a C++ toolchain (`build-essential` on Debian/Ubuntu, Xcode Command Line Tools on macOS): Tauri,
-  and NATTEN (section detection), which is built from source on every OS.
+- Rust stable (1.98) and a C++ toolchain (`build-essential` on Debian/Ubuntu, Xcode Command Line Tools on macOS): Tauri
+  (and madmom, built from its git source).
 - [uv](https://docs.astral.sh/uv/) (0.12): it installs Python 3.11 (`engine/.python-version`) by itself.
 - ffmpeg on `PATH` (the engine decodes every input with it).
 - Linux: the [Tauri system packages](https://v2.tauri.app/start/prerequisites/#linux), same list as

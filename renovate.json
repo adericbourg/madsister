@@ -6,19 +6,15 @@
   "minimumReleaseAge": "3 days",
   "packageRules": [
     {
-      "description": "Pinned on purpose: natten 0.18+ removed the legacy ops that allin1 1.1.0 calls (see engine/pyproject.toml).",
-      "matchPackageNames": ["natten"],
-      "enabled": false
-    },
-    {
       "description": "Pinned on purpose: the engine stays on Python 3.11 for madmom and allin1 (engine/.python-version, requires-python).",
       "matchDepNames": ["python"],
       "enabled": false
     },
     {
-      "description": "torchaudio wheels are built against one torch version: update them together.",
+      "description": "torchaudio wheels are built against one torch version: update them together. torchaudio has no release after 2.11.0 (it pins torch==2.11.0), which demucs and allin1 need: stay below 2.12 until that changes.",
       "matchPackageNames": ["torch", "torchaudio"],
-      "groupName": "torch"
+      "groupName": "torch",
+      "allowedVersions": "<2.12"
     },
     {
       "description": "Tauri npm packages and Rust crates must stay on the same major.minor.",

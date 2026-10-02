@@ -21,3 +21,5 @@ Append-only log. Format per entry:
   shows it isn't worth it (it's also the slowest tracker: ~30 s for a 16 s clip).
 - Resolution (user, 2026-10-01): keep all-in-one as a slow opt-in for section detection, so the torch 2.5.1 pin and
   its Dependabot alerts are accepted for now.
+- Superseded 2026-10-02: NATTEN is replaced by a PyTorch reimplementation of the ops all-in-one calls, torch/torchaudio
+  moved to 2.11.0 (see `doc/torch-2.11-migration.md`). Section detection kept.
