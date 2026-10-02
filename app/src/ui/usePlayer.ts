@@ -58,11 +58,13 @@ export const usePlayer = (path: string | undefined) => {
     return true;
   };
 
+  const syncDuration = () => setDuration(ref.current!.duration || 0); // NaN until the metadata is loaded
   const audioProps = {
     ref,
     src,
     onPlay: () => setIsPlaying(true),
-    onDurationChange: () => setDuration(ref.current!.duration || 0), // NaN until the metadata is loaded
+    onDurationChange: syncDuration,
+    onLoadedMetadata: syncDuration,
     onPause: () => setIsPlaying(false),
     onError: () => fail(ref.current?.error?.message || "unsupported format"),
   };

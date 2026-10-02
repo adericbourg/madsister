@@ -388,6 +388,11 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   await vi.waitFor(() => expect(transport.disabled).toBe(false));
   expect(invoke).toHaveBeenCalledWith("read_audio", { path: "/music/song.mp3" });
 
+  // When the webview only reports the metadata (no durationchange), Then the total length shows
+  vi.spyOn(HTMLMediaElement.prototype, "duration", "get").mockReturnValue(125);
+  document.querySelector("audio")!.dispatchEvent(new Event("loadedmetadata"));
+  await vi.waitFor(() => expect(transport.textContent).toContain("00:00/02:05"));
+
   // When pressing Play with the audio at 2.5 s
   currentTime = 2.5;
   await user.click(screen.getByRole("button", { name: "Play" }));
