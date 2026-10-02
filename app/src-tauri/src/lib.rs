@@ -156,7 +156,7 @@ fn read_audio(path: String) -> Result<Response, String> {
         .extension()
         .and_then(|e| e.to_str())
         .is_some_and(|e| {
-            ["mp3", "wav", "flac", "m4a", "ogg"].contains(&e.to_ascii_lowercase().as_str())
+            ["mp3", "wav", "flac", "m4a", "ogg", "webm"].contains(&e.to_ascii_lowercase().as_str())
         });
     if !is_audio {
         return Err(format!("not an audio file: {path}"));

@@ -108,7 +108,7 @@ test("Importer_whenCancelling_cancelsTheJob", async () => {
   render(<Importer onResult={onResult} />);
   vi.mocked(open).mockResolvedValueOnce("/music/take.wav");
   await user.click(screen.getByRole("button", { name: "Import audio…" }));
-  expect(open).toHaveBeenCalledWith(expect.objectContaining({ filters: [expect.objectContaining({ extensions: ["mp3", "wav", "flac", "m4a", "ogg"] })] }));
+  expect(open).toHaveBeenCalledWith(expect.objectContaining({ filters: [expect.objectContaining({ extensions: ["mp3", "wav", "flac", "m4a", "ogg", "webm"] })] }));
   expect(screen.getByText("take.wav")).toBeDefined();
   expect(transcribe).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Run" }));

@@ -28,7 +28,7 @@ export const confirmDeleteSection = (label: string): Promise<boolean> =>
   confirm(`Delete the section "${label}" and its chords?`, { kind: "warning" });
 
 // The MIME type lets WKWebView (AVFoundation) play a blob; keep the extensions in sync with `read_audio` (lib.rs).
-const AUDIO_TYPES: Record<string, string> = { mp3: "audio/mpeg", wav: "audio/wav", flac: "audio/flac", m4a: "audio/mp4", ogg: "audio/ogg" };
+const AUDIO_TYPES: Record<string, string> = { mp3: "audio/mpeg", wav: "audio/wav", flac: "audio/flac", m4a: "audio/mp4", ogg: "audio/ogg", webm: "audio/webm" };
 export const AUDIO_EXTENSIONS = Object.keys(AUDIO_TYPES);
 
 export const pickAudioPath = async (): Promise<string | null> => open({ filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS }] });

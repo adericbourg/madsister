@@ -53,7 +53,6 @@ With the dev env synced (root README "Development", including `--group fetch --g
       transcription runs, the grid appears, the WAV plays back.
 - [ ] Record then Cancel → nothing is transcribed, no engine process left.
 - [ ] VoiceOver announces "Recording 0:05"-style updates and the stages.
-- [ ] A fetched webm/opus file transcribes, but playback only works for mp3/wav/flac/m4a/ogg (`read_audio` list).
 
 ## Commit message
 `feat(app): import from URL and from the microphone`
