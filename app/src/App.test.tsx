@@ -247,9 +247,8 @@ test("App_onStart_listsTheFontCreditsInTheAboutMenu", async () => {
   await user.click(screen.getByText("About"));
 
   // Then every chart font is credited with its license and source
-  for (const font of ["Patrick Hand", "Kalam", "Petaluma", "Golden Age"]) expect(screen.getByRole("link", { name: font })).toBeDefined();
-  expect(screen.getAllByText(/SIL Open Font License/)).toHaveLength(4);
-  expect(screen.getByRole("link", { name: "Golden Age" }).getAttribute("href")).toBe("https://github.com/benwiggy/GoldenAge");
+  for (const font of ["Patrick Hand", "Kalam", "Petaluma"]) expect(screen.getByRole("link", { name: font })).toBeDefined();
+  expect(screen.getAllByText(/SIL Open Font License/)).toHaveLength(3);
 });
 
 test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings", async () => {
@@ -289,7 +288,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "serif");
   expect(JSON.parse(files["/config/settings.json"]).font).toBe("serif");
   expect(screen.getByRole("main").className).toBe("compact-print font-serif");
-  for (const font of ["petaluma-script", "petaluma-text", "golden-age"]) {
+  for (const font of ["petaluma-script", "petaluma-text"]) {
     await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), font);
     expect(JSON.parse(files["/config/settings.json"]).font).toBe(font);
     expect(screen.getByRole("main").className).toBe(`compact-print font-${font}`);

@@ -12,7 +12,6 @@ import type { useHistory } from "./useHistory";
 export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont; minorConvention: MinorConvention };
 
 const CHART_FONTS = [
-  ["golden-age", "Golden Age"],
   ["kalam", "Kalam"],
   ["patrick-hand", "Patrick Hand"],
   ["petaluma-script", "Petaluma Script"],
