@@ -21,7 +21,7 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | python-sounddevice | Microphone recording (`record` group) | MIT | — | https://github.com/spatialaudio/python-sounddevice |
 | PortAudio | Audio I/O under sounddevice (bundled in its macOS wheels; `libportaudio2` on Linux) | MIT | — | https://www.portaudio.com |
 | FFmpeg | Decoding (called as an external program on `PATH`, not bundled) | LGPL-2.1+ (GPL-2+ for some builds) | — | https://ffmpeg.org |
-| uv (Astral) | Bundled in the release packages (`madsister-uv`): installs Python and the engine on first launch | MIT OR Apache-2.0 | — | https://github.com/astral-sh/uv |
+| uv (Astral) | Bundled in the release packages (`madsister-uv`, `madsister-snapshot-uv`): installs Python and the engine on first launch | MIT OR Apache-2.0 | — | https://github.com/astral-sh/uv |
 | GStreamer (base, good, libav plugins), WebKitGTK and their libraries | Bundled in the Linux AppImage only (the deb depends on the distribution's packages) | LGPL-2.1+ (libav plugin: LGPL, FFmpeg inside) | — | https://gstreamer.freedesktop.org, https://webkitgtk.org |
 | pytest | Tests only (`dev` group), not shipped | MIT | — | https://github.com/pytest-dev/pytest |
 | GuitarSet (Xi et al., ISMIR 2018) | Proxy bench data (`bench/`), downloaded by `bench/fetch_guitarset.py`; not shipped | — | CC BY 4.0 (data) | https://zenodo.org/records/3371780 |

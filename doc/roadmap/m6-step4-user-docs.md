@@ -10,7 +10,8 @@ The top of the root `README.md` explains what madsister is and how to use it, wi
 M6-2/M6-3 (installation instructions), M2-7 (developer section stays at the end).
 
 ## Tasks
-- README top part: one-paragraph pitch (offline chord charts from audio, the editor is the product), install (link the latest release;
+- README top part: one-paragraph pitch (offline chord charts from audio, the editor is the product), install (the apt repository, README
+  "Install" section, plus the latest release;
   Linux deb/AppImage, macOS dmg + Gatekeeper bypass; first-launch engine setup), quick start in 5 steps (import or new chart →
   correct chords → review low-confidence chords with F8 → print → save), feature list (from §5, only what exists), keyboard: press `?`
   in the app for all shortcuts, known limits (sections detection is slow and opt-in, Linux/macOS only, non-commercial model weights).

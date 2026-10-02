@@ -13,7 +13,8 @@ M6-1.
 
 ## Decisions
 - **Packaged engine** (M6-1's recommendation): `uv` is a Tauri sidecar (`bundle.externalBin`, `binaries/madsister-uv-<triple>`,
-  installed next to the app's binary; `madsister-uv` so the deb never clashes with a `/usr/bin/uv`), and the `engine/`
+  installed next to the app's binary; `<package>-uv` (`madsister-uv`, `madsister-snapshot-uv` for snapshots) so the debs never
+  clash with a `/usr/bin/uv` nor with each other), and the `engine/`
   project (`pyproject.toml`, `uv.lock`, `.python-version`, `madsister_engine/`) a resource. Both live in
   `app/src-tauri/tauri.bundle.conf.json`, merged only when packaging (`--config`): in `tauri.conf.json` they would make every
   dev build and the `app` CI need the sidecar binary.

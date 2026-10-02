@@ -116,7 +116,8 @@ Second unattended run (2026-10-01): M2, M3, M4, M5, M6, one agent per step, same
 - **M4b is skipped**: M0 found no slower combo measurably better (D7 → single mode). Revisit after the user's own bench.
 - **M6 releases**: Linux (deb + AppImage) + macOS arm64 (unsigned .dmg). Version from tag `vX.Y.Z` (semver, injected at build
   time); every `main` build publishes a snapshot pre-release `<last tag or 0.0.0>-snapshot.<run number>`, only the latest
-  snapshot is kept; tagged releases are kept.
+  snapshot is kept; tagged releases are kept. Both go to a signed apt repository on GitHub Pages (single suite): a release is
+  the package `madsister`, a snapshot `madsister-snapshot` (own binary, files and data dir, installable together).
 - Coarse steps: each agent refines its step file (in the same commit) before implementing. Steps needing hardware or a desktop
   session (microphone, audio playback, printing) get automated tests + a "check by hand" list in the step file.
 - Engine model dependencies (torch, torchaudio, natten, madmom, allin1, demucs, librosa…) are tested by the `engine-models` workflow, not by `engine`.
