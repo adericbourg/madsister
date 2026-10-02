@@ -225,7 +225,7 @@ jobs:
             gpg --batch --yes --clearsign -o "dists/$suite/InRelease" "dists/$suite/Release"
           done
           gpg --export --armor > key.asc
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
       - id: deploy
