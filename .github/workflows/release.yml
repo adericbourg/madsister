@@ -91,10 +91,11 @@ jobs:
           workspaces: app/src-tauri
       # Tauri's packages (https://v2.tauri.app/start/prerequisites/#linux), patchelf for the AppImage, and the GStreamer
       # plugins the AppImage bundles (bundleMediaFramework).
-      - run: >-
-          sudo apt-get update && sudo apt-get install -y
-          libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-          gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
+      - uses: awalsh128/cache-apt-pkgs-action@v1.6.3
+        with:
+          packages: >-
+            libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
       - uses: actions/cache@v6 # the AppImage tools (linuxdeploy, AppRun, its plugins) tauri downloads otherwise
         with:
           path: ~/.cache/tauri
