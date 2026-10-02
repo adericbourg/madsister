@@ -18,6 +18,10 @@
   padding: 2rem 1.5rem;
 }
 
+.font-kalam .chart {
+  font-family: Kalam, ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
 .chart-header {
   margin-bottom: 2rem;
 }

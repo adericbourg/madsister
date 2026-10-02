@@ -155,7 +155,7 @@ function App() {
   });
 
   return (
-    <main className={settings.compactPrint ? "compact-print" : undefined}>
+    <main className={[settings.compactPrint && "compact-print", settings.font === "kalam" && "font-kalam"].filter(Boolean).join(" ") || undefined}>
       <nav aria-label="File">
         {hasSong && (
           <>
