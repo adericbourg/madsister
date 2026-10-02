@@ -23,6 +23,7 @@ import {
   writeSong,
 } from "./ui/fileActions";
 import { parseSettings, Toolbar, type Settings } from "./ui/Toolbar";
+import { FontCredits } from "./ui/FontCredits";
 import { useHistory } from "./ui/useHistory";
 
 const RECENT = "recent.json";
@@ -211,6 +212,7 @@ function App() {
             </ul>
           </details>
         )}
+        <FontCredits />
         {hasSong && (
           <button type="button" className="panel-toggle" aria-expanded={isPanelOpen} aria-controls="parameters" onClick={() => setIsPanelOpen(!isPanelOpen)}>
             Parameters

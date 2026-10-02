@@ -231,6 +231,20 @@ test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {
   vi.useRealTimers();
 });
 
+test("App_onStart_listsTheFontCreditsInTheAboutMenu", async () => {
+  // Given the app just started, with no song
+  const user = userEvent.setup();
+  render(<App />);
+
+  // When opening the About menu
+  await user.click(screen.getByText("About"));
+
+  // Then every chart font is credited with its license and source
+  for (const font of ["Patrick Hand", "Kalam", "Petaluma", "Golden Age"]) expect(screen.getByRole("link", { name: font })).toBeDefined();
+  expect(screen.getAllByText(/SIL Open Font License/)).toHaveLength(4);
+  expect(screen.getByRole("link", { name: "Golden Age" }).getAttribute("href")).toBe("https://github.com/benwiggy/GoldenAge");
+});
+
 test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings", async () => {
   // Given saved settings (international style, 2 bars per row) and Cmaj7 typed in the first slot
   const user = userEvent.setup();
