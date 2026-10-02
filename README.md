@@ -27,6 +27,16 @@ sudo apt update && sudo apt install madsister
 - Uninstall: `sudo apt remove madsister` (or `madsister-snapshot`); to remove the repository, delete
   `/etc/apt/sources.list.d/madsister.sources` and `/etc/apt/keyrings/madsister.asc`.
 
+## Install (macOS, Apple silicon)
+
+Download `madsister_<version>_aarch64.dmg` from the [releases page](https://github.com/adericbourg/madsister/releases) and
+copy the app to `/Applications`. It isn't signed or notarized: run `xattr -dr com.apple.quarantine /Applications/madsister.app`
+once, or Gatekeeper blocks it.
+
+- `madsister-snapshot_<version>_aarch64.dmg` (the latest pre-release) installs next to `madsister`, with its own data dir.
+- Same first launch as on Linux (the engine and the models download once); ffmpeg must be on `PATH` (`brew install ffmpeg`).
+  Section detection builds NATTEN from source on demand, which needs the Xcode Command Line Tools.
+
 ## Development
 
 ### Prerequisites
@@ -109,7 +119,8 @@ launch builds madmom from git: it needs git and a C compiler. The deb depends on
 ### Releases
 
 `.github/workflows/release.yml` builds the Linux deb and AppImage (on Ubuntu 22.04, with the madmom wheel and the `uv`
-sidecar), installs the deb in a clean `ubuntu:24.04` container to set up its engine and transcribe a clip, then publishes:
+sidecar) and the macOS arm64 dmg (ad-hoc signed), installs each on a clean system to set up its engine and transcribe a clip,
+then publishes:
 
 - every push to `main`: a pre-release `v<last vX.Y.Z tag or 0.0.0>-snapshot.<run number>`; the previous snapshot (release and
   tag) is deleted once the new one is published, so only the latest is kept;

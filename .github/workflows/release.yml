@@ -67,7 +67,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "package=$package" >> "$GITHUB_OUTPUT"
 
-  # One job per platform; a macOS job (M6-3) would build its .dmg the same way and upload a `macos` artifact.
+  # One job per platform, each uploading its artifact (`linux`, `macos`) to `publish`.
   linux:
     needs: version
     runs-on: ubuntu-22.04 # the oldest glibc the deb and the AppImage then run on
@@ -163,8 +163,91 @@ jobs:
           grep -q '"chord": "C:maj"' c.madsister.json
           EOF
 
+  # macOS arm64: an unsigned .dmg (ad-hoc signature only).
+  macos:
+    needs: version
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tag upstream
+        with:
+          version: ${{ env.UV_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: Build the madmom wheel (first launch then needs no git nor C compiler)
+        run: |
+          rev=$(sed -n 's/^madmom = .*rev = "\([0-9a-f]*\)".*/\1/p' engine/pyproject.toml)
+          git clone --quiet https://github.com/CPJKU/madmom "$RUNNER_TEMP/madmom"
+          git -C "$RUNNER_TEMP/madmom" checkout --quiet "$rev"
+          git -C "$RUNNER_TEMP/madmom" submodule update --init --quiet # the model weights
+          uv build --wheel --python 3.11 --out-dir engine/wheels "$RUNNER_TEMP/madmom"
+      - name: Download the uv sidecar
+        env:
+          PACKAGE: ${{ needs.version.outputs.package }}
+        run: |
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          mkdir -p app/src-tauri/binaries
+          curl -fsSL "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.tar.gz" |
+            tar -xzO "uv-$triple/uv" > "app/src-tauri/binaries/$PACKAGE-uv-$triple"
+          chmod +x "app/src-tauri/binaries/$PACKAGE-uv-$triple"
+      - run: pnpm install --frozen-lockfile
+        working-directory: app
+      - name: Build the dmg
+        working-directory: app
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          PACKAGE: ${{ needs.version.outputs.package }}
+        # Same overrides as on Linux; signingIdentity "-" is the ad-hoc signature Apple silicon requires to run the app.
+        run: >-
+          pnpm tauri build --bundles dmg --config src-tauri/tauri.bundle.conf.json
+          --config "{\"productName\":\"$PACKAGE\",\"mainBinaryName\":\"$PACKAGE\",\"identifier\":\"dev.dericbourg.$PACKAGE\",\"version\":\"$VERSION\",\"bundle\":{\"externalBin\":[\"binaries/$PACKAGE-uv\"],\"resources\":{\"../../engine/wheels/\":\"engine/wheels/\"},\"macOS\":{\"signingIdentity\":\"-\"}}}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          if-no-files-found: error
+          path: app/src-tauri/target/release/bundle/dmg/*.dmg
+
+  # The macOS twin of linux-clean-install: the engine sets up from the installed .app and transcribes, with ffmpeg as the only prerequisite.
+  macos-clean-install:
+    needs: [version, macos]
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7 # setup-engine.sh, the script the app runs on first launch
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos
+      - run: brew install ffmpeg
+      - name: Set up the engine from the .app, then transcribe a synthetic C major clip
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          PACKAGE: ${{ needs.version.outputs.package }}
+        run: |
+          hdiutil attach -nobrowse -mountpoint "$RUNNER_TEMP/dmg" ./*.dmg
+          app="$RUNNER_TEMP/dmg/$PACKAGE.app"
+          env=$RUNNER_TEMP/engine-env
+          start=$(date +%s)
+          sh app/src-tauri/setup-engine.sh "$app/Contents/MacOS/$PACKAGE-uv" "$app/Contents/Resources/engine" "$env" "$VERSION"
+          echo "setup: $(($(date +%s) - start)) s, env: $(du -sh "$env" | cut -f1)"
+          ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
+          start=$(date +%s)
+          "$env/bin/madsister-engine" transcribe c.wav --out c.madsister.json
+          echo "transcribe: $(($(date +%s) - start)) s"
+          grep -q '"chord": "C:maj"' c.madsister.json
+
   publish:
-    needs: [version, linux, linux-clean-install]
+    needs: [version, linux, linux-clean-install, macos, macos-clean-install]
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
@@ -180,6 +263,7 @@ jobs:
         run: |
           notes="For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see THIRD_PARTY.md).
           Linux: \`sudo apt install ./${PACKAGE}_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
+          macOS (Apple silicon): the dmg (it needs ffmpeg). The app is unsigned: run \`xattr -dr com.apple.quarantine /Applications/$PACKAGE.app\` once after copying it.
           To get updates through apt (the package \`madsister\` follows the releases, \`madsister-snapshot\` the snapshots; they can be installed together):
           \`\`\`
           sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://www.dericbourg.net/madsister/key.asc
@@ -189,10 +273,10 @@ jobs:
           The first launch downloads the engine (Python, its libraries and the models), once."
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             # Creates the tag on this commit (a tag pushed with the workflow's token wouldn't trigger anything anyway).
-            gh release create "v$VERSION" dist/*/* --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
+            gh release create "v$VERSION" dist/*/* dist/*.dmg --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
           else
             tag=v$VERSION
-            gh release create "$tag" dist/*/* --prerelease --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
+            gh release create "$tag" dist/*/* dist/*.dmg --prerelease --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
             # Only the latest snapshot is kept: the previous ones go once this one is published.
             gh release list --limit 100 --json tagName --jq '.[].tagName | select(contains("-snapshot."))' |
               while read -r old; do

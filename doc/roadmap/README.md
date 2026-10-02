@@ -104,7 +104,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M5-4 | [m5-step4-sections-fallback](m5-step4-sections-fallback.md) | done (covered by M0-6 + M2-2) | |
 | M6-1 | [m6-step1-engine-setup-script](m6-step1-engine-setup-script.md) | done | d7eaa2c |
 | M6-2 | [m6-step2-linux-bundle](m6-step2-linux-bundle.md) | done | 36cb421 |
-| M6-3 | [m6-step3-macos-bundle](m6-step3-macos-bundle.md) | postponed (user 2026-10-01) | |
+| M6-3 | [m6-step3-macos-bundle](m6-step3-macos-bundle.md) | done | this |
 | M6-4 | [m6-step4-user-docs](m6-step4-user-docs.md) | todo | |
 
 Scope of the first unattended run (2026-09-30 night): M0 + M1. M2–M6 are written at a coarser level. Revise them
