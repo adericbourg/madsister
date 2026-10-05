@@ -19,13 +19,28 @@ def test_to_harte_of_cnnlstm_labels_keeps_bass_and_degrades_extended_qualities()
     assert to_harte("Eb:maj/3") == "Eb:maj/3"
     assert to_harte("A:min/b3") == "A:min/b3"
     assert to_harte("G:maj/b7") == "G:maj/b7"
-    assert to_harte("C:9") == "C:7"
-    assert to_harte("C:11") == "C:7"
-    assert to_harte("C:13") == "C:7"
-    assert to_harte("C:maj9") == "C:maj7"
-    assert to_harte("D:min9") == "D:min7"
-    assert to_harte("F#:sus4(b7)") == "F#:7"
-    assert to_harte("C:9/b7") == "C:7/b7"
+    assert to_harte("C:9") == "C:9"
+    assert to_harte("C:11") == "C:11"
+    assert to_harte("C:13") == "C:13"
+    assert to_harte("C:maj9") == "C:maj9"
+    assert to_harte("D:min9") == "D:min9"
+    assert to_harte("C:9/b7") == "C:9/b7"
+    assert to_harte("C:7(b9)") == "C:7"
+    assert to_harte("C:min13") == "C:min11"
+
+
+def test_to_harte_of_extended_labels_maps_to_the_rich_qualities():
+    # Given the extra names of the richer chord list, When mapping, Then each lands on its app quality
+    assert to_harte("F#:sus4(b7)") == "F#:7sus4"
+    assert to_harte("G:sus4(b7,9)/2") == "G:9sus4/2"
+    assert to_harte("C:maj(9)") == "C:add2"
+    assert to_harte("C:maj(11)") == "C:add4"
+    assert to_harte("A:min(9)") == "A:minadd2"
+    assert to_harte("A:min(11)/b3") == "A:minadd4/b3"
+    assert to_harte("C:maj6(9)") == "C:69"
+    assert to_harte("C:min6(9)") == "C:min69"
+    assert to_harte("C:min11") == "C:min11"
+    assert to_harte("C:maj13") == "C:maj13"
 
 
 def test_to_harte_of_guitarset_performed_labels_strips_extensions_and_root_bass():
@@ -38,13 +53,13 @@ def test_to_harte_of_guitarset_performed_labels_strips_extensions_and_root_bass(
     assert to_harte("E:(1,5)/1") == "E:maj"
     assert to_harte("D:maj(2)/1") == "D:add2"
     assert to_harte("D:maj(11)/4") == "D:add4/4"
-    assert to_harte("D:sus4(b7)/1") == "D:7"
+    assert to_harte("D:sus4(b7)/1") == "D:7sus4"
 
 
 def test_to_harte_of_unknown_quality_raises():
     # Given a quality outside the §4.1 set, When mapping, Then it doesn't survive
     with pytest.raises(ValueError):
-        to_harte("C:maj13")
+        to_harte("C:foo")
 
 
 def test_merge_frames_merges_equal_consecutive_labels_with_mean_confidence():

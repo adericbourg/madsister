@@ -6,12 +6,18 @@ import statistics
 from madsister_engine.quantize import NO_CHORD, ChordSegment
 
 QUALITIES = {"maj", "min", "dim", "aug", "maj6", "min6", "7", "maj7", "min7", "minmaj7", "dim7", "hdim7", "sus2", "sus4"}
-QUALITIES |= {"add2", "add4"}  # the §4 extension (GuitarSet `maj(2)` / `maj(11)`)
+QUALITIES |= {"9", "maj9", "min9", "11", "13", "min11", "maj13"}
+QUALITIES |= {"add2", "add4", "minadd2", "minadd4", "7sus4", "9sus4", "69", "min69"}  # the §4 extensions
 
 
-# Extended qualities some models (and GuitarSet) emit, mapped to the nearest §4.1 quality (the bass is kept).
+# Extended qualities some models (and GuitarSet) emit, mapped to the app's quality (the bass is kept). Other
+# `(degree, ...)` lists are dropped by `to_harte`; a quality listed here wins over that.
 _DEGRADED = {
-    "9": "7", "11": "7", "13": "7", "sus4(b7)": "7", "maj9": "maj7", "min9": "min7", "maj(2)": "add2", "maj(11)": "add4"
+    "min13": "min11",
+    "sus4(b7)": "7sus4", "sus4(b7,9)": "9sus4",
+    "maj(2)": "add2", "maj(9)": "add2", "maj(4)": "add4", "maj(11)": "add4",
+    "min(2)": "minadd2", "min(9)": "minadd2", "min(4)": "minadd4", "min(11)": "minadd4",
+    "maj6(9)": "69", "min6(9)": "min69",
 }
 
 
