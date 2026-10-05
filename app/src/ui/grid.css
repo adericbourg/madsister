@@ -349,6 +349,11 @@
     break-after: page;
   }
 
+  /* A break after the last page would print a blank one. */
+  .print-page:last-child {
+    break-after: auto;
+  }
+
   /* WebKitGTK has no @page margin boxes, so the compact pages number themselves. */
   .page-number {
     grid-column: 1 / -1;
