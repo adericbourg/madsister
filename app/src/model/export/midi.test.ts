@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { QUALITIES } from "../chord";
 import type { Bar, Song } from "../song";
 import { toMidi } from "./midi";
 
@@ -73,4 +74,16 @@ test("toMidi_whenBarsHaveStartSec_followsTheRecordingAfterALeadingRest", () => {
   expect(hex(midi).match(/ff 58 04 0[24] 02/g)).toEqual([
     "ff 58 04 04 02", "ff 58 04 02 02", "ff 58 04 04 02", "ff 58 04 02 02", "ff 58 04 04 02",
   ]);
+});
+
+test("toMidi_ofEveryQuality_voicesAChordFromTheRoot", () => {
+  // Given one bar per quality
+  const song = {
+    version: 1,
+    meta: { title: "T", meter: { beats: 4, unit: 4 } },
+    sections: [{ id: "a", label: "A", bars: QUALITIES.map((quality) => bar([`C:${quality}`, 4])) }],
+  } as Song;
+
+  // When / Then: no quality lacks a voicing (it would throw)
+  expect(() => toMidi(song)).not.toThrow();
 });

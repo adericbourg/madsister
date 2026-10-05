@@ -6,12 +6,17 @@ import { playedBars } from "./bars";
 
 const KINDS: Record<string, string> = {
   maj: "major", min: "minor", aug: "augmented", dim: "diminished", sus2: "suspended-second", sus4: "suspended-fourth",
-  add2: "major", add4: "major", "7": "dominant", maj7: "major-seventh", min7: "minor-seventh", minmaj7: "major-minor",
+  add2: "major", add4: "major", minadd2: "minor", minadd4: "minor",
+  "7sus4": "suspended-fourth", "9sus4": "suspended-fourth", "69": "major-sixth", min69: "minor-sixth",
+  min11: "minor-11th", maj13: "major-13th", "7": "dominant", maj7: "major-seventh", min7: "minor-seventh", minmaj7: "major-minor",
   maj6: "major-sixth", min6: "minor-sixth", dim7: "diminished-seventh", hdim7: "half-diminished",
   "9": "dominant-ninth", maj9: "major-ninth", min9: "minor-ninth", "11": "dominant-11th", "13": "dominant-13th",
 };
 // Spelled like the app ("Bbadd2"), not as the equivalent add9/add11.
-const ADDED: Record<string, string> = { add2: "2", add4: "4" };
+const ADDED: Record<string, [value: number, alter: number][]> = {
+  add2: [[2, 0]], add4: [[4, 0]], minadd2: [[2, 0]], minadd4: [[4, 0]],
+  "7sus4": [[7, -1]], "9sus4": [[7, -1], [9, 0]], "69": [[9, 0]], min69: [[9, 0]],
+};
 
 const DIVISIONS = 2; // per quarter note, so an eighth-note beat is 1
 
@@ -28,13 +33,13 @@ const harmony = (harte: string): string | undefined => {
   const parsed = parseHarte(harte);
   if (!parsed) return undefined;
   const [, bass] = displayChord(harte, "intl").split("/");
-  const added = ADDED[parsed.quality];
+  const added = ADDED[parsed.quality] ?? [];
   return (
     `<harmony>${pitch("root", parsed.root)}<kind>${KINDS[parsed.quality]}</kind>` +
     (bass === undefined ? "" : pitch("bass", bass)) +
-    (added === undefined
-      ? ""
-      : `<degree><degree-value>${added}</degree-value><degree-alter>0</degree-alter><degree-type>add</degree-type></degree>`) +
+    added
+      .map(([value, alter]) => `<degree><degree-value>${value}</degree-value><degree-alter>${alter}</degree-alter><degree-type>add</degree-type></degree>`)
+      .join("") +
     "</harmony>"
   );
 };

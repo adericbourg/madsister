@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { QUALITIES } from "../chord";
 import type { Bar, Song } from "../song";
 import { toMusicXml } from "./musicxml";
 import golden from "./__golden__/song1.musicxml?raw";
@@ -46,4 +47,34 @@ test("toMusicXml_ofAHalfNoteUnitMeter_writesHalfNoteSlashes", () => {
   // Then
   expect(xml).toContain("<beats>3</beats><beat-type>2</beat-type>");
   expect(xml.match(/<type>half<\/type>/g)).toHaveLength(3);
+});
+
+test("toMusicXml_ofEveryQuality_writesAKindAndNoUndefined", () => {
+  // Given one bar per quality
+  const song = {
+    version: 1,
+    meta: { title: "T", meter: { beats: 4, unit: 4 } },
+    sections: [{ id: "a", label: "A", bars: QUALITIES.map((quality) => bar([`C:${quality}`, 4])) }],
+  } as Song;
+
+  // When
+  const xml = toMusicXml(song);
+
+  // Then
+  expect(xml).not.toContain("undefined");
+  expect(xml.match(/<harmony>/g)).toHaveLength(QUALITIES.length);
+});
+
+test("toMusicXml_ofA7sus4_addsTheFlatSeventh", () => {
+  // Given
+  const song = {
+    version: 1,
+    meta: { title: "T", meter: { beats: 4, unit: 4 } },
+    sections: [{ id: "a", label: "A", bars: [bar(["G:7sus4", 4])] }],
+  } as Song;
+
+  // When / Then
+  expect(toMusicXml(song)).toContain(
+    "<kind>suspended-fourth</kind><degree><degree-value>7</degree-value><degree-alter>-1</degree-alter><degree-type>add</degree-type></degree>",
+  );
 });

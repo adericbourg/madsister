@@ -23,6 +23,17 @@ const accepted: [string, string][] = [
   ["Cadd2", "C:add2"],
   ["Cadd11", "C:add4"],
   ["Cadd4", "C:add4"],
+  ["Amadd9", "A:minadd2"],
+  ["Am(add2)", "A:minadd2"],
+  ["Amadd11", "A:minadd4"],
+  ["Am(add4)", "A:minadd4"],
+  ["G7sus4", "G:7sus4"],
+  ["G9sus", "G:9sus4"],
+  ["C69", "C:69"],
+  ["C6(9)", "C:69"],
+  ["Cm69", "C:min69"],
+  ["Cm11", "C:min11"],
+  ["Cmaj13", "C:maj13"],
   ["C7", "C:7"],
   ["CmM7", "C:minmaj7"],
   ["C-Δ", "C:minmaj7"],
@@ -68,7 +79,7 @@ describe("parseChord", () => {
     expect(result).toEqual({ ok: true, harte });
   });
 
-  test.each([["H"], ["Cx7"], ["C/"], ["C/H"], [""], ["Cmaj7/E/G"], ["c"], ["Amadd9"]])(
+  test.each([["H"], ["Cx7"], ["C/"], ["C/H"], [""], ["Cmaj7/E/G"], ["c"], ["Cm(add13)"]])(
     "parseChord_of%s_returnsError",
     (input) => {
       // Given / When
@@ -79,14 +90,6 @@ describe("parseChord", () => {
       expect(!result.ok && result.error).toMatch(/\S/);
     },
   );
-
-  test("parseChord_ofMinorAddChord_explainsItIsNotSupported", () => {
-    // Given / When
-    const result = parseChord("Am(add9)");
-
-    // Then
-    expect(!result.ok && result.error).toMatch(/minor add/i);
-  });
 });
 
 describe("parseHarte", () => {

@@ -4,13 +4,15 @@ export type DisplayStyle = "fr" | "intl" | "latin";
 
 const FR: Record<string, string> = {
   maj: "", min: "m", aug: "+", dim: "°", sus2: "sus2", sus4: "sus4", add2: "add2", add4: "add4",
+  minadd2: "madd2", minadd4: "madd4", "7sus4": "7sus4", "9sus4": "9sus4", "69": "69", min69: "m69", min11: "m11",
+  maj13: "7M13",
   "7": "7", maj7: "7M", min7: "m7", minmaj7: "m7M", maj6: "6", min6: "m6", dim7: "°7", hdim7: "m7b5",
   "9": "9", maj9: "7M9", min9: "m9", "11": "11", "13": "13",
 };
 export const SUFFIXES: Record<DisplayStyle, Record<string, string>> = {
   fr: FR,
   latin: FR,
-  intl: { ...FR, maj7: "maj7", minmaj7: "m(maj7)", dim: "dim", dim7: "dim7", hdim7: "ø7", maj9: "maj9" },
+  intl: { ...FR, maj7: "maj7", minmaj7: "m(maj7)", dim: "dim", dim7: "dim7", hdim7: "ø7", maj9: "maj9", maj13: "maj13" },
 };
 
 const LATIN: Record<string, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
@@ -41,7 +43,9 @@ export const displayChord = (harte: string, style: DisplayStyle): string => {
 
 export const SPOKEN: Record<string, string> = {
   maj: "", min: " minor", aug: " augmented", dim: " diminished", sus2: " suspended 2", sus4: " suspended 4",
-  add2: " add 2", add4: " add 4", "7": " 7", maj7: " major 7", min7: " minor 7", minmaj7: " minor major 7",
+  add2: " add 2", add4: " add 4", minadd2: " minor add 2", minadd4: " minor add 4",
+  "7sus4": " 7 suspended 4", "9sus4": " 9 suspended 4", "69": " 6 9", min69: " minor 6 9", min11: " minor 11",
+  maj13: " major 13", "7": " 7", maj7: " major 7", min7: " minor 7", minmaj7: " minor major 7",
   maj6: " 6", min6: " minor 6", dim7: " diminished 7", hdim7: " half-diminished 7",
   "9": " 9", maj9: " major 9", min9: " minor 9", "11": " 11", "13": " 13",
 };

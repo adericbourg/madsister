@@ -8,6 +8,12 @@ const ALIASES: Record<string, string> = {
   "°": "dim", o: "dim", dim: "dim",
   sus: "sus4", sus4: "sus4", sus2: "sus2",
   add2: "add2", add9: "add2", add4: "add4", add11: "add4",
+  madd2: "minadd2", madd9: "minadd2", "m(add2)": "minadd2", "m(add9)": "minadd2", "-add9": "minadd2",
+  madd4: "minadd4", madd11: "minadd4", "m(add4)": "minadd4", "m(add11)": "minadd4",
+  "7sus4": "7sus4", "7sus": "7sus4", "9sus4": "9sus4", "9sus": "9sus4",
+  "69": "69", "6add9": "69", "6(9)": "69", m69: "min69", m6add9: "min69", "m6(9)": "min69",
+  m11: "min11", min11: "min11", "-11": "min11",
+  maj13: "maj13", "7M13": "maj13", M13: "maj13", "Δ13": "maj13",
   "7": "7",
   "7M": "maj7", maj7: "maj7", M7: "maj7", "Δ": "maj7", "Δ7": "maj7", ma7: "maj7",
   m7: "min7", min7: "min7", "-7": "min7",
@@ -42,11 +48,7 @@ export const parseChord = (input: string): ParseResult => {
   const [, root, alias, bassNote] = match;
   const quality = ALIASES[alias];
   if (quality === undefined) {
-    const isMinorAdd = /^(m|min|-)\(?add/.test(alias);
-    return {
-      ok: false,
-      error: isMinorAdd ? `minor add chords ("${alias}") aren't supported yet` : `unknown chord quality "${alias}"`,
-    };
+    return { ok: false, error: `unknown chord quality "${alias}"` };
   }
   if (bassNote === undefined) return { ok: true, harte: `${root}:${quality}` };
   if (!NOTE.test(bassNote)) return { ok: false, error: `bass "${bassNote}" isn't a note (A–G, optional # or b)` };
