@@ -1,7 +1,8 @@
 """Chord-CNN-LSTM large-vocabulary chord recognizer (spec §2.1). Needs the `chords-cnnlstm` dependency group.
 
 Code and weights come from a pinned archive of the upstream repo under `models_dir()`; the inference path mirrors its
-`chord_recognition.py` (5-model ensemble + HMM decoding over the `submission` chord dictionary, which has inversions).
+`chord_recognition.py` (5-model ensemble + HMM decoding), over `chord_list.txt`: upstream's `submission` dictionary
+(inversions) plus 6, m6, mMaj7, add, 6/9, 11 and 13 chords that `to_harte` maps to the app's qualities.
 """
 
 import contextlib
@@ -18,6 +19,7 @@ _REPO = (
     "481f4ce703f8822b99f4037e9104ba1760e21ea3",
     "d82917aac315be3b3b23d54b0a27a196d009b6c9d7a65f3d50c5939834c2c09e",
 )
+_CHORD_LIST = Path(__file__).with_name("chord_list.txt")  # absolute: upstream's cwd is its own repo while decoding
 _MODELS = [f"joint_chord_net_ismir_naive_v1.0_reweight(0.0,10.0)_s{i}.best" for i in range(5)]
 
 
@@ -51,7 +53,7 @@ def recognize(wav_path: str | Path) -> list[ChordSegment]:
         entry.append_extractor(CQTV2, "cqt")
         ensemble = [NetworkInterface(ChordNet(None), name).inference(entry.cqt) for name in _MODELS]
         probs = [np.mean(heads, axis=0) for heads in zip(*ensemble)]
-        hmm = XHMMDecoder(template_file="data/submission_chord_list.txt")
+        hmm = XHMMDecoder(template_file=str(_CHORD_LIST))
 
     names, logprob = hmm.get_chord_tag_obs(probs)
     labels = hmm.decode(probs, np.ones(len(logprob), dtype=np.int8))  # no beat constraint, as upstream by default

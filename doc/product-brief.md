@@ -52,8 +52,11 @@ Playback exists only to **verify** the transcription (hear it, see a cursor on t
 **Vocabulary gap (important):** the 14 qualities of the standard large vocabulary (MIREX/Harte-based) are
 `maj, min, dim, aug, maj6, min6, 7, maj7, min7, minmaj7, dim7, hdim7, sus2, sus4`.
 There is **no add2/add9 or add4/add11** class, although the user requires them.
-Consequence: off-the-shelf models can't recognize `add*` chords. v1 approach (decision D6):
-manual entry always works, and a **chroma post-processing heuristic** (§3.3 step 5b) is evaluated in M0 and shipped only if it passes.
+The Chord-CNN-LSTM adapter decodes over `engine/madsister_engine/chords/chord_list.txt` (upstream's `submission` list plus
+6, m6, mMaj7, add, 6/9, m11, maj13 templates) and `to_harte` maps them to the app's qualities (`minadd2`, `7sus4`, `69`…),
+but the network gives these classes almost no probability (see [M0 results](roadmap/m0-results.md)), so in practice
+manual entry remains the way to get them. v1 approach (decision D6): manual entry always works, and a **chroma
+post-processing heuristic** (§3.3 step 5b) is evaluated in M0 and shipped only if it passes.
 
 **Known limits (literature + tools):** rare chords are poorly classified (class imbalance). Downbeat and tempo
 detection is brittle (double/half tempo, wrong bar phase). Dense mixes degrade results.

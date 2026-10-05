@@ -81,6 +81,22 @@ guitar are a likely cause. With Demucs the numbers are the same (see the full ta
 | `window.print()` in the Tauri v2 webview (M1-13) | Works. On Linux (WebKitGTK) and Windows the native `window.print()` opens the print dialog. On macOS WKWebView has no `window.print()`, so Tauri's webview plugin injects a shim that calls `plugin:webview\|print`, which needs the `core:webview:allow-print` permission (not in `core:default`; added to `capabilities/default.json`). `printSong()` just calls `window.print()`. Not tried in a running app tonight (no display session). | tauri 2.12.0 `src/webview/plugin.rs` + `scripts/print.js`, https://github.com/tw93/Pake/issues/1396, https://github.com/tauri-apps/tauri/issues/3066 |
 | WebKitGTK/WKWebView `<audio>` (M3-1) | Plays through the platform media stack: AVFoundation on macOS (mp3, m4a, wav, flac natively; a blob needs its MIME type), GStreamer on Linux (`gstreamer1.0-plugins-base`/`-good` for wav/ogg/mp3/flac, `gstreamer1.0-libav` for m4a/AAC, AppImage `bundleMediaFramework`). GStreamer has no source for Tauri's `asset://` scheme, so `<audio src={convertFileSrc(…)}>` fails on Linux (`NotSupportedError`, `GST_CORE_ERROR_MISSING_PLUGIN`); blob URLs work. Decision: Rust `read_audio` returns the bytes, played as a typed blob on both platforms (no asset protocol). From docs and reports, not tried in a running app (no display session). | https://yanovskyy.com/blog/en/tauri-webkit, https://github.com/InstaZDLL/WaveFlow/pull/773, https://v2.tauri.app/distribute/appimage/ |
 
+## Richer chord list (Chord-CNN-LSTM)
+`chords/chord_list.txt` adds 12 templates (6, m6, mMaj7, `maj(9)`, `min(9)`, `maj(11)`, `min(11)`, `sus4(b7,9)`, `maj6(9)`,
+`min6(9)`, m11, maj13) to upstream's `submission` list, and `to_harte` keeps 9/11/13/maj9/min9 instead of degrading them.
+Same bench, `--combos madmom+cnnlstm`, 72 takes, before (`submission` list) and after:
+
+| chord list | edits /100 | edits, bass ignored | majmin | sevenths | tetrads |
+|---|---|---|---|---|---|
+| `submission` | 65.7 | 58.0 | 0.927 | 0.889 | 0.799 |
+| `chord_list.txt` | 65.7 | 58.0 | 0.927 | 0.889 | 0.799 |
+
+Identical on every take: none of the 1056 predicted slots uses a rich quality. On a probe take the decoder holds all 445
+states, but the best rich template never exceeds 0.06 of a frame's probability mass. The five ensemble networks were trained
+with the `submission` vocabulary and a reweighting that favors common classes, so the extra templates are reachable but
+never win on guitar. No regression, no gain: detecting rich chords would need a larger `diff_trans_penalty`/prior change
+in the decoder or a different model, to be tried on the user's own songs.
+
 ## Provisional decisions
 - **Default (`auto`) = madmom + Chord-CNN-LSTM, no Demucs, add2/add4 heuristic off.** Lowest edits (65.7/100) among the combos
   meeting NF-2 (~15 s per 4-min song estimated, 19 s measured). Set as the `auto` order in `engine/madsister_engine/pipeline.py`.
