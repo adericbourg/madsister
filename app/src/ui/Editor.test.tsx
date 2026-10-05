@@ -384,6 +384,8 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(function (this: HTMLMediaElement) {
     this.dispatchEvent(new Event("pause"));
   });
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
   vi.mocked(invoke).mockResolvedValue(new ArrayBuffer(8));
   const timed = (startSec?: number) => ({ startSec, chords: [{ chord: "C:maj", beats: 4 }] });
   const from = (): Song => ({
@@ -414,15 +416,17 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   currentTime = 2.5;
   await user.click(screen.getByRole("button", { name: "Play" }));
 
-  // Then only bar 2 is highlighted and the time shows
+  // Then only bar 2 is highlighted, scrolled into view, and the time shows
   await vi.waitFor(() => expect(barOf(2).classList).toContain("is-playing"));
   expect(document.querySelectorAll(".is-playing")).toHaveLength(1);
+  expect(scrollIntoView.mock.contexts.at(-1)).toBe(barOf(2));
   expect(transport.textContent).toContain("0:02");
 
-  // When the audio reaches 6.1 s, Then the cursor skips the manual bar 4 and goes to bar 5
+  // When the audio reaches 6.1 s, Then the cursor skips the manual bar 4 and goes to bar 5, which the view follows
   currentTime = 6.1;
   await vi.waitFor(() => expect(barOf(5).classList).toContain("is-playing"));
   expect(barOf(4).classList).not.toContain("is-playing");
+  expect(scrollIntoView.mock.contexts.at(-1)).toBe(barOf(5));
 
   // When pressing Space in the grid, Then it pauses and the edit cursor stays on bar 1
   barOf(1).querySelector<HTMLElement>('[tabindex="0"]')!.focus();
@@ -470,6 +474,7 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   vi.mocked(HTMLMediaElement.prototype.pause).mockClear();
   unmount();
   expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+  delete (Element.prototype as Partial<Element>).scrollIntoView;
 });
 
 test("Editor_whenPickingASectionByName_editsThatSection", async () => {

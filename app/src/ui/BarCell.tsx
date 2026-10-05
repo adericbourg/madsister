@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { BarRef, SlotRef } from "../model/commands";
 import { displayChord, speakChord, type DisplayStyle } from "../model/display";
 import { displayNashville, speakNashville } from "../model/nashville";
@@ -28,9 +28,15 @@ export const BarCell = ({ bar, at, sectionLabel, style, tonic, tabStop, playing,
   const isSelected = selection?.section === at.section && at.bar >= selection.from && at.bar <= selection.to;
   const isPlaying = playing?.section === at.section && playing.bar === at.bar;
   const meter = bar.meter && `${bar.meter.beats}/${bar.meter.unit}`;
+  const ref = useRef<HTMLDivElement>(null);
+  // Follows the playback: "nearest" leaves a visible bar alone, so the view only moves when the highlight would leave it.
+  useEffect(() => {
+    if (isPlaying) ref.current!.scrollIntoView({ block: "nearest" });
+  }, [isPlaying]);
   let beat = 1;
   return (
     <div
+      ref={ref}
       className={`bar${isSelected ? " is-selected" : ""}${isPlaying ? " is-playing" : ""}`}
       onContextMenu={
         onContextMenu &&

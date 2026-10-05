@@ -183,6 +183,11 @@ nav details li button {
   background: #fff;
 }
 
+/* A bar scrolled into view while playing stops below the transport, not under it. */
+.content .bar {
+  scroll-margin-top: 4.5rem;
+}
+
 aside {
   flex: none;
   box-sizing: border-box;
