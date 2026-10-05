@@ -4,6 +4,12 @@ import type { DisplayStyle } from "../model/display";
 import type { Section } from "../model/song";
 import { BarCell } from "./BarCell";
 
+/** What a right-click landed on: a chord, the line between bars `bar - 1` and `bar` of a section, or a section label. */
+export type MenuTarget =
+  | { kind: "slot"; ref: SlotRef }
+  | { kind: "separator"; section: number; bar: number }
+  | { kind: "section"; index: number };
+
 export type Selection = { section: number; from: number; to: number } | undefined;
 
 type Props = {
@@ -19,9 +25,10 @@ type Props = {
   editor: ReactNode;
   onCellClick?: (ref: SlotRef) => void;
   onSectionClick?: (index: number) => void;
+  onContextMenu?: (target: MenuTarget) => void;
 };
 
-export const SectionBlock = ({ section, index, barsPerRow, onSectionClick, ...cell }: Props) => {
+export const SectionBlock = ({ section, index, barsPerRow, onSectionClick, onContextMenu, ...cell }: Props) => {
   const repeat = section.repeat ?? 1;
   const rows = Array.from({ length: Math.ceil(section.bars.length / barsPerRow) }, (_, r) => r * barsPerRow);
   return (
@@ -31,7 +38,17 @@ export const SectionBlock = ({ section, index, barsPerRow, onSectionClick, ...ce
       aria-label={repeat > 1 ? `${section.label}, ${repeat} times` : section.label}
     >
       <div className="section-header" aria-hidden="true">
-        <span className="section-label" onClick={() => onSectionClick?.(index)}>
+        <span
+          className="section-label"
+          onClick={() => onSectionClick?.(index)}
+          onContextMenu={
+            onContextMenu &&
+            ((e) => {
+              e.preventDefault();
+              onContextMenu({ kind: "section", index });
+            })
+          }
+        >
           {section.label}
         </span>
         {repeat > 1 && <span className="section-repeat">x{repeat}</span>}
@@ -39,7 +56,7 @@ export const SectionBlock = ({ section, index, barsPerRow, onSectionClick, ...ce
       {rows.map((start) => (
         <div role="row" key={start} className="bar-row" style={{ gridTemplateColumns: `repeat(${barsPerRow}, 1fr)` }}>
           {section.bars.slice(start, start + barsPerRow).map((bar, i) => (
-            <BarCell key={start + i} bar={bar} at={{ section: index, bar: start + i }} sectionLabel={section.label} {...cell} />
+            <BarCell key={start + i} bar={bar} at={{ section: index, bar: start + i }} sectionLabel={section.label} onContextMenu={onContextMenu} {...cell} />
           ))}
         </div>
       ))}

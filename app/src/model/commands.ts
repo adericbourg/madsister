@@ -151,6 +151,14 @@ export const splitSection = (song: Song, ref: BarRef): Song => {
   return { ...song, sections: song.sections.toSpliced(ref.section, 1, head, tail) };
 };
 
+/** The inverse of `splitSection`: the section's bars join the previous section, which keeps its label and repeat count. */
+export const mergeWithPrevious = (song: Song, index: number): Song => {
+  const section = at(song.sections, index, "section");
+  const previous = at(song.sections, index - 1, "previous section");
+  const merged = { ...previous, bars: [...previous.bars, ...section.bars] };
+  return { ...song, sections: song.sections.toSpliced(index - 1, 2, merged) };
+};
+
 /** `n <= 1` removes the repeat count. */
 export const setRepeat = (song: Song, index: number, n: number): Song =>
   updateSection(song, index, ({ repeat: _, ...section }) => (n > 1 ? { ...section, repeat: n } : section));

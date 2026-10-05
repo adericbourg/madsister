@@ -2,7 +2,7 @@ import { useEffect, useRef, type KeyboardEventHandler, type ReactNode } from "re
 import type { BarRef, SlotRef } from "../model/commands";
 import { displayKey, type DisplayStyle } from "../model/display";
 import type { Song } from "../model/song";
-import { SectionBlock, type Selection } from "./SectionBlock";
+import { SectionBlock, type MenuTarget, type Selection } from "./SectionBlock";
 import "./grid.css";
 
 type Props = {
@@ -23,9 +23,11 @@ type Props = {
   onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
   onCellClick?: (ref: SlotRef) => void;
   onSectionClick?: (index: number) => void;
+  /** Right-click on a chord, a bar line or a section label; the browser menu is only suppressed when set. */
+  onContextMenu?: (target: MenuTarget) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, onKeyDown, onCellClick, onSectionClick }: Props) => {
+export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, onKeyDown, onCellClick, onSectionClick, onContextMenu }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
@@ -66,6 +68,7 @@ export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, l
             editor={editor}
             onCellClick={onCellClick}
             onSectionClick={onSectionClick}
+            onContextMenu={onContextMenu}
           />
         ))}
       </div>

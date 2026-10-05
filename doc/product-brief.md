@@ -220,7 +220,7 @@ Rules:
 - **F-ED-4** Split a bar (add a slot) / merge slots / change slot duration in beats (integers only).
 - **F-ED-11** (M2) Set a per-bar meter override (e.g. a single 2/4 bar in a 4/4 song).
 - **F-ED-5** Insert, delete, duplicate bars. Copy/paste bar ranges, including across sections.
-- **F-ED-6** Create, rename, reorder, delete sections. Split a section at a bar. Set a repeat count.
+- **F-ED-6** Create, rename, reorder, delete sections. Split a section at a bar, merge it with the previous one. Bar and section actions are also in a right-click menu. Set a repeat count.
 - **F-ED-7** Undo/redo for every edit (unlimited within the session).
 - **F-ED-8** Low-confidence chords (below a threshold, default 0.5) are visually flagged. Editing a chord clears its flag.
 - **F-ED-9** Transpose the whole song ±N semitones, with sharp/flat spelling choice.

@@ -1,13 +1,15 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Menu } from "@tauri-apps/api/menu";
 import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
-import { addSection, deleteSection, doubleTempo, halveTempo, moveSection, removeSlot, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, splitSlot, type BarRef, type SlotRef } from "../model/commands";
+import { addSection, deleteSection, doubleTempo, halveTempo, insertBar, mergeWithPrevious, moveSection, removeSlot, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, splitSection, splitSlot, type BarRef, type SlotRef } from "../model/commands";
 import { displayChord, type DisplayStyle } from "../model/display";
 import { displayNashville, parseNashville, tonicPc, type MinorConvention } from "../model/nashville";
 import { barAtTime } from "../model/playback";
 import type { Bar, Song } from "../model/song";
 import { confirmDeleteSection } from "./fileActions";
 import { Grid } from "./Grid";
+import type { MenuTarget } from "./SectionBlock";
 import { Field } from "./Toolbar";
 import { clampCursor, countFlagged, hasConfidence, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
 import type { useHistory } from "./useHistory";
@@ -171,6 +173,42 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
     } catch (e) {
       setNotice((e as Error).message);
     }
+  };
+
+  // Right-click menu (F-ED-6): only offers what cannot throw, since history.apply runs in a reducer.
+  const openMenu = (target: MenuTarget) => {
+    const run = (fn: (s: Song) => Song, to: SlotRef) => () => {
+      history.apply(fn);
+      setCursor(to);
+      setAnchor(null);
+    };
+    const item = (text: string, action: () => void, enabled = true) => ({ text, action, enabled });
+    let items;
+    if (target.kind === "slot") {
+      const { ref } = target;
+      items = [
+        item("Split", run((s) => splitSlot(s, ref), { ...ref, slot: ref.slot + 1 }), song.sections[ref.section].bars[ref.bar].chords[ref.slot].beats > 1),
+        item("Add empty bar before", run((s) => insertBar(s, ref, "before"), { ...ref, slot: 0 })),
+        item("Add empty bar after", run((s) => insertBar(s, ref, "after"), { ...ref, bar: ref.bar + 1, slot: 0 })),
+      ];
+      setCursor(ref);
+    } else if (target.kind === "separator") {
+      const at = { section: target.section, bar: target.bar };
+      const count = song.sections[at.section].bars.length;
+      items = [
+        item("Split section here", run((s) => splitSection(s, at), { section: at.section + 1, bar: 0, slot: 0 }), at.bar > 0 && at.bar < count),
+        // `bar` may equal the bar count (the line closing the section), which appends.
+        item("Add empty bar here", run((s) => insertBar(s, at, "before"), { ...at, slot: 0 })),
+      ];
+      setCursor({ ...at, bar: Math.min(at.bar, Math.max(count - 1, 0)), slot: 0 });
+    } else {
+      const { index } = target;
+      const before = index > 0 ? song.sections[index - 1].bars.length : 0;
+      items = [item("Merge with previous section", run((s) => mergeWithPrevious(s, index), { section: index - 1, bar: before, slot: 0 }), index > 0)];
+      setCursor({ section: index, bar: 0, slot: 0 });
+    }
+    setDraft(null);
+    void Menu.new({ items }).then((menu) => menu.popup());
   };
 
   const closeHelp = () => {
@@ -356,6 +394,7 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
         editor={editor}
         onKeyDown={onKeyDown}
         onSectionClick={selectSection}
+        onContextMenu={isEditable ? openMenu : undefined}
         onCellClick={(ref) => {
           const startSec = song.sections[ref.section].bars[ref.bar].startSec;
           if (startSec !== undefined) player.seek(startSec);

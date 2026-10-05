@@ -11,6 +11,14 @@ import { useHistory } from "./useHistory";
 vi.mock("@tauri-apps/plugin-dialog", () => ({ confirm: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
+type MenuItem = { text: string; enabled: boolean; action: () => void };
+let menuItems: MenuItem[] = [];
+const menuNew = vi.fn(async ({ items }: { items: MenuItem[] }) => {
+  menuItems = items;
+  return { popup: vi.fn() };
+});
+vi.mock("@tauri-apps/api/menu", () => ({ Menu: { new: (o: { items: MenuItem[] }) => menuNew(o) } }));
+
 afterEach(cleanup);
 
 let song: Song | undefined;
@@ -507,4 +515,84 @@ test("Editor_whenClearingTheChordOfASplitSlot_removesTheSubdivision", async () =
   await user.clear(screen.getByRole("textbox", { name: "Chord" }));
   await user.keyboard("{Enter}");
   expect(song?.sections[0].bars[0]).toEqual(bar(["C:maj", 4]));
+});
+
+const menuFixture = () => ({ ...emptySong(), sections: [{ id: "v", label: "Verse", bars: [bar(["C:maj", 4]), bar(["G:maj", 1], ["D:maj", 1])] }, { id: "c", label: "Chorus", bars: [bar(["A:min", 4])] }] });
+const texts = () => menuItems.map((i) => `${i.text}${i.enabled ? "" : " (off)"}`);
+const labels = () => song?.sections.map((s) => `${s.label}:${s.bars.length}`);
+
+test("Editor_rightClickOnAChord_offersSplitAndBarInsertion", async () => {
+  // Given a 4-beat chord and a bar of two 1-beat chords
+  render(<Harness mode="edit" from={menuFixture} />);
+  // jsdom has no layout: give every bar a 100px width so that x = 50 is in the middle
+  const sizeBars = () => document.querySelectorAll<HTMLElement>(".bar").forEach((b) => (b.getBoundingClientRect = () => ({ left: 0, right: 100 }) as DOMRect));
+  sizeBars();
+
+  // When right-clicking the 4-beat chord, Then the chord can be split and bars added
+  fireEvent.contextMenu(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }), { clientX: 50 });
+  await vi.waitFor(() => expect(menuItems.length).toBe(3));
+  expect(texts()).toEqual(["Split", "Add empty bar before", "Add empty bar after"]);
+
+  // When running "Add empty bar after", Then the section has one more bar
+  menuItems[2].action();
+  await vi.waitFor(() => expect(labels()).toEqual(["Verse:3", "Chorus:1"]));
+
+  // When right-clicking a 1-beat chord, Then Split is disabled
+  sizeBars();
+  fireEvent.contextMenu(screen.getByRole("gridcell", { name: "Verse, bar 3, beat 1: G" }), { clientX: 50 });
+  await vi.waitFor(() => expect(texts()[0]).toBe("Split (off)"));
+});
+
+test("Editor_rightClickOnABarLine_offersToSplitTheSectionOrAddABar", async () => {
+  // Given a section of two bars, each rendered 100px wide in the test
+  render(<Harness mode="edit" from={menuFixture} />);
+  const second = screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }).closest(".bar") as HTMLElement;
+  second.getBoundingClientRect = () => ({ left: 100, right: 200 }) as DOMRect;
+
+  // When right-clicking its left line, Then the section can be split between the two bars
+  fireEvent.contextMenu(second, { clientX: 102 });
+  await vi.waitFor(() => expect(texts()).toEqual(["Split section here", "Add empty bar here"]));
+  menuItems[0].action();
+  await vi.waitFor(() => expect(labels()).toEqual(["Verse:1", "Verse (2):1", "Chorus:1"]));
+});
+
+test("Editor_rightClickOnTheFirstBarsLeftLine_cannotSplitTheSection", async () => {
+  // Given
+  render(<Harness mode="edit" from={menuFixture} />);
+  const first = screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }).closest(".bar") as HTMLElement;
+  first.getBoundingClientRect = () => ({ left: 0, right: 100 }) as DOMRect;
+
+  // When
+  fireEvent.contextMenu(first, { clientX: 1 });
+
+  // Then
+  await vi.waitFor(() => expect(texts()).toEqual(["Split section here (off)", "Add empty bar here"]));
+});
+
+test("Editor_rightClickOnASectionLabel_offersToMergeWithThePreviousOne", async () => {
+  // Given
+  render(<Harness mode="edit" from={menuFixture} />);
+
+  // When right-clicking the first label, Then merging is disabled
+  fireEvent.contextMenu(screen.getByText("Verse", { selector: ".section-label" }));
+  await vi.waitFor(() => expect(texts()).toEqual(["Merge with previous section (off)"]));
+
+  // When merging the second one, Then it joins the first
+  fireEvent.contextMenu(screen.getByText("Chorus", { selector: ".section-label" }));
+  await vi.waitFor(() => expect(texts()).toEqual(["Merge with previous section"]));
+  menuItems[0].action();
+  await vi.waitFor(() => expect(labels()).toEqual(["Verse:3"]));
+});
+
+test("Editor_rightClickInViewMode_leavesTheBrowserMenu", () => {
+  // Given
+  menuNew.mockClear();
+  render(<Harness mode="view" from={menuFixture} />);
+
+  // When
+  const proceeded = fireEvent.contextMenu(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }));
+
+  // Then
+  expect(proceeded).toBe(true);
+  expect(menuNew).not.toHaveBeenCalled();
 });

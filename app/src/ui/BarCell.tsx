@@ -3,7 +3,7 @@ import type { BarRef, SlotRef } from "../model/commands";
 import { displayChord, speakChord, type DisplayStyle } from "../model/display";
 import { displayNashville, speakNashville } from "../model/nashville";
 import type { Bar } from "../model/song";
-import type { Selection } from "./SectionBlock";
+import type { MenuTarget, Selection } from "./SectionBlock";
 
 type Props = {
   bar: Bar;
@@ -18,15 +18,34 @@ type Props = {
   selection: Selection;
   editor: ReactNode;
   onCellClick?: (ref: SlotRef) => void;
+  onContextMenu?: (target: MenuTarget) => void;
 };
 
-export const BarCell = ({ bar, at, sectionLabel, style, tonic, tabStop, playing, lowConfidenceThreshold, selection, editor, onCellClick }: Props) => {
+/** Bar lines are borders, not elements: a right-click this close to a bar's edge is on the line. */
+const LINE_REACH_PX = 6;
+
+export const BarCell = ({ bar, at, sectionLabel, style, tonic, tabStop, playing, lowConfidenceThreshold, selection, editor, onCellClick, onContextMenu }: Props) => {
   const isSelected = selection?.section === at.section && at.bar >= selection.from && at.bar <= selection.to;
   const isPlaying = playing?.section === at.section && playing.bar === at.bar;
   const meter = bar.meter && `${bar.meter.beats}/${bar.meter.unit}`;
   let beat = 1;
   return (
-    <div className={`bar${isSelected ? " is-selected" : ""}${isPlaying ? " is-playing" : ""}`}>
+    <div
+      className={`bar${isSelected ? " is-selected" : ""}${isPlaying ? " is-playing" : ""}`}
+      onContextMenu={
+        onContextMenu &&
+        ((e) => {
+          e.preventDefault();
+          const { left, right } = e.currentTarget.getBoundingClientRect();
+          if (e.clientX - left <= LINE_REACH_PX) return onContextMenu({ kind: "separator", section: at.section, bar: at.bar });
+          if (right - e.clientX <= LINE_REACH_PX) return onContextMenu({ kind: "separator", section: at.section, bar: at.bar + 1 });
+          // The slot under the pointer; a click on the bar's padding (meter label) falls back to its first slot.
+          const slot = (e.target as HTMLElement).closest<HTMLElement>('[role="gridcell"]');
+          const index = slot ? Array.from(e.currentTarget.querySelectorAll('[role="gridcell"]')).indexOf(slot) : 0;
+          onContextMenu({ kind: "slot", ref: { ...at, slot: Math.max(index, 0) } });
+        })
+      }
+    >
       {meter && (
         <span className="bar-meter" aria-hidden="true">
           {meter}

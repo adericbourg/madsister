@@ -8,6 +8,7 @@ import {
   duplicateBar,
   halveTempo,
   insertBar,
+  mergeWithPrevious,
   mergeSlotWithNext,
   moveSection,
   pasteBars,
@@ -371,6 +372,36 @@ describe("section commands", () => {
     expect(atLast.sections[1].id).not.toBe(song.sections[0].id);
     expect(chords(atFirst, 0)).toEqual([]);
     expect(chords(atFirst, 1)).toEqual(["A:min E:7", "C:maj"]);
+  });
+});
+
+describe("mergeWithPrevious", () => {
+  test("mergeWithPrevious_appendsTheBarsAndKeepsThePreviousLabelAndRepeat", () => {
+    // Given Verse (2 bars) and Chorus x2 (2 bars)
+    const song = fixture();
+
+    // When
+    const result = checkSong(song, mergeWithPrevious(song, 1));
+
+    // Then
+    expect(labels(result)).toEqual(["Verse"]);
+    expect(chords(result, 0)).toEqual(["A:min E:7", "C:maj", "G:maj", "F:maj"]);
+    expect(result.sections[0].repeat).toBe(song.sections[0].repeat);
+  });
+
+  test("mergeWithPrevious_afterSplitSection_restoresTheBars", () => {
+    // Given
+    const song = fixture();
+
+    // When
+    const result = mergeWithPrevious(splitSection(song, { section: 0, bar: 1 }), 1);
+
+    // Then
+    expect(result.sections[0].bars).toEqual(song.sections[0].bars);
+  });
+
+  test("mergeWithPrevious_onTheFirstSection_throws", () => {
+    expect(() => mergeWithPrevious(fixture(), 0)).toThrow(/no previous section/);
   });
 });
 
