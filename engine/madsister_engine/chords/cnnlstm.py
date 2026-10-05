@@ -16,6 +16,7 @@ _REPO = (
     "chord-cnn-lstm",
     "https://github.com/music-x-lab/ISMIR2019-Large-Vocabulary-Chord-Recognition",
     "481f4ce703f8822b99f4037e9104ba1760e21ea3",
+    "d82917aac315be3b3b23d54b0a27a196d009b6c9d7a65f3d50c5939834c2c09e",
 )
 _MODELS = [f"joint_chord_net_ismir_naive_v1.0_reweight(0.0,10.0)_s{i}.best" for i in range(5)]
 

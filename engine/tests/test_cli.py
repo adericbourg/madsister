@@ -206,8 +206,8 @@ def test_main_of_setup_when_run_twice_downloads_default_models_once(monkeypatch,
 
     # Given the default chord model's repo archive, and an empty models dir
     upstream = tmp_path / "upstream"
-    _publish_archive(upstream, "abc123", {"model.sdict": b"weights"})
-    monkeypatch.setattr(cnnlstm, "_REPO", ("chord-cnn-lstm", upstream.as_uri(), "abc123"))
+    sha256 = _publish_archive(upstream, "abc123", {"model.sdict": b"weights"})
+    monkeypatch.setattr(cnnlstm, "_REPO", ("chord-cnn-lstm", upstream.as_uri(), "abc123", sha256))
     monkeypatch.setattr(pipeline, "_installed", lambda module: True)
     monkeypatch.setenv("MADSISTER_MODELS_DIR", str(tmp_path / "models"))
 

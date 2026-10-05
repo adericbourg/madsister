@@ -10,7 +10,12 @@ from madsister_engine.chords.labels import merge_frames, to_harte
 from madsister_engine.models import ensure_repo
 from madsister_engine.quantize import ChordSegment
 
-_REPO = ("btc-ismir19", "https://github.com/jayg996/BTC-ISMIR19", "2682317be668032e6e4b269ded36adaa2ad57df0")
+_REPO = (
+    "btc-ismir19",
+    "https://github.com/jayg996/BTC-ISMIR19",
+    "2682317be668032e6e4b269ded36adaa2ad57df0",
+    "2298b4f3230e249b5f1958a9bca8aabc241115b989697d72c0d43fe3926d1ee6",
+)
 _NUM_CHORDS = 170  # large vocabulary: 12 roots x 14 qualities + X + N
 
 
