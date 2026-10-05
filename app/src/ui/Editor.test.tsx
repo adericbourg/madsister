@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { confirm } from "@tauri-apps/plugin-dialog";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -499,7 +499,7 @@ test("Editor_whenPickingASectionByName_editsThatSection", async () => {
   expect(song?.sections.map((s) => s.label)).toEqual(["Intro", "Chorus"]);
 
   // When clicking the intro's name in the grid, Then the panel follows
-  await user.click(screen.getByText("Intro", { selector: ".section-label" }));
+  await user.click(within(screen.getByRole("grid")).getByText("Intro", { selector: ".section-label" }));
   expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("Intro");
 });
 
@@ -574,11 +574,11 @@ test("Editor_rightClickOnASectionLabel_offersToMergeWithThePreviousOne", async (
   render(<Harness mode="edit" from={menuFixture} />);
 
   // When right-clicking the first label, Then merging is disabled
-  fireEvent.contextMenu(screen.getByText("Verse", { selector: ".section-label" }));
+  fireEvent.contextMenu(within(screen.getByRole("grid")).getByText("Verse", { selector: ".section-label" }));
   await vi.waitFor(() => expect(texts()).toEqual(["Merge with previous section (off)"]));
 
   // When merging the second one, Then it joins the first
-  fireEvent.contextMenu(screen.getByText("Chorus", { selector: ".section-label" }));
+  fireEvent.contextMenu(within(screen.getByRole("grid")).getByText("Chorus", { selector: ".section-label" }));
   await vi.waitFor(() => expect(texts()).toEqual(["Merge with previous section"]));
   menuItems[0].action();
   await vi.waitFor(() => expect(labels()).toEqual(["Verse:3"]));

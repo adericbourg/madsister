@@ -262,22 +262,6 @@
   @page {
     size: A4;
     margin: 12mm;
-
-    /* Margin boxes: Chromium webviews only; elsewhere the page number is simply absent. */
-    @bottom-right {
-      content: counter(page) " / " counter(pages);
-    }
-  }
-
-  /* Compact pages print their own number (.page-number). */
-  @page compact {
-    @bottom-right {
-      content: none;
-    }
-  }
-
-  .compact-print {
-    page: compact;
   }
 
   nav,
@@ -292,10 +276,6 @@
   .chart {
     max-width: none;
     padding: 0;
-  }
-
-  .section {
-    break-inside: avoid;
   }
 
   .section.is-current .section-label {
@@ -333,20 +313,24 @@
     font-size: 1.4rem;
   }
 
-  /* WebKitGTK prints CSS columns as one, so compactPages() lays out the pages; each line is 9mm, as it assumes. */
-  .compact-print .grid {
+  /* WebKitGTK prints CSS columns as one and has no @page margin boxes for page numbers, so printPages() lays out
+     the pages; each line is 15mm, 9mm in compact print, as it assumes. */
+  .grid {
     display: none;
   }
 
-  .compact-print .print-pages {
+  .print-pages {
     display: block;
   }
 
   .print-page {
     display: grid;
+    break-after: page;
+  }
+
+  .compact-print .print-page {
     grid-template-columns: 1fr 1fr;
     column-gap: 20mm;
-    break-after: page;
   }
 
   /* A break after the last page would print a blank one. */
@@ -354,7 +338,6 @@
     break-after: auto;
   }
 
-  /* WebKitGTK has no @page margin boxes, so the compact pages number themselves. */
   .page-number {
     grid-column: 1 / -1;
     margin: 0 0 2mm;
@@ -383,8 +366,13 @@
   .print-page .section-header,
   .print-page .bar-row {
     box-sizing: border-box;
-    height: 7mm;
+    height: 13mm;
     margin: 0 0 2mm;
+  }
+
+  .compact-print .print-page .section-header,
+  .compact-print .print-page .bar-row {
+    height: 7mm;
   }
 
   .print-page .section-header {

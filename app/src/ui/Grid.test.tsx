@@ -31,12 +31,12 @@ test("Grid_ofSong_rendersSectionedChart", () => {
   expect(screen.getByText("Kenny Dorham")).toBeDefined();
   expect(screen.getByText("Cm")).toBeDefined();
   expect(screen.getByText("♩ = 120")).toBeDefined();
-  expect(screen.getByText("Verse")).toBeDefined();
-  expect(screen.getByText("x2")).toBeDefined();
-  expect(screen.getByText("No bars yet")).toBeDefined();
+  expect(within(screen.getByRole("grid")).getByText("Verse")).toBeDefined();
+  expect(within(screen.getByRole("grid")).getByText("x2")).toBeDefined();
+  expect(within(screen.getByRole("grid")).getByText("No bars yet")).toBeDefined();
 
   // And a bar with a meter override shows it, also to screen readers
-  expect(screen.getByText("2/4")).toBeDefined();
+  expect(within(screen.getByRole("grid")).getByText("2/4")).toBeDefined();
   expect(screen.getByRole("gridcell", { name: "Verse, bar 4 in 2/4, beat 1: D 7" })).toBeDefined();
 
   // And bars are laid out in rows of barsPerRow: Verse takes 2 rows
