@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
@@ -11,6 +12,14 @@ import { transcribe } from "./ui/engine";
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), writeFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
+// jsdom has no modal <dialog>: only expose it in the accessibility tree while open
+HTMLDialogElement.prototype.showModal = function () {
+  this.setAttribute("open", "");
+};
+HTMLDialogElement.prototype.close = function () {
+  this.removeAttribute("open");
+};
 vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn(), engineNeedsSetup: async () => false, engineHasSections: async () => true }));
 const drop = vi.hoisted(() => ({ handler: (_: { payload: unknown }) => {} }));
 vi.mock("@tauri-apps/api/webview", () => ({
@@ -238,17 +247,31 @@ test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {
   vi.useRealTimers();
 });
 
-test("App_onStart_listsTheFontCreditsInTheAboutMenu", async () => {
+test("App_onAboutClick_opensADialogWithAuthorModelAndFontCreditsThenTheRepoLink", async () => {
   // Given the app just started, with no song
   const user = userEvent.setup();
   render(<App />);
+  expect(screen.queryByRole("dialog")).toBeNull();
 
-  // When opening the About menu
-  await user.click(screen.getByText("About"));
+  // When opening About
+  await user.click(screen.getByRole("button", { name: "About" }));
 
-  // Then every chart font is credited with its license and source
-  for (const font of ["Patrick Hand", "Kalam", "Petaluma"]) expect(screen.getByRole("link", { name: font })).toBeDefined();
-  expect(screen.getAllByText(/SIL Open Font License/)).toHaveLength(3);
+  // Then a dialog credits the author, the models and every chart font, ending with the repo link
+  const dialog = screen.getByRole("dialog", { name: "About madsister" });
+  expect(dialog.textContent).toContain("Alban Dericbourg");
+  for (const name of ["madmom", "all-in-one", "Demucs", "BTC", "Chord-CNN-LSTM", "Patrick Hand", "Kalam", "Petaluma"])
+    expect(within(dialog).getByRole("link", { name })).toBeDefined();
+  expect(within(dialog).getAllByText(/SIL Open Font License/)).toHaveLength(3);
+  const links = within(dialog).getAllByRole("link");
+  expect(links[links.length - 1].getAttribute("href")).toBe("https://github.com/adericbourg/madsister");
+
+  // When clicking a link, then it opens in the system browser
+  await user.click(links[links.length - 1]);
+  expect(openUrl).toHaveBeenCalledWith("https://github.com/adericbourg/madsister");
+
+  // When closing the dialog, then it is gone
+  await user.click(within(dialog).getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
 
 test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings", async () => {
@@ -419,7 +442,9 @@ test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () =>
   }
 
   // Then every enabled control and the grid's single tab stop were focused
-  const controls = document.querySelectorAll('button:not([disabled]), input, select:not([disabled]), summary, [tabindex="0"]');
+  const controls = [...document.querySelectorAll('button:not([disabled]), input, select:not([disabled]), summary, [tabindex="0"]')].filter(
+    (control) => !control.closest("dialog:not([open])"),
+  );
   expect(controls.length).toBeGreaterThan(15);
   for (const control of controls) expect(reached).toContain(control);
 });

@@ -122,6 +122,17 @@ nav details {
   position: relative;
 }
 
+dialog.about {
+  max-width: 36rem;
+  max-height: 90vh;
+  padding: 0;
+  color: #000;
+  background: #fff;
+  border: 2px solid #000;
+}
+dialog.about > div { padding: 1rem 1.5rem; }
+dialog.about::backdrop { background: rgb(0 0 0 / 0.4); }
+
 nav details ul {
   position: absolute;
   z-index: 2;
