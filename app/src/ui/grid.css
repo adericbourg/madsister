@@ -244,6 +244,10 @@
 }
 
 /* Screen-reader-only text (the grid's live region). */
+.print-pages {
+  display: none;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -318,27 +322,39 @@
     font-size: 1.4rem;
   }
 
+  /* WebKitGTK prints CSS columns as one, so compactPages() lays out the pages; each line is 9mm, as it assumes. */
   .compact-print .grid {
-    columns: 2;
+    display: none;
+  }
+
+  .compact-print .print-pages {
+    display: block;
+  }
+
+  .print-page {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     column-gap: 8mm;
+    break-after: page;
   }
 
-  /* A section kept whole would stay in the first column (a song without detected sections is a single one), so split between rows. */
-  .compact-print .section {
-    break-inside: auto;
-    margin-bottom: 1rem;
+  .print-page .section {
+    margin: 0;
   }
 
-  .compact-print .section-header {
-    break-after: avoid;
+  .print-page .section-header,
+  .print-page .bar-row {
+    box-sizing: border-box;
+    height: 7mm;
+    margin: 0 0 2mm;
   }
 
-  .compact-print .bar-row {
-    break-inside: avoid;
+  .print-page .section-header {
+    align-items: flex-end;
   }
 
   .compact-print .bar {
-    min-height: 2rem;
+    min-height: 0;
   }
 
   .compact-print .slot {
