@@ -77,8 +77,11 @@ export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, l
       </div>
       {compactPrint && (
         <div className="print-pages" aria-hidden="true">
-          {compactPages(song.sections, barsPerRow).map((page, p) => (
+          {compactPages(song.sections, barsPerRow).map((page, p, pages) => (
             <div key={p} className="print-page">
+              <p className="page-number">
+                {p + 1} / {pages.length}
+              </p>
               {page.map((column, c) => (
                 <div key={c}>
                   {column.map(({ section, from, to }) => (

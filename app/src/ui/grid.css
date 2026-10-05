@@ -269,6 +269,17 @@
     }
   }
 
+  /* Compact pages print their own number (.page-number). */
+  @page compact {
+    @bottom-right {
+      content: none;
+    }
+  }
+
+  .compact-print {
+    page: compact;
+  }
+
   nav,
   aside,
   .toolbar,
@@ -336,6 +347,14 @@
     grid-template-columns: 1fr 1fr;
     column-gap: 20mm;
     break-after: page;
+  }
+
+  /* WebKitGTK has no @page margin boxes, so the compact pages number themselves. */
+  .page-number {
+    grid-column: 1 / -1;
+    margin: 0 0 2mm;
+    font-size: 0.7rem;
+    text-align: right;
   }
 
   /* A rule down the middle of the gap, as tall as the longer column. */
