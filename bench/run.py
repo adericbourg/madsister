@@ -15,6 +15,7 @@ import dataclasses
 import datetime
 import itertools
 import json
+import re
 import statistics
 import sys
 import time
@@ -94,8 +95,15 @@ def add_counts(ref: list[Slot], est: list[Slot]) -> tuple[int, int, int, int]:
     return *matches(adds(est), ref), *matches(adds(ref), est)
 
 
+# The app's extra qualities in plain Harte, which mir_eval parses.
+_PLAIN_HARTE = {
+    "add2": "maj(2)", "add4": "maj(4)", "minadd2": "min(2)", "minadd4": "min(4)",
+    "7sus4": "sus4(b7)", "9sus4": "sus4(b7,9)", "69": "maj6(9)", "min69": "min6(9)",
+}
+
+
 def _mir_eval_label(label: str) -> str:
-    return label.replace(":add2", ":maj(2)").replace(":add4", ":maj(4)")  # the §4 extension in plain Harte
+    return re.sub(r":(\w+)(?=/|$)", lambda m: ":" + _PLAIN_HARTE.get(m[1], m[1]), label)
 
 
 def evaluate(ref_id: str, song: dict | None, beat_result: BeatResult) -> dict:
