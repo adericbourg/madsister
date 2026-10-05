@@ -334,8 +334,22 @@
   .print-page {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    column-gap: 8mm;
+    column-gap: 14mm;
     break-after: page;
+  }
+
+  /* A rule down the middle of the gap, as tall as the longer column. */
+  .print-page > div + div {
+    position: relative;
+  }
+
+  .print-page > div + div::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -7mm;
+    border-left: 1px solid var(--hairline);
   }
 
   .print-page .section {
