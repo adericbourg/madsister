@@ -494,3 +494,17 @@ test("Editor_whenPickingASectionByName_editsThatSection", async () => {
   await user.click(screen.getByText("Intro", { selector: ".section-label" }));
   expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("Intro");
 });
+
+test("Editor_whenClearingTheChordOfASplitSlot_removesTheSubdivision", async () => {
+  // Given a bar split into C and G
+  const user = userEvent.setup();
+  render(<Harness />);
+  await user.keyboard("C{Control>}/{/Control}G{Enter}");
+  expect(song?.sections[0].bars[0]).toEqual(bar(["C:maj", 2], ["G:maj", 2]));
+
+  // When clearing the second chord and pressing Enter, Then the bar is whole again
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 3: G" }));
+  await user.clear(screen.getByRole("textbox", { name: "Chord" }));
+  await user.keyboard("{Enter}");
+  expect(song?.sections[0].bars[0]).toEqual(bar(["C:maj", 4]));
+});

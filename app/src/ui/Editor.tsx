@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
-import { addSection, deleteSection, doubleTempo, halveTempo, moveSection, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, splitSlot, type BarRef, type SlotRef } from "../model/commands";
+import { addSection, deleteSection, doubleTempo, halveTempo, moveSection, removeSlot, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, splitSlot, type BarRef, type SlotRef } from "../model/commands";
 import { displayChord, type DisplayStyle } from "../model/display";
 import { displayNashville, parseNashville, tonicPc, type MinorConvention } from "../model/nashville";
 import { barAtTime } from "../model/playback";
@@ -106,6 +106,13 @@ export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfide
       const label = draft.text.trim();
       if (label === "") return isBlur ? setDraft(null) : setDraft({ ...draft, error: "a section needs a name" });
       if (label !== song.sections[cursor.section].label) history.apply((s) => renameSection(s, cursor.section, label));
+    } else if (draft.text.trim() === "") {
+      // Clearing a chord removes its slot (the bar is unsplit); an already empty single slot is left alone.
+      const { chords } = song.sections[cursor.section].bars[cursor.bar];
+      if (chords.length > 1 || chords[0].chord !== "N") {
+        history.apply((s) => removeSlot(s, cursor));
+        setCursor({ ...cursor, slot: Math.max(cursor.slot - 1, 0) });
+      }
     } else {
       const parsed = parse(draft.text);
       if (!parsed.ok) return isBlur ? setDraft(null) : setDraft({ ...draft, error: parsed.error });

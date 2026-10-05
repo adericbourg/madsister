@@ -11,6 +11,7 @@ import {
   mergeSlotWithNext,
   moveSection,
   pasteBars,
+  removeSlot,
   renameSection,
   resizeSlot,
   setBarMeter,
@@ -210,6 +211,30 @@ describe("mergeSlotWithNext", () => {
     // Then
     expect(bars[0].chords.map((s) => [s.chord, s.beats])).toEqual([["A:min", 4]]);
     expect(() => mergeSlotWithNext(song, { section: 0, bar: 0, slot: 1 })).toThrow();
+  });
+});
+
+describe("removeSlot", () => {
+  test("removeSlot_givesTheBeatsToThePreviousSlotOrTheNextForTheFirst", () => {
+    // Given
+    const song = fixture();
+
+    // When / Then
+    const last = check(song, removeSlot(song, { section: 0, bar: 0, slot: 1 }));
+    expect(last[0].chords.map((s) => [s.chord, s.beats])).toEqual([["A:min", 4]]);
+    const first = check(song, removeSlot(song, { section: 0, bar: 0, slot: 0 }));
+    expect(first[0].chords.map((s) => [s.chord, s.beats])).toEqual([[song.sections[0].bars[0].chords[1].chord, 4]]);
+  });
+
+  test("removeSlot_turnsTheOnlySlotIntoN", () => {
+    // Given
+    const song = fixture();
+
+    // When
+    const bars = check(song, removeSlot(song, { section: 0, bar: 1, slot: 0 }));
+
+    // Then
+    expect(bars[1].chords.map((s) => [s.chord, s.beats])).toEqual([["N", song.sections[0].bars[1].chords[0].beats]]);
   });
 });
 

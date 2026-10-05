@@ -58,6 +58,14 @@ export const mergeSlotWithNext = (song: Song, ref: SlotRef): Song =>
     return slots.toSpliced(ref.slot, 2, { ...slot, beats: slot.beats + next.beats });
   });
 
+/** Removes a slot, its beats going to the previous slot (the next one for the first slot); the only slot of a bar becomes `N`. */
+export const removeSlot = (song: Song, ref: SlotRef): Song =>
+  updateSlots(song, ref, (slots, { confidence: _, ...slot }) => {
+    if (slots.length < 2) return [{ ...slot, chord: "N" }];
+    const other = ref.slot > 0 ? ref.slot - 1 : 1;
+    return slots.flatMap((s, i) => (i === ref.slot ? [] : i === other ? [{ ...s, beats: s.beats + slot.beats }] : [s]));
+  });
+
 /** Moves one beat between the slot and its next neighbour (previous one for the last slot); a slot left with 0 beats is removed. */
 export const resizeSlot = (song: Song, ref: SlotRef, delta: 1 | -1): Song =>
   updateSlots(song, ref, (slots) => {
