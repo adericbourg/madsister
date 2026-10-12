@@ -1,10 +1,11 @@
 pub mod engine;
+mod print;
 
 use engine::{EngineEvent, Jobs, Packaged};
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use tauri::ipc::{Channel, Response};
-use tauri::{Manager, RunEvent, State};
+use tauri::{AppHandle, Manager, RunEvent, State, Webview};
 
 /// The packaged engine; None in dev (`tauri dev`) and when `MADSISTER_ENGINE` overrides it.
 struct Engine(Option<Packaged>);
@@ -166,15 +167,84 @@ fn read_audio(path: String) -> Result<Response, String> {
         .map_err(|e| format!("can't read {path}: {e}"))
 }
 
+/// Set by `madsister print …`: the window stays hidden and renders these songs to PDF.
+struct PrintBatch(Option<print::Batch>);
+
+#[tauri::command]
+fn print_plan(batch: State<PrintBatch>) -> Option<print::Plan> {
+    batch.0.as_ref().map(print::Batch::plan)
+}
+
+/// The text of the batch's song `index`, read here: the fs scope doesn't cover every path given on the command line.
+#[tauri::command(async)]
+fn print_read(batch: State<PrintBatch>, index: usize) -> Result<String, String> {
+    let song = &batch
+        .0
+        .as_ref()
+        .ok_or("not printing")?
+        .jobs
+        .get(index)
+        .ok_or("no such song")?
+        .song;
+    std::fs::read_to_string(song).map_err(|e| format!("can't read it: {e}"))
+}
+
+/// Prints the page to the PDF of the batch's song `index`; returns its path. Off the main thread, which prints.
+#[tauri::command(async)]
+fn print_pdf(webview: Webview, batch: State<PrintBatch>, index: usize) -> Result<String, String> {
+    let pdf = &batch
+        .0
+        .as_ref()
+        .ok_or("not printing")?
+        .jobs
+        .get(index)
+        .ok_or("no such song")?
+        .pdf;
+    let pdf = std::path::absolute(pdf).map_err(|e| e.to_string())?;
+    if let Some(dir) = pdf.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("can't create {}: {e}", dir.display()))?;
+    }
+    print::to_pdf(&webview, &pdf)?;
+    Ok(pdf.display().to_string())
+}
+
+#[tauri::command]
+fn print_log(line: String) {
+    eprintln!("{line}");
+}
+
+#[tauri::command]
+fn print_finish(app: AppHandle, failed: bool) {
+    app.exit(failed.into());
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let batch = match args.split_first() {
+        Some((command, rest)) if command == "print" => match print::parse_args(rest) {
+            Ok(batch) => Some(batch),
+            Err(e) => {
+                eprintln!("madsister print: {e}\n{}", print::USAGE);
+                std::process::exit(2);
+            }
+        },
+        _ => None,
+    };
+    let is_printing = batch.is_some();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Jobs::default())
-        .setup(|app| {
+        .manage(PrintBatch(batch))
+        .setup(move |app| {
             app.manage(Engine(packaged_engine(app)));
+            if is_printing {
+                app.get_webview_window("main")
+                    .ok_or("no main window")?
+                    .hide()?;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -187,7 +257,12 @@ pub fn run() {
             setup_engine,
             engine_has_sections,
             audio_sha256,
-            read_audio
+            read_audio,
+            print_plan,
+            print_read,
+            print_pdf,
+            print_log,
+            print_finish
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

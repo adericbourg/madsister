@@ -36,6 +36,19 @@ export const parseSettings = (json: unknown): Settings => {
   };
 };
 
+/** The `madsister print` option of each `Settings` key (print.rs `parse_args`). */
+const OPTIONS: Record<string, string> = { style: "--style", font: "--font", barsPerRow: "--bars-per-row", compactPrint: "--compact" };
+
+/** The saved settings with the command line's (`madsister print --font …`) on top, by `Settings` key. */
+export const mergeSettings = (saved: unknown, overrides: Record<string, unknown>): Settings => {
+  const settings = parseSettings({ ...(typeof saved === "object" ? saved : {}), ...overrides });
+  // parseSettings replaces an invalid value with the default: an override that didn't survive was invalid.
+  for (const [key, value] of Object.entries(overrides)) {
+    if (settings[key as keyof Settings] !== value) throw new Error(`invalid ${OPTIONS[key] ?? key}: ${JSON.stringify(value)}`);
+  }
+  return settings;
+};
+
 type FieldProps = {
   label: string;
   value: string;

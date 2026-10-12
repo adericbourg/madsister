@@ -32,6 +32,21 @@ runs on your machine; nothing is sent anywhere.
 4. Print (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd>) or export.
 5. Save (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>S</kbd>).
 
+## Print many charts
+
+`madsister print` writes each chart to a PDF (A4) next to it, as the app prints it, e.g. after an update that improves
+the layout:
+
+```sh
+madsister print ~/charts/*.madsister.json
+madsister print --compact --font kalam --bars-per-row 8 --out-dir ~/pdf song.madsister.json
+```
+
+- Options left out use the app's settings: `--style fr|intl|latin`, `--font kalam|patrick-hand|petaluma-script|petaluma-text|serif`,
+  `--bars-per-row 2|4|8`, `--compact` or `--no-compact`.
+- It exits with 1 if a chart failed, after printing the others.
+- Linux only for now. It opens a hidden window, so it needs a desktop session.
+
 ## Install (Debian, Ubuntu)
 
 Add the apt repository once, and `apt upgrade` then keeps madsister up to date:

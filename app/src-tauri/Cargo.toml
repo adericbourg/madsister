@@ -23,6 +23,11 @@ libc = "0.2"
 sha2 = "0.11"
 tauri-plugin-opener = "2.7.0"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+glib = "0.18"
+gtk = "0.18"
+webkit2gtk = "2.0"
+
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
