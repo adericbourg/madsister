@@ -48,7 +48,7 @@ EOF
 sudo apt update && sudo apt install madsister
 ```
 
-- Two packages: `madsister` follows the releases; `madsister-snapshot` follows every push to `main` (unreleased, may be
+- Two packages: `madsister` follows the releases; `madsister-snapshot` follows `main`, rebuilt nightly (unreleased, may be
   broken). Install either or both: the snapshot has its own command (`madsister-snapshot`), launcher and data dir, so
   it never touches the stable app's settings, and it downloads its own engine.
 - amd64 only. The first launch downloads the engine (Python, its libraries and the models), once, and again after an update.
@@ -64,7 +64,7 @@ brew trust --tap adericbourg/tap
 brew install --cask madsister
 ```
 
-- `madsister-snapshot` follows every push to `main`, like the apt package, and installs next to `madsister`.
+- `madsister-snapshot` follows `main`, rebuilt nightly, like the apt package, and installs next to `madsister`.
 - The app isn't signed or notarized: the cask clears the quarantine flag, so Gatekeeper doesn't block it. With the `.dmg`
   from the [releases page](https://github.com/adericbourg/madsister/releases), copy the app to `/Applications` and run
   `xattr -dr com.apple.quarantine /Applications/madsister.app` once.

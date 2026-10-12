@@ -1,15 +1,15 @@
 name: release
 
-# Every push to main publishes a snapshot pre-release `v<last tag or 0.0.0>-snapshot.<run number>` (only the latest is kept);
+# Every night, if main got a commit in the last 25 hours, publishes a snapshot pre-release `v<last tag or 0.0.0>-snapshot.<run number>` (only the latest is kept);
 # running it by hand (Actions > release > Run workflow, on main) with a patch/minor/major bump publishes the release
 # `vX.Y.Z` that is kept; the tag is created by the publication itself. It doesn't wait for the `app`/`engine` workflows: the clean-install
-# check below gates the publication, and a later push replaces a bad snapshot.
+# check below gates the publication, and the next nightly snapshot replaces a bad one.
 # A release is the package `madsister`, a snapshot the package `madsister-snapshot` (own binary, files and data dir: both
 # can be installed together). The `apt` job then republishes the signed apt repository on GitHub Pages: its only suite
 # holds the latest of each, and the `homebrew` job commits the matching macOS cask to adericbourg/homebrew-tap.
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"  # macOS runners bill ~10x Linux: a snapshot per push burned the Actions quota
   workflow_dispatch:
     inputs:
       bump:
@@ -24,7 +24,7 @@ permissions:
 
 concurrency:
   group: release-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' }} # a newer snapshot supersedes this one, a release is never cancelled
+  cancel-in-progress: false # a snapshot or a release is never cancelled midway
 
 env:
   UV_VERSION: 0.12.21 # the uv bundled as the app's sidecar, also used to build the madmom wheel
@@ -35,6 +35,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       package: ${{ steps.version.outputs.package }}
+      skip: ${{ steps.version.outputs.skip }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,6 +46,10 @@ jobs:
         run: |
           last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || echo v0.0.0)
           package=madsister-snapshot
+          skip=false
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ -z "$(git log --since='25 hours ago' -1 --format=%H)" ]; then
+            skip=true # nothing new on main since the last nightly
+          fi
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             package=madsister
             if [ "$GITHUB_REF" != refs/heads/main ]; then
@@ -66,10 +71,12 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
   # One job per platform, each uploading its artifact (`linux`, `macos`) to `publish`.
   linux:
     needs: version
+    if: needs.version.outputs.skip != 'true' # the jobs that need this one are skipped with it
     runs-on: ubuntu-26.04 # the oldest glibc the deb and the AppImage then run on
     timeout-minutes: 60
     steps:
@@ -180,6 +187,7 @@ jobs:
   # macOS arm64: an unsigned .dmg (ad-hoc signature only); the `homebrew` job below installs it through a cask that clears the quarantine flag.
   macos:
     needs: version
+    if: needs.version.outputs.skip != 'true'
     runs-on: macos-26
     timeout-minutes: 60
     steps:
