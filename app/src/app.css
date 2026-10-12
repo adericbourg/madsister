@@ -357,7 +357,8 @@ aside button {
 /* Same specificity as the nav/aside rules above, so the print hiding lives here, after them. */
 @media print {
   nav,
-  aside {
+  aside,
+  .audio-notice {
     display: none;
   }
 

@@ -241,7 +241,7 @@ function App() {
         <div className="workspace">
           <div className="content">
             {audioNotice !== null && (
-              <p role="status">
+              <p role="status" className="audio-notice">
                 <span>{audioNotice}</span>{" "}
                 <button type="button" onClick={locateAudio}>
                   Locate audio…
