@@ -398,7 +398,11 @@ chmod +x "$UV_PROJECT_ENVIRONMENT/bin/madsister-engine"
 
         // Then uv synced with all-in-one and the env remembers it, until a plain setup (an update) drops it
         let calls = std::fs::read_to_string(root.join("env.log")).unwrap();
-        assert!(calls.lines().nth(2).unwrap().contains("--group beats-allinone"));
+        assert!(calls
+            .lines()
+            .nth(2)
+            .unwrap()
+            .contains("--group beats-allinone"));
         assert!(packaged.has_sections());
         run(false);
         assert!(!packaged.has_sections());
