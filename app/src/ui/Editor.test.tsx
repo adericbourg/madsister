@@ -526,17 +526,17 @@ const menuFixture = () => ({ ...emptySong(), sections: [{ id: "v", label: "Verse
 const texts = () => menuItems.map((i) => `${i.text}${i.enabled ? "" : " (off)"}`);
 const labels = () => song?.sections.map((s) => `${s.label}:${s.bars.length}`);
 
-test("Editor_rightClickOnAChord_offersSplitAndBarInsertion", async () => {
+test("Editor_rightClickOnAChord_offersSplitAndBarInsertionAndRemoval", async () => {
   // Given a 4-beat chord and a bar of two 1-beat chords
   render(<Harness mode="edit" from={menuFixture} />);
   // jsdom has no layout: give every bar a 100px width so that x = 50 is in the middle
   const sizeBars = () => document.querySelectorAll<HTMLElement>(".bar").forEach((b) => (b.getBoundingClientRect = () => ({ left: 0, right: 100 }) as DOMRect));
   sizeBars();
 
-  // When right-clicking the 4-beat chord, Then the chord can be split and bars added
+  // When right-clicking the 4-beat chord, Then the chord can be split, bars added and the bar removed
   fireEvent.contextMenu(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }), { clientX: 50 });
-  await vi.waitFor(() => expect(menuItems.length).toBe(3));
-  expect(texts()).toEqual(["Split", "Add empty bar before", "Add empty bar after"]);
+  await vi.waitFor(() => expect(menuItems.length).toBe(4));
+  expect(texts()).toEqual(["Split", "Add empty bar before", "Add empty bar after", "Remove bar"]);
 
   // When running "Add empty bar after", Then the section has one more bar
   menuItems[2].action();
@@ -546,6 +546,10 @@ test("Editor_rightClickOnAChord_offersSplitAndBarInsertion", async () => {
   sizeBars();
   fireEvent.contextMenu(screen.getByRole("gridcell", { name: "Verse, bar 3, beat 1: G" }), { clientX: 50 });
   await vi.waitFor(() => expect(texts()[0]).toBe("Split (off)"));
+
+  // When running "Remove bar" on it, Then the section has one bar less
+  menuItems[3].action();
+  await vi.waitFor(() => expect(labels()).toEqual(["Verse:2", "Chorus:1"]));
 });
 
 test("Editor_rightClickOnABarLine_offersToSplitTheSectionOrAddABar", async () => {

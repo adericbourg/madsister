@@ -3,7 +3,7 @@ import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu } from "@tauri-apps/api/menu";
 import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
-import { addSection, deleteSection, doubleTempo, halveTempo, insertBar, mergeWithPrevious, moveSection, removeSlot, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, splitSection, splitSlot, type BarRef, type SlotRef } from "../model/commands";
+import { addSection, deleteBar, deleteSection, doubleTempo, halveTempo, insertBar, mergeWithPrevious, moveSection, removeSlot, renameSection, setBarMeter, setChord, setRepeat, shiftPhase, splitSection, splitSlot, type BarRef, type SlotRef } from "../model/commands";
 import { displayChord, type DisplayStyle } from "../model/display";
 import { displayNashville, parseNashville, tonicPc, type MinorConvention } from "../model/nashville";
 import { barAtTime } from "../model/playback";
@@ -194,6 +194,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
         item("Split", run((s) => splitSlot(s, ref), { ...ref, slot: ref.slot + 1 }), song.sections[ref.section].bars[ref.bar].chords[ref.slot].beats > 1),
         item("Add empty bar before", run((s) => insertBar(s, ref, "before"), { ...ref, slot: 0 })),
         item("Add empty bar after", run((s) => insertBar(s, ref, "after"), { ...ref, bar: ref.bar + 1, slot: 0 })),
+        item("Remove bar", run((s) => deleteBar(s, ref), clampCursor(deleteBar(song, ref), { ...ref, slot: 0 }))),
       ];
       setCursor(ref);
     } else if (target.kind === "separator") {
