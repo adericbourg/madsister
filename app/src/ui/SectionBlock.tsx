@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import type { BarRef, SlotRef } from "../model/commands";
 import type { DisplayStyle } from "../model/display";
 import type { Section } from "../model/song";
@@ -25,7 +25,7 @@ type Props = {
   editor: ReactNode;
   onCellClick?: (ref: SlotRef) => void;
   onSectionClick?: (index: number) => void;
-  onContextMenu?: (target: MenuTarget) => void;
+  onContextMenu?: (target: MenuTarget, e: MouseEvent) => void;
 };
 
 export const SectionBlock = ({ section, index, barsPerRow, onSectionClick, onContextMenu, ...cell }: Props) => {
@@ -45,7 +45,7 @@ export const SectionBlock = ({ section, index, barsPerRow, onSectionClick, onCon
             onContextMenu &&
             ((e) => {
               e.preventDefault();
-              onContextMenu({ kind: "section", index });
+              onContextMenu({ kind: "section", index }, e);
             })
           }
         >

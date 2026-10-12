@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEventHandler, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEventHandler, type MouseEvent, type ReactNode } from "react";
 import type { BarRef, SlotRef } from "../model/commands";
 import { displayKey, type DisplayStyle } from "../model/display";
 import type { Song } from "../model/song";
@@ -27,7 +27,7 @@ type Props = {
   onCellClick?: (ref: SlotRef) => void;
   onSectionClick?: (index: number) => void;
   /** Right-click on a chord, a bar line or a section label; the browser menu is only suppressed when set. */
-  onContextMenu?: (target: MenuTarget) => void;
+  onContextMenu?: (target: MenuTarget, e: MouseEvent) => void;
 };
 
 export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, compactPrint = false, onKeyDown, onCellClick, onSectionClick, onContextMenu }: Props) => {

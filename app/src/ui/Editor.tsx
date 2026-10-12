@@ -1,4 +1,5 @@
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu } from "@tauri-apps/api/menu";
 import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
@@ -179,7 +180,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
   };
 
   // Right-click menu (F-ED-6): only offers what cannot throw, since history.apply runs in a reducer.
-  const openMenu = (target: MenuTarget) => {
+  const openMenu = (target: MenuTarget, e: MouseEvent) => {
     const run = (fn: (s: Song) => Song, to: SlotRef) => () => {
       history.apply(fn);
       setCursor(to);
@@ -211,7 +212,9 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
       setCursor({ section: index, bar: 0, slot: 0 });
     }
     setDraft(null);
-    void Menu.new({ items }).then((menu) => menu.popup());
+    // Wayland has no global cursor position, so a popup without one lands elsewhere.
+    const at = new LogicalPosition(e.clientX, e.clientY);
+    void Menu.new({ items }).then((menu) => menu.popup(at));
   };
 
   const closeHelp = () => {

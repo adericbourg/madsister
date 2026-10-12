@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import type { BarRef, SlotRef } from "../model/commands";
 import { displayChord, speakChord, type DisplayStyle } from "../model/display";
 import { displayNashville, speakNashville } from "../model/nashville";
@@ -18,7 +18,7 @@ type Props = {
   selection: Selection;
   editor: ReactNode;
   onCellClick?: (ref: SlotRef) => void;
-  onContextMenu?: (target: MenuTarget) => void;
+  onContextMenu?: (target: MenuTarget, e: MouseEvent) => void;
 };
 
 /** Bar lines are borders, not elements: a right-click this close to a bar's edge is on the line. */
@@ -43,12 +43,12 @@ export const BarCell = ({ bar, at, sectionLabel, style, tonic, tabStop, playing,
         ((e) => {
           e.preventDefault();
           const { left, right } = e.currentTarget.getBoundingClientRect();
-          if (e.clientX - left <= LINE_REACH_PX) return onContextMenu({ kind: "separator", section: at.section, bar: at.bar });
-          if (right - e.clientX <= LINE_REACH_PX) return onContextMenu({ kind: "separator", section: at.section, bar: at.bar + 1 });
+          if (e.clientX - left <= LINE_REACH_PX) return onContextMenu({ kind: "separator", section: at.section, bar: at.bar }, e);
+          if (right - e.clientX <= LINE_REACH_PX) return onContextMenu({ kind: "separator", section: at.section, bar: at.bar + 1 }, e);
           // The slot under the pointer; a click on the bar's padding (meter label) falls back to its first slot.
           const slot = (e.target as HTMLElement).closest<HTMLElement>('[role="gridcell"]');
           const index = slot ? Array.from(e.currentTarget.querySelectorAll('[role="gridcell"]')).indexOf(slot) : 0;
-          onContextMenu({ kind: "slot", ref: { ...at, slot: Math.max(index, 0) } });
+          onContextMenu({ kind: "slot", ref: { ...at, slot: Math.max(index, 0) } }, e);
         })
       }
     >
