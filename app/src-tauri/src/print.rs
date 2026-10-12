@@ -124,7 +124,101 @@ pub fn to_pdf(webview: &tauri::Webview, pdf: &Path) -> Result<(), String> {
     rx.recv().map_err(|e| e.to_string())?
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+pub fn to_pdf(webview: &tauri::Webview, pdf: &Path) -> Result<(), String> {
+    use objc2::{sel, MainThreadMarker};
+    use objc2_app_kit::{NSPrintInfo, NSPrintJobSavingURL, NSPrintSaveJob};
+    use objc2_foundation::{NSSize, NSURL};
+    use objc2_web_kit::WKWebView;
+
+    let pdf = pdf.to_owned();
+    let (tx, rx) = std::sync::mpsc::channel();
+    webview
+        .with_webview(move |w| {
+            let Some(mtm) = MainThreadMarker::new() else {
+                _ = tx.send(Err("not on the main thread".into()));
+                return;
+            };
+            // Safety: on macOS, the platform webview is a WKWebView, alive while the window is.
+            let view = unsafe { &*w.inner().cast::<WKWebView>() };
+            let Some(window) = view.window() else {
+                _ = tx.send(Err("the webview has no window".into()));
+                return;
+            };
+            // The app prints with no margins of its own, as the GUI does (wry's default): grid.css's @page sets them.
+            let info = NSPrintInfo::sharedPrintInfo();
+            info.setPaperSize(NSSize::new(595.28, 841.89)); // A4, in points
+            info.setTopMargin(0.0);
+            info.setRightMargin(0.0);
+            info.setBottomMargin(0.0);
+            info.setLeftMargin(0.0);
+            let Some(url) = NSURL::from_file_path(&pdf) else {
+                _ = tx.send(Err("not a file path".into()));
+                return;
+            };
+            // Safety: the extern statics are AppKit's constants; the dictionary holds AnyObject values.
+            unsafe {
+                info.setJobDisposition(NSPrintSaveJob);
+                info.dictionary().insert(NSPrintJobSavingURL, &*url);
+            }
+            let op = unsafe { view.printOperationWithPrintInfo(&info) };
+            op.setShowsPrintPanel(false);
+            op.setShowsProgressPanel(false);
+            // WKWebView prints blank pages into a print view without a frame.
+            if let Some(print_view) = op.view() {
+                print_view.setFrame(view.frame());
+            }
+            let done = PrintDone::new(mtm, tx);
+            // Modal, not runOperation: WKWebView draws its print pages asynchronously.
+            unsafe {
+                op.runOperationModalForWindow_delegate_didRunSelector_contextInfo(
+                    &window,
+                    Some(&done),
+                    Some(sel!(printOperationDidRun:success:contextInfo:)),
+                    std::ptr::null_mut(),
+                );
+            }
+            // The operation doesn't retain its delegate; one small object per song, until the batch exits.
+            std::mem::forget(done);
+        })
+        .map_err(|e| e.to_string())?;
+    rx.recv().map_err(|e| e.to_string())?
+}
+
+#[cfg(target_os = "macos")]
+objc2::define_class!(
+    /// The delegate `runOperationModalForWindow` calls once the PDF is written.
+    #[unsafe(super(objc2::runtime::NSObject))]
+    #[thread_kind = objc2::MainThreadOnly]
+    #[ivars = std::sync::mpsc::Sender<Result<(), String>>]
+    struct PrintDone;
+
+    impl PrintDone {
+        #[unsafe(method(printOperationDidRun:success:contextInfo:))]
+        fn did_run(
+            &self,
+            _op: &objc2::runtime::AnyObject,
+            success: objc2::runtime::Bool,
+            _context: *mut std::ffi::c_void,
+        ) {
+            let result = success.as_bool().then_some(()).ok_or("the print failed".into());
+            _ = objc2::DefinedClass::ivars(self).send(result);
+        }
+    }
+);
+
+#[cfg(target_os = "macos")]
+impl PrintDone {
+    fn new(
+        mtm: objc2::MainThreadMarker,
+        done: std::sync::mpsc::Sender<Result<(), String>>,
+    ) -> objc2::rc::Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(done);
+        unsafe { objc2::msg_send![super(this), init] }
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 pub fn to_pdf(_webview: &tauri::Webview, _pdf: &Path) -> Result<(), String> {
     Err("printing to PDF from the command line isn't supported on this system yet".into())
 }

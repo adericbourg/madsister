@@ -45,7 +45,8 @@ madsister print --compact --font kalam --bars-per-row 8 --out-dir ~/pdf song.mad
 - Options left out use the app's settings: `--style fr|intl|latin`, `--font kalam|patrick-hand|petaluma-script|petaluma-text|serif`,
   `--bars-per-row 2|4|8`, `--compact` or `--no-compact`.
 - It exits with 1 if a chart failed, after printing the others.
-- Linux only for now. It opens a hidden window, so it needs a desktop session.
+- Linux and macOS. It opens a hidden window, so it needs a desktop session. On macOS, the command is inside the app:
+  `/Applications/madsister.app/Contents/MacOS/madsister print …`.
 
 ## Install (Debian, Ubuntu)
 
