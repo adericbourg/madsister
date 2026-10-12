@@ -7,6 +7,8 @@ name: release
 # A release is the package `madsister`, a snapshot the package `madsister-snapshot` (own binary, files and data dir: both
 # can be installed together). The `apt` job then republishes the signed apt repository on GitHub Pages: its only suite
 # holds the latest of each, and the `homebrew` job commits the matching macOS cask to adericbourg/homebrew-tap.
+# A manual run can be limited to one platform: the release then only holds its files, and the other platform's apt
+# repository or cask keeps pointing at its previous release.
 on:
   schedule:
     - cron: "0 3 * * *"  # macOS runners bill ~10x Linux: a snapshot per push burned the Actions quota
@@ -18,6 +20,12 @@ on:
         type: choice
         options: [patch, minor, major]
         default: patch
+      platforms:
+        description: Platforms to build and publish
+        required: true
+        type: choice
+        options: [both, linux, macos]
+        default: both
 
 permissions:
   contents: write
@@ -76,7 +84,7 @@ jobs:
   # One job per platform, each uploading its artifact (`linux`, `macos`) to `publish`.
   linux:
     needs: version
-    if: needs.version.outputs.skip != 'true' # the jobs that need this one are skipped with it
+    if: needs.version.outputs.skip != 'true' && inputs.platforms != 'macos' # the jobs that need this one are skipped with it
     runs-on: ubuntu-26.04 # the oldest glibc the deb and the AppImage then run on
     timeout-minutes: 60
     steps:
@@ -187,7 +195,7 @@ jobs:
   # macOS arm64: an unsigned .dmg (ad-hoc signature only); the `homebrew` job below installs it through a cask that clears the quarantine flag.
   macos:
     needs: version
-    if: needs.version.outputs.skip != 'true'
+    if: needs.version.outputs.skip != 'true' && inputs.platforms != 'linux'
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -279,12 +287,15 @@ jobs:
 
   publish:
     needs: [version, linux, linux-clean-install, macos, macos-clean-install]
+    # A platform left out of a manual run skips its jobs, which would skip this one too.
+    if: ${{ !cancelled() && !failure() && needs.version.outputs.skip != 'true' }}
     runs-on: ubuntu-26.04
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       VERSION: ${{ needs.version.outputs.version }}
       PACKAGE: ${{ needs.version.outputs.package }}
+      PLATFORMS: ${{ inputs.platforms }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -292,15 +303,23 @@ jobs:
           merge-multiple: true
       - name: Publish
         run: |
-          notes="For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see THIRD_PARTY.md).
+          shopt -s nullglob # a platform left out has no files
+          notes="For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see THIRD_PARTY.md)."
+          if [ "$PLATFORMS" != macos ]; then
+            notes="$notes
           Linux: \`sudo apt install ./${PACKAGE}_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
-          macOS (Apple silicon): \`brew install --cask adericbourg/tap/$PACKAGE\` (it installs ffmpeg), or the dmg: the app is unsigned, run \`xattr -dr com.apple.quarantine /Applications/$PACKAGE.app\` once after copying it (it needs ffmpeg).
           To get updates through apt (the package \`madsister\` follows the releases, \`madsister-snapshot\` the snapshots; they can be installed together):
           \`\`\`
           sudo curl -fsSLo /etc/apt/keyrings/madsister.asc https://www.dericbourg.net/madsister/key.asc
           printf 'Types: deb\nURIs: https://www.dericbourg.net/madsister\nSuites: stable\nComponents: main\nSigned-By: /etc/apt/keyrings/madsister.asc\n' | sudo tee /etc/apt/sources.list.d/madsister.sources
           sudo apt update && sudo apt install $PACKAGE
-          \`\`\`
+          \`\`\`"
+          fi
+          if [ "$PLATFORMS" != linux ]; then
+            notes="$notes
+          macOS (Apple silicon): \`brew install --cask adericbourg/tap/$PACKAGE\` (it installs ffmpeg), or the dmg: the app is unsigned, run \`xattr -dr com.apple.quarantine /Applications/$PACKAGE.app\` once after copying it (it needs ffmpeg)."
+          fi
+          notes="$notes
           The first launch downloads the engine (Python, its libraries and the models), once."
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             # Creates the tag on this commit (a tag pushed with the workflow's token wouldn't trigger anything anyway).
@@ -339,7 +358,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y apt-utils  # apt-ftparchive; not on the ubuntu-26.04 image
           gpg --batch --import <<< "$GPG_KEY"
           mkdir -p site/pool site/dists/stable/main/binary-amd64 && cd site
-          release=$(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+          # The latest release with a deb: a macOS-only one has none.
+          release=$(gh api "repos/$GH_REPO/releases" --jq '[.[] | select(.prerelease | not) | select(any(.assets[]; .name | endswith(".deb")))][0].tag_name // empty')
           snapshot=$(gh release list --limit 100 --json tagName --jq '[.[].tagName | select(contains("-snapshot."))][0] // empty')
           for tag in $release $snapshot; do gh release download "$tag" --pattern '*.deb' --dir pool; done
           apt-ftparchive packages pool > dists/stable/main/binary-amd64/Packages
@@ -358,6 +378,7 @@ jobs:
   # GITHUB_TOKEN can't write to another repository: HOMEBREW_TAP_TOKEN is a fine-grained PAT with contents:write on the tap only.
   homebrew:
     needs: [version, publish]
+    if: inputs.platforms != 'linux' # no dmg to point the cask at
     runs-on: ubuntu-26.04
     concurrency:
       group: homebrew
