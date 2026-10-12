@@ -18,6 +18,7 @@ import {
   shortestUniquePaths,
   readConfigJson,
   readSong,
+  relativeAudioPath,
   resolveAudioPath,
   setWindowTitle,
   writeConfigJson,
@@ -116,7 +117,7 @@ function App() {
     if (p === null) return;
     const sha256 = await audioSha256(p);
     if (sha256 === null) fail(new Error(`Can't read ${p}`));
-    else history.apply((s) => ({ ...s, audio: { ...s.audio, path: p, sha256 } }));
+    else history.apply((s) => ({ ...s, audio: { ...s.audio, path: relativeAudioPath(path, p), sha256 } }));
   };
 
   // Checked after the song is shown, and again whenever the reference changes (locate, undo).

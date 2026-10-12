@@ -28,7 +28,22 @@ export const resolveAudioPath = (songPath: string | null, audioPath: string): st
   return `${songPath.replace(/[^/\\]*$/, "")}${audioPath}`;
 };
 
-export const confirmDiscard = (): Promise<boolean> => confirm("Discard unsaved changes?", { kind: "warning" });
+/**
+ * The inverse of `resolveAudioPath`: `audioPath` relative to the song file's directory, so the song and its audio can move together.
+ * Stays as is for an unsaved song or when the paths share no root (another drive).
+ * shortcut: the comparison is case-sensitive, so Windows paths differing only by case stay absolute; normalise if that bites.
+ */
+export const relativeAudioPath = (songPath: string | null, audioPath: string): string => {
+  if (songPath === null) return audioPath;
+  const song = songPath.split(/[\\/]/).slice(0, -1);
+  const audio = audioPath.split(/[\\/]/);
+  let common = 0;
+  while (common < song.length && common < audio.length - 1 && song[common] === audio[common]) common++;
+  if (common === 0) return audioPath;
+  return [...song.slice(common).map(() => ".."), ...audio.slice(common)].join("/");
+};
+
+export const confirmDiscard =(): Promise<boolean> => confirm("Discard unsaved changes?", { kind: "warning" });
 
 export const confirmDeleteSection = (label: string): Promise<boolean> =>
   confirm(`Delete the section "${label}" and its chords?`, { kind: "warning" });

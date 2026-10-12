@@ -198,12 +198,12 @@ test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAud
   vi.mocked(open).mockResolvedValueOnce("/music/found.mp3");
   await user.click(screen.getByRole("button", { name: "Locate audio…" }));
 
-  // Then the notice goes away, and the new path and hash are saved
+  // Then the notice goes away, and the new path (relative to the song) and hash are saved
   await vi.waitFor(() => expect(screen.queryByText(/Audio file/)).toBeNull());
   vi.mocked(save).mockResolvedValueOnce("/blues2.madsister.json");
   await user.click(screen.getByRole("button", { name: "Save as…" }));
   await vi.waitFor(() => expect(files["/blues2.madsister.json"]).toBeDefined());
-  expect(JSON.parse(files["/blues2.madsister.json"]).audio).toEqual({ path: "/music/found.mp3", sha256: "abc" });
+  expect(JSON.parse(files["/blues2.madsister.json"]).audio).toEqual({ path: "music/found.mp3", sha256: "abc" });
 
   // When switching to edit mode and undoing, Then the old path is back with its notice (locating is one history entry)
   await user.keyboard("{Control>}e{/Control}");

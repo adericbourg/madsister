@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { pushRecent, resolveAudioPath, shortestUniquePaths } from "./fileActions";
+import { pushRecent, relativeAudioPath, resolveAudioPath, shortestUniquePaths } from "./fileActions";
 
 test("pushRecent_movesThePathToTheFrontWithoutDuplicatesAndKeepsTen", () => {
   // Given a full list of 10 paths
@@ -33,4 +33,18 @@ test("resolveAudioPath_resolvesRelativePathsAgainstTheSongDirectoryAndKeepsAbsol
   expect(resolveAudioPath("/music/s.madsister.json", "/other/a.mp3")).toBe("/other/a.mp3");
   expect(resolveAudioPath("/music/s.madsister.json", "D:\\a.mp3")).toBe("D:\\a.mp3");
   expect(resolveAudioPath(null, "a.mp3")).toBe("a.mp3");
+});
+
+test("relativeAudioPath_isRelativeToTheSongDirectoryAndRoundTripsWithResolveAudioPath", () => {
+  // Given a song file, When the audio is next to it, below it or above it, Then the path is relative
+  expect(relativeAudioPath("/music/s.madsister.json", "/music/a.mp3")).toBe("a.mp3");
+  expect(relativeAudioPath("/music/s.madsister.json", "/music/live/a.mp3")).toBe("live/a.mp3");
+  expect(relativeAudioPath("/music/songs/s.madsister.json", "/music/live/a.mp3")).toBe("../live/a.mp3");
+  expect(relativeAudioPath("C:\\music\\s.madsister.json", "C:\\music\\live\\a.mp3")).toBe("live/a.mp3");
+  // And resolving it gives back the same file
+  const relative = relativeAudioPath("/music/songs/s.madsister.json", "/music/live/a.mp3");
+  expect(resolveAudioPath("/music/songs/s.madsister.json", relative)).toBe("/music/songs/../live/a.mp3");
+  // And an unsaved song, or another drive, keeps the absolute path
+  expect(relativeAudioPath(null, "/music/a.mp3")).toBe("/music/a.mp3");
+  expect(relativeAudioPath("C:\\music\\s.madsister.json", "D:\\a.mp3")).toBe("D:\\a.mp3");
 });
