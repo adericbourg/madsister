@@ -2,7 +2,8 @@ name: release
 
 # Every night, if main got a commit in the last 25 hours, publishes a snapshot pre-release `v<last tag or 0.0.0>-snapshot.<run number>` (only the latest is kept);
 # running it by hand (Actions > release > Run workflow, on main) with a patch/minor/major bump publishes the release
-# `vX.Y.Z` that is kept; the tag is created by the publication itself. It doesn't wait for the `app`/`engine` workflows: the clean-install
+# `vX.Y.Z` that is kept; the tag is created by the publication itself. With the `snapshot` bump, a manual run publishes
+# a snapshot on demand, the same as the nightly one. It doesn't wait for the `app`/`engine` workflows: the clean-install
 # check below gates the publication, and the next nightly snapshot replaces a bad one.
 # A release is the package `madsister`, a snapshot the package `madsister-snapshot` (own binary, files and data dir: both
 # can be installed together). The `apt` job then republishes the signed apt repository on GitHub Pages: its only suite
@@ -15,10 +16,10 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: Version component to bump
+        description: "Version component to bump (snapshot: a pre-release, no bump)"
         required: true
         type: choice
-        options: [patch, minor, major]
+        options: [patch, minor, major, snapshot]
         default: minor
       platforms:
         description: Platforms to build and publish
@@ -31,7 +32,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event_name }}-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false # a snapshot or a release is never cancelled midway
 
 env:
@@ -44,6 +45,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       package: ${{ steps.version.outputs.package }}
       skip: ${{ steps.version.outputs.skip }}
+      release: ${{ steps.version.outputs.release }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -55,10 +57,12 @@ jobs:
           last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || echo v0.0.0)
           package=madsister-snapshot
           skip=false
+          release=false
           if [ "$GITHUB_EVENT_NAME" = schedule ] && [ -z "$(git log --since='25 hours ago' -1 --format=%H)" ]; then
             skip=true # nothing new on main since the last nightly
           fi
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$BUMP" != snapshot ]; then
+            release=true
             package=madsister
             if [ "$GITHUB_REF" != refs/heads/main ]; then
               echo "::error::releases are made from main, not $GITHUB_REF"
@@ -80,6 +84,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "package=$package" >> "$GITHUB_OUTPUT"
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
 
   # One job per platform, each uploading its artifact (`linux`, `macos`) to `publish`.
   linux:
@@ -296,6 +301,7 @@ jobs:
       VERSION: ${{ needs.version.outputs.version }}
       PACKAGE: ${{ needs.version.outputs.package }}
       PLATFORMS: ${{ inputs.platforms }}
+      RELEASE: ${{ needs.version.outputs.release }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -321,7 +327,7 @@ jobs:
           fi
           notes="$notes
           The first launch downloads the engine (Python, its libraries and the models), once."
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+          if [ "$RELEASE" = true ]; then
             # Creates the tag on this commit (a tag pushed with the workflow's token wouldn't trigger anything anyway).
             gh release create "v$VERSION" dist/*/* dist/*.dmg --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
           else
