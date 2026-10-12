@@ -165,6 +165,8 @@ nav details li button {
 }
 
 .content {
+  /* Contains the chart's absolutely positioned bits (live region, slot errors); otherwise they stretch the window. */
+  position: relative;
   flex: 1;
   min-width: 0;
   overflow: auto;
