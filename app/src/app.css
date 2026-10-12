@@ -320,6 +320,8 @@ aside button {
   padding: 1rem;
   border: 1px solid var(--control-border);
   border-radius: 0 3px 3px 3px;
+  /* Long file names wrap instead of widening the panel (and unstacking the start screen). */
+  overflow-wrap: anywhere;
 }
 
 .importer [role="tabpanel"][aria-hidden="true"] {
