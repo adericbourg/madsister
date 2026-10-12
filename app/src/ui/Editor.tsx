@@ -26,6 +26,8 @@ type Props = {
   panel?: HTMLElement | null;
   /** The audio file to play, already resolved against the song's location. */
   audioPath?: string;
+  /** Lets the user pick the audio file again; offered next to a playback error. */
+  onLocateAudio?: () => void;
   /** View is read-only: clicking a bar only moves the cursor and the audio. */
   mode?: "view" | "edit";
 };
@@ -35,7 +37,7 @@ type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; err
 const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, compactPrint, style, minorConvention, lowConfidenceThreshold, panel, audioPath, mode = "edit" }: Props) => {
+export const Editor = ({ history, barsPerRow, compactPrint, style, minorConvention, lowConfidenceThreshold, panel, audioPath, onLocateAudio, mode = "edit" }: Props) => {
   const { song } = history;
   const isEditable = mode === "edit";
   // Nashville: chords are typed and shown as degrees of this tonic; undefined = chord names.
@@ -375,12 +377,21 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
           <span>
             {minutes(player.time)}/{minutes(player.duration)}
           </span>
-          {player.error !== null && (
-            <span role="alert" className="field-error">
-              {player.error}
-            </span>
-          )}
         </fieldset>
+      )}
+      {song.audio !== undefined && player.error !== null && (
+        // Outside the fieldset: it's disabled until the audio loads, which a missing file never does.
+        <p role="alert" className="field-error audio-notice">
+          {player.error}
+          {onLocateAudio && (
+            <>
+              {" "}
+              <button type="button" onClick={onLocateAudio}>
+                Locate audio…
+              </button>
+            </>
+          )}
+        </p>
       )}
       <Grid
         song={song}

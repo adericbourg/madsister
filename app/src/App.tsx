@@ -250,7 +250,7 @@ function App() {
               </p>
             )}
             {panel && (
-              <Editor history={history} mode={mode} barsPerRow={settings.barsPerRow} compactPrint={settings.compactPrint} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} audioPath={song.audio && resolveAudioPath(path, song.audio.path)} />
+              <Editor history={history} mode={mode} barsPerRow={settings.barsPerRow} compactPrint={settings.compactPrint} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} audioPath={song.audio && resolveAudioPath(path, song.audio.path)} onLocateAudio={locateAudio} />
             )}
           </div>
           <aside id="parameters" aria-label="Parameters" hidden={!isPanelOpen} ref={setPanel}>
