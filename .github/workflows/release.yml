@@ -19,7 +19,7 @@ on:
         required: true
         type: choice
         options: [patch, minor, major]
-        default: patch
+        default: minor
       platforms:
         description: Platforms to build and publish
         required: true
