@@ -97,7 +97,7 @@ jobs:
           node-version: lts/*
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
-      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tag upstream
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag upstream
         with:
           version: ${{ env.UV_VERSION }}
       - uses: dtolnay/rust-toolchain@stable
@@ -208,7 +208,7 @@ jobs:
           node-version: lts/*
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
-      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tag upstream
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag upstream
         with:
           version: ${{ env.UV_VERSION }}
       - uses: dtolnay/rust-toolchain@stable
