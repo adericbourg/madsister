@@ -24,6 +24,7 @@ type Props = {
   selection: Selection;
   editor: ReactNode;
   onCellClick?: (ref: SlotRef) => void;
+  onMeterClick?: (ref: BarRef) => void;
   onSectionClick?: (index: number) => void;
   onContextMenu?: (target: MenuTarget, e: MouseEvent) => void;
 };

@@ -35,6 +35,8 @@ type Props = {
   mode?: "view" | "edit";
   /** False while the song's tab is in the background: playback pauses. */
   isActive?: boolean;
+  /** Expands the sidebar holding `panel`. */
+  onShowPanels?: () => void;
 };
 // `select` is where the caret lands on focus: "all" selects the whole text, "end" keeps a typed first character.
 type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; error?: string };
@@ -42,7 +44,7 @@ type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; err
 const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, compactPrint, style, minorConvention, lowConfidenceThreshold, panel, audioPath, onLocateAudio, mode = "edit", isActive = true }: Props) => {
+export const Editor = ({ history, barsPerRow, compactPrint, style, minorConvention, lowConfidenceThreshold, panel, audioPath, onLocateAudio, mode = "edit", isActive = true, onShowPanels }: Props) => {
   const id = useId();
   const { song } = history;
   const isEditable = mode === "edit";
@@ -58,6 +60,14 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
   const [notice, setNotice] = useState("");
   const helpOpener = useRef<HTMLElement | null>(null);
   const isCancelled = useRef(false);
+  const beatsInput = useRef<HTMLInputElement>(null);
+  // Bumped by a click on a time signature; focusing waits for the effect, once the sidebar is expanded.
+  const [beatsFocusRequest, setBeatsFocusRequest] = useState(0);
+  useEffect(() => {
+    if (beatsFocusRequest === 0) return;
+    beatsInput.current?.focus();
+    beatsInput.current?.select();
+  }, [beatsFocusRequest]);
   // Undo/redo and structural edits can leave the cursor dangling: always read it clamped.
   const cursor = clampCursor(song, rawCursor);
   const flaggedCount = countFlagged(song, lowConfidenceThreshold);
@@ -333,6 +343,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
             <label>
               Beats in this bar{" "}
               <input
+                ref={beatsInput}
                 type="number"
                 min={1}
                 value={barMeter?.beats ?? ""}
@@ -443,6 +454,17 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
         onKeyDown={onKeyDown}
         onSectionClick={selectSection}
         onContextMenu={isEditable ? openMenu : undefined}
+        onMeterClick={
+          isEditable
+            ? (ref) => {
+                setCursor({ ...ref, slot: 0 });
+                setAnchor(null);
+                setDraft(null);
+                onShowPanels?.();
+                setBeatsFocusRequest((n) => n + 1);
+              }
+            : undefined
+        }
         onCellClick={(ref) => {
           const startSec = song.sections[ref.section].bars[ref.bar].startSec;
           if (startSec !== undefined) player.seek(startSec);

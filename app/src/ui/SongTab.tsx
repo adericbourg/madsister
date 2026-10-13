@@ -178,6 +178,7 @@ export const SongTab = ({ ref, isActive, initial, settings, onSettingsChange, on
                 panel={panel}
                 audioPath={song.audio && resolveAudioPath(path, song.audio.path)}
                 onLocateAudio={locateAudio}
+                onShowPanels={() => onSettingsChange({ ...settings, isSidebarCollapsed: false })}
               />
             )}
           </div>

@@ -25,12 +25,14 @@ type Props = {
   compactPrint?: boolean;
   onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
   onCellClick?: (ref: SlotRef) => void;
+  /** Click on a bar's own time signature. */
+  onMeterClick?: (ref: BarRef) => void;
   onSectionClick?: (index: number) => void;
   /** Right-click on a chord, a bar line or a section label; the browser menu is only suppressed when set. */
   onContextMenu?: (target: MenuTarget, e: MouseEvent) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, compactPrint = false, onKeyDown, onCellClick, onSectionClick, onContextMenu }: Props) => {
+export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, compactPrint = false, onKeyDown, onCellClick, onMeterClick, onSectionClick, onContextMenu }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
@@ -70,6 +72,7 @@ export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, l
             selection={selection}
             editor={editor}
             onCellClick={onCellClick}
+            onMeterClick={onMeterClick}
             onSectionClick={onSectionClick}
             onContextMenu={onContextMenu}
           />

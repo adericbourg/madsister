@@ -18,13 +18,14 @@ type Props = {
   selection: Selection;
   editor: ReactNode;
   onCellClick?: (ref: SlotRef) => void;
+  onMeterClick?: (ref: BarRef) => void;
   onContextMenu?: (target: MenuTarget, e: MouseEvent) => void;
 };
 
 /** Bar lines are borders, not elements: a right-click this close to a bar's edge is on the line. */
 const LINE_REACH_PX = 6;
 
-export const BarCell = ({ bar, at, sectionLabel, style, tonic, tabStop, playing, lowConfidenceThreshold, selection, editor, onCellClick, onContextMenu }: Props) => {
+export const BarCell = ({ bar, at, sectionLabel, style, tonic, tabStop, playing, lowConfidenceThreshold, selection, editor, onCellClick, onMeterClick, onContextMenu }: Props) => {
   const isSelected = selection?.section === at.section && at.bar >= selection.from && at.bar <= selection.to;
   const isPlaying = playing?.section === at.section && playing.bar === at.bar;
   const meter = bar.meter && `${bar.meter.beats}/${bar.meter.unit}`;
@@ -53,7 +54,8 @@ export const BarCell = ({ bar, at, sectionLabel, style, tonic, tabStop, playing,
       }
     >
       {meter && (
-        <span className="bar-meter" aria-hidden="true">
+        // Mouse shortcut only: the keyboard reaches the same control through the Bar panel.
+        <span className="bar-meter" aria-hidden="true" onClick={() => onMeterClick?.(at)}>
           {meter}
         </span>
       )}
