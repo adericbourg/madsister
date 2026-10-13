@@ -61,6 +61,7 @@ export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, l
               Key <b>{displayKey(key, style)}</b>
             </span>
           )}
+          {/* Engraving convention: the tempo marking sits right above the first bar. */}
           {tempoBpm !== undefined && <span onClick={() => onMetaClick?.("tempoBpm")}>♩ = {tempoBpm}</span>}
         </p>
       </header>
