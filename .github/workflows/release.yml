@@ -343,6 +343,8 @@ jobs:
   # Rebuilds the whole site each time (a Pages deployment replaces it): the latest release and the latest snapshot, so no deb enters git.
   apt:
     needs: publish
+    # The implicit success() is false when any ancestor (here the macos jobs of a linux-only run) was skipped.
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -384,7 +386,7 @@ jobs:
   # GITHUB_TOKEN can't write to another repository: HOMEBREW_TAP_TOKEN is a fine-grained PAT with contents:write on the tap only.
   homebrew:
     needs: [version, publish]
-    if: inputs.platforms != 'linux' # no dmg to point the cask at
+    if: ${{ !cancelled() && needs.publish.result == 'success' && inputs.platforms != 'linux' }} # no dmg to point the cask at; see `apt`
     runs-on: ubuntu-26.04
     concurrency:
       group: homebrew
