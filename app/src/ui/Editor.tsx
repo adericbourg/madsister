@@ -61,13 +61,17 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
   const helpOpener = useRef<HTMLElement | null>(null);
   const isCancelled = useRef(false);
   const beatsInput = useRef<HTMLInputElement>(null);
-  // Bumped by a click on a time signature; focusing waits for the effect, once the sidebar is expanded.
-  const [beatsFocusRequest, setBeatsFocusRequest] = useState(0);
+  // Set by a click on a time signature or the chart header; focusing waits for the effect, once the sidebar is expanded.
+  const [focusRequest, setFocusRequest] = useState<{ input: () => HTMLInputElement | null | undefined } | null>(null);
   useEffect(() => {
-    if (beatsFocusRequest === 0) return;
-    beatsInput.current?.focus();
-    beatsInput.current?.select();
-  }, [beatsFocusRequest]);
+    const input = focusRequest?.input();
+    input?.focus();
+    input?.select();
+  }, [focusRequest]);
+  const focusPanelInput = (input: () => HTMLInputElement | null | undefined) => {
+    onShowPanels?.();
+    setFocusRequest({ input });
+  };
   // Undo/redo and structural edits can leave the cursor dangling: always read it clamped.
   const cursor = clampCursor(song, rawCursor);
   const flaggedCount = countFlagged(song, lowConfidenceThreshold);
@@ -460,11 +464,11 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
                 setCursor({ ...ref, slot: 0 });
                 setAnchor(null);
                 setDraft(null);
-                onShowPanels?.();
-                setBeatsFocusRequest((n) => n + 1);
+                focusPanelInput(() => beatsInput.current);
               }
             : undefined
         }
+        onMetaClick={isEditable ? (field) => focusPanelInput(() => panel?.querySelector<HTMLInputElement>(`input[name="${field}"]`)) : undefined}
         onCellClick={(ref) => {
           const startSec = song.sections[ref.section].bars[ref.bar].startSec;
           if (startSec !== undefined) player.seek(startSec);

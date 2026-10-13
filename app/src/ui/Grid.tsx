@@ -27,12 +27,14 @@ type Props = {
   onCellClick?: (ref: SlotRef) => void;
   /** Click on a bar's own time signature. */
   onMeterClick?: (ref: BarRef) => void;
+  /** Click on the title, artist, key or tempo in the chart header. */
+  onMetaClick?: (field: "title" | "artist" | "key" | "tempoBpm") => void;
   onSectionClick?: (index: number) => void;
   /** Right-click on a chord, a bar line or a section label; the browser menu is only suppressed when set. */
   onContextMenu?: (target: MenuTarget, e: MouseEvent) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, compactPrint = false, onKeyDown, onCellClick, onMeterClick, onSectionClick, onContextMenu }: Props) => {
+export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, compactPrint = false, onKeyDown, onCellClick, onMeterClick, onMetaClick, onSectionClick, onContextMenu }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
@@ -45,16 +47,21 @@ export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, l
   }, [tabStop.section, tabStop.bar, tabStop.slot, song, isEditing]);
   return (
     <article className="chart">
-      <header className="chart-header">
-        <h1>{title}</h1>
-        {artist !== undefined && <p className="chart-artist">{artist}</p>}
+      {/* Mouse shortcuts only: the keyboard reaches the same fields through the Song panel. */}
+      <header className={onMetaClick ? "chart-header is-editable" : "chart-header"}>
+        <h1 onClick={() => onMetaClick?.("title")}>{title}</h1>
+        {artist !== undefined && (
+          <p className="chart-artist" onClick={() => onMetaClick?.("artist")}>
+            {artist}
+          </p>
+        )}
         <p className="chart-facts">
           {key !== undefined && (
-            <span>
+            <span onClick={() => onMetaClick?.("key")}>
               Key <b>{displayKey(key, style)}</b>
             </span>
           )}
-          {tempoBpm !== undefined && <span>♩ = {tempoBpm}</span>}
+          {tempoBpm !== undefined && <span onClick={() => onMetaClick?.("tempoBpm")}>♩ = {tempoBpm}</span>}
         </p>
       </header>
       <div role="grid" aria-label={`${title} chord chart`} className={isEditable ? "grid is-editable" : "grid"} ref={gridRef} onKeyDown={onKeyDown}>

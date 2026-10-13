@@ -52,6 +52,7 @@ export const mergeSettings = (saved: unknown, overrides: Record<string, unknown>
 
 type FieldProps = {
   label: string;
+  name?: string;
   value: string;
   type?: "text" | "number";
   /** Returns an error message, or null when the text is valid. */
@@ -60,7 +61,7 @@ type FieldProps = {
 };
 
 /** A text input committed on Enter or blur (one history entry per change, not per keystroke). */
-export const Field = ({ label, value, type = "text", check = () => null, onCommit }: FieldProps) => {
+export const Field = ({ label, name, value, type = "text", check = () => null, onCommit }: FieldProps) => {
   const [text, setText] = useState(value);
   const [error, setError] = useState<string | null>(null);
   const errorId = useId();
@@ -76,6 +77,7 @@ export const Field = ({ label, value, type = "text", check = () => null, onCommi
       <label>
         {label}{" "}
         <input
+          name={name}
           type={type}
           value={text}
           aria-invalid={error !== null}
@@ -109,10 +111,11 @@ export const Toolbar = ({ history, settings }: Props) => {
   return (
     <div className="toolbar">
       <Panel id="song">
-        <Field label="Title" value={meta.title} check={(t) => (t === "" ? "a song needs a title" : null)} onCommit={(title) => setMeta({ title })} />
-        <Field label="Artist" value={meta.artist ?? ""} onCommit={(t) => setMeta({ artist: t || undefined })} />
+        <Field label="Title" name="title" value={meta.title} check={(t) => (t === "" ? "a song needs a title" : null)} onCommit={(title) => setMeta({ title })} />
+        <Field label="Artist" name="artist" value={meta.artist ?? ""} onCommit={(t) => setMeta({ artist: t || undefined })} />
         <Field
           label="Key"
+          name="key"
           value={meta.key ?? ""}
           check={(t) => (t === "" || /^[A-G][#b]?m?$/.test(t) ? null : "a key is a note, optionally followed by m (e.g. F#m)")}
           onCommit={(t) => history.apply((s) => setKey(s, t || undefined, settings.minorConvention))}
@@ -136,6 +139,7 @@ export const Toolbar = ({ history, settings }: Props) => {
         )}
         <Field
           label="Tempo (BPM)"
+          name="tempoBpm"
           type="number"
           value={meta.tempoBpm?.toString() ?? ""}
           check={(t) => (t === "" || Number(t) > 0 ? null : "the tempo must be a positive number")}

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { emptySong, type Song } from "../model/song";
 import { Editor } from "./Editor";
+import { parseSettings, Toolbar } from "./Toolbar";
 import { useHistory } from "./useHistory";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ confirm: vi.fn() }));
@@ -329,6 +330,34 @@ test("Editor_whenSettingTheBarMeter_overridesTheCursorBar", async () => {
   expect(song?.sections[0].bars[0]).toEqual({ meter: { beats: 3, unit: 4 }, chords: [{ chord: "N", beats: 3 }] });
   fireEvent.change(beats, { target: { value: "4" } });
   expect(song?.sections[0].bars[0]).toEqual({ chords: [{ chord: "N", beats: 4 }] });
+});
+
+test("Editor_whenClickingTheChartHeader_focusesTheSongField", async () => {
+  // Given a song with an artist, a key and a tempo, its Song panel next to the chart
+  const user = userEvent.setup();
+  const WithToolbar = () => {
+    const [panel, setPanel] = useState<HTMLDivElement | null>(null);
+    const history = useHistory({ ...emptySong(), meta: { ...emptySong().meta, title: "Blue", artist: "Ella", key: "F", tempoBpm: 120 } });
+    return (
+      <>
+        <div ref={setPanel}>
+          <Toolbar history={history} settings={parseSettings({})} />
+        </div>
+        {panel && <Editor history={history} barsPerRow={4} style="intl" minorConvention="relative" lowConfidenceThreshold={0.5} panel={panel} />}
+      </>
+    );
+  };
+  render(<WithToolbar />);
+
+  // When clicking the title, the artist, the key and the tempo, Then their field takes the focus
+  await user.click(screen.getByRole("heading", { name: "Blue" }));
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Title" }));
+  await user.click(screen.getByText("Ella"));
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Artist" }));
+  await user.click(screen.getByText("F"));
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Key" }));
+  await user.click(screen.getByText("♩ = 120"));
+  expect(document.activeElement).toBe(screen.getByRole("spinbutton", { name: "Tempo (BPM)" }));
 });
 
 test("Editor_whenShiftingThePhase_movesTheBarLinesInOneUndoableStep", async () => {

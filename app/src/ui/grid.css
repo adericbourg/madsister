@@ -179,12 +179,19 @@
   outline-offset: -1px;
 }
 
-/* A click on a bar's time signature edits it in the Bar panel. */
-.grid.is-editable .bar-meter {
+/* A click on a bar's time signature, or on the title, artist, key or tempo, edits it in the Bar or Song panel. */
+.chart-header.is-editable :is(h1, .chart-artist) {
+  width: fit-content;
+  margin-inline: auto;
+}
+
+.grid.is-editable .bar-meter,
+.chart-header.is-editable :is(h1, .chart-artist, .chart-facts > span) {
   cursor: pointer;
 }
 
-.grid.is-editable .bar-meter:hover {
+.grid.is-editable .bar-meter:hover,
+.chart-header.is-editable :is(h1, .chart-artist, .chart-facts > span):hover {
   outline: 1px solid var(--focus);
   outline-offset: -1px;
 }
