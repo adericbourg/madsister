@@ -342,41 +342,52 @@ test("App_whenUsingPreferencesAndTheToolbar_restylesTransposesEditsMetadataAndPe
   const firstSlot = () => screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ });
   expect(firstSlot().textContent).toBe("Cmaj7");
 
-  // When opening Preferences and switching to the French style, Then the chord is re-rendered and the setting saved
+  const preferences = () => within(screen.getByRole("dialog", { name: "Preferences" }));
+  const editPreferences = async (edit: () => Promise<void>, button = "Save") => {
+    await user.click(screen.getByRole("button", { name: "Preferences" }));
+    await edit();
+    await user.click(preferences().getByRole("button", { name: button }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  };
+
+  // When switching to the French style in Preferences but cancelling, Then nothing changes
+  await editPreferences(async () => {
+    await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
+    expect(firstSlot().textContent).toBe("Cmaj7");
+  }, "Cancel");
+  expect(firstSlot().textContent).toBe("Cmaj7");
+  expect(files["/config/settings.json"]).toBe('{"style":"intl","barsPerRow":2}');
+
+  // When reopening it, Then the cancelled edit is gone
   await user.click(screen.getByRole("button", { name: "Preferences" }));
-  await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
+  expect((screen.getByRole("combobox", { name: "Chord style" }) as HTMLSelectElement).value).toBe("intl");
+  await user.click(preferences().getByRole("button", { name: "Cancel" }));
+
+  // When switching to the French style and saving, Then the chord is re-rendered and the setting saved
+  await editPreferences(() => user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr"));
   expect(firstSlot().textContent).toBe("C7M");
   expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false, font: "petaluma-script", minorConvention: "relative", isSidebarCollapsed: false });
 
   // When switching to the Latin style, Then the root is spelled Do and the setting saved
-  await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "latin");
+  await editPreferences(() => user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "latin"));
   expect(firstSlot().textContent).toBe("Do7M");
   expect(JSON.parse(files["/config/settings.json"]).style).toBe("latin");
-  await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
 
-  // Then the review threshold is offered, though the grid went through no chord recognition
-  expect(screen.getByRole("spinbutton", { name: "Review chords below confidence" })).toBeDefined();
-
-  // When ticking Compact print, Then the setting is saved and the app root carries the print class
-  await user.click(screen.getByRole("checkbox", { name: "Compact print (2 columns)" }));
-  expect(JSON.parse(files["/config/settings.json"]).compactPrint).toBe(true);
-  expect(screen.getByRole("main").className).toBe("compact-print font-petaluma-script");
-
-  // When picking Kalam, Then the setting is saved and the app root carries the font class
-  await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "kalam");
-  expect(JSON.parse(files["/config/settings.json"]).font).toBe("kalam");
+  // When switching back to French, ticking Compact print and picking Kalam, Then the settings are saved and the app root carries the classes
+  await editPreferences(async () => {
+    await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
+    // Then the review threshold is offered, though the grid went through no chord recognition
+    expect(screen.getByRole("spinbutton", { name: "Review chords below confidence" })).toBeDefined();
+    await user.click(screen.getByRole("checkbox", { name: "Compact print (2 columns)" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "kalam");
+  });
+  expect(JSON.parse(files["/config/settings.json"])).toMatchObject({ style: "fr", compactPrint: true, font: "kalam" });
   expect(screen.getByRole("main").className).toBe("compact-print font-kalam");
-  await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "serif");
-  expect(JSON.parse(files["/config/settings.json"]).font).toBe("serif");
-  expect(screen.getByRole("main").className).toBe("compact-print font-serif");
-  for (const font of ["petaluma-script", "petaluma-text"]) {
-    await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), font);
+  for (const font of ["serif", "petaluma-text", "petaluma-script"]) {
+    await editPreferences(() => user.selectOptions(screen.getByRole("combobox", { name: "Font" }), font));
     expect(JSON.parse(files["/config/settings.json"]).font).toBe(font);
     expect(screen.getByRole("main").className).toBe(`compact-print font-${font}`);
   }
-  await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "petaluma-script");
-  await user.click(within(screen.getByRole("dialog", { name: "Preferences" })).getByRole("button", { name: "Close" }));
-  expect(screen.queryByRole("dialog")).toBeNull();
 
   // When transposing up twice with flats, then undoing once
   await user.selectOptions(screen.getByRole("combobox", { name: "Spelling" }), "flat");
@@ -439,8 +450,9 @@ test("App_whenTheSongHasRecognizedChords_reviewsThemAgainstThePersistedThreshold
   const threshold = screen.getByRole("spinbutton", { name: "Review chords below confidence" });
   fireEvent.change(threshold, { target: { value: "0.7" } });
   fireEvent.change(threshold, { target: { value: "2" } });
-  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"]).lowConfidenceThreshold).toBe(0.7));
   expect((threshold as HTMLInputElement).value).toBe("0.7");
+  await user.click(within(screen.getByRole("dialog", { name: "Preferences" })).getByRole("button", { name: "Save" }));
+  await vi.waitFor(() => expect(JSON.parse(files["/config/settings.json"]).lowConfidenceThreshold).toBe(0.7));
 
 });
 

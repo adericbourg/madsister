@@ -14,7 +14,8 @@ M7-1.
 ## Tasks
 - `ui/Preferences.tsx`: a `<dialog>` opened with `showModal()`, following the `About.tsx` pattern. It has every `Settings` field:
   chord style, font, Nashville minor convention, bars per row, low-confidence threshold and compact print.
-  - Changes apply at once through `onSettingsChange`. The dialog has a Close button and Escape closes it.
+  - Changes apply only on Save (primary button), through `onSettingsChange`. Cancel (secondary button), Escape and a
+    backdrop click discard them.
   - The low-confidence threshold is always shown, not only for songs with confidence data.
 - `Toolbar.tsx`: remove the Display fieldset and move its controls into `Preferences.tsx`. `Settings`, `parseSettings`,
   `mergeSettings` and `settings.json` don't change.
@@ -22,7 +23,8 @@ M7-1.
 
 ## Tests
 vitest: the Display cases already in `App.test.tsx`, enriched (no separate test file):
-- Given the dialog is open, when the user changes the font, then `onSettingsChange` gets the new font.
+- Given the dialog is open, when the user changes the font and saves, then `onSettingsChange` gets the new font.
+- Given the dialog is open, when the user changes the chord style and cancels, then nothing changes.
 - Given a song without confidence data, when the dialog opens, then the threshold field is shown.
 - Given the sidebar is open, then it has no chord-style select.
 
@@ -30,8 +32,8 @@ vitest: the Display cases already in `App.test.tsx`, enriched (no separate test 
 `cd app && pnpm test && pnpm build`.
 
 ## Check by hand
-- [ ] Preferences → change the chord style and the font → the chart updates behind the dialog. After a relaunch, they are kept.
-- [ ] Escape closes the dialog, and focus goes back to the button that opened it.
+- [ ] Preferences → change the chord style and the font → Save → the chart updates. After a relaunch, they are kept.
+- [ ] Escape closes the dialog without applying the changes, and focus goes back to the button that opened it.
 
 ## Commit message
 `feat(app): move the user settings into a Preferences dialog`
