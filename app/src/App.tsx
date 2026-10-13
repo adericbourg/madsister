@@ -177,7 +177,7 @@ function App() {
             <button type="button" onClick={() => openSong()}>
               Open…
             </button>
-            <button type="button" onClick={saveSong}>
+            <button type="button" className="primary" onClick={saveSong}>
               Save
             </button>
             <button type="button" onClick={saveAs}>
@@ -278,7 +278,7 @@ function App() {
               <option value="chords">Chords</option>
               <option value="nashville">Nashville numbers</option>
             </select>
-            <button type="button" onClick={createGrid}>
+            <button type="button" className="primary" onClick={createGrid}>
               Create grid
             </button>
           </section>

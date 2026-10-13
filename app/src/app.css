@@ -1,12 +1,44 @@
-/* App chrome: plain system UI, light gray menus, white chart. The chart's own look is in ui/grid.css. */
+/* App chrome: system UI on a gray surface, one indigo accent; the chart is a lighter sheet on it (ui/grid.css). */
 :root {
-  --menu: #f3f3f3;
-  --border: #d0d0d0;
-  --control-border: #767676; /* 4.5:1 on white, 4.1:1 on the menu gray */
-  --text: #1a1a1a;
-  color-scheme: light;
+  --surface: #f4f4f6; /* chrome: menus, sidebar, behind the chart */
+  --surface-2: #fff; /* cards, inputs */
+  --border: #d4d4dc;
+  --control-border: #767680; /* 4.5:1 on surface-2, 4.1:1 on surface */
+  --text: #1a1a1f; /* 15.8:1 on surface */
+  --text-muted: #5c5c66; /* 6.0:1 on surface */
+  --accent: #4f46e5; /* 5.7:1 on surface */
+  --accent-hover: #4338ca;
+  --accent-text: #fff; /* 6.3:1 on accent */
+  --danger: #b42318; /* 6.0:1 on surface */
+  --focus: #4f46e5;
+  color-scheme: light dark;
   font-family: system-ui, sans-serif;
   color: var(--text);
+}
+
+/* Screen only: print keeps the light tokens. */
+@media screen and (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1c1c1f;
+    --surface-2: #2a2a2f;
+    --border: #3a3a41;
+    --control-border: #8a8a94; /* 4.2:1 on surface-2, 5.0:1 on surface */
+    --text: #e6e6ea; /* 11.5:1 on surface-2 */
+    --text-muted: #a6a6b0; /* 5.9:1 on surface-2 */
+    --accent: #818cf8; /* 5.7:1 on surface */
+    --accent-hover: #a5b4fc;
+    --accent-text: #14142b; /* 6.0:1 on accent */
+    --danger: #f97066; /* 5.1:1 on surface-2 */
+    --focus: #a5b4fc;
+  }
+}
+
+body {
+  background: var(--surface);
+}
+
+:focus-visible {
+  outline-color: var(--focus);
 }
 
 html,
@@ -33,17 +65,35 @@ select {
   min-height: 1.75rem;
   padding: 0.1rem 0.6rem;
   color: var(--text);
-  background: #fff;
+  background: var(--surface-2);
   border: 1px solid var(--control-border);
-  border-radius: 3px;
+  border-radius: 6px;
 }
 
 button:enabled:hover {
-  background: #e6e6e6;
+  border-color: var(--accent);
 }
 
 button:disabled {
-  color: #6b6b6b;
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+button.primary {
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+button.primary:enabled:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+button.primary:disabled {
+  color: var(--text-muted);
+  background: var(--surface);
   border-color: var(--border);
 }
 
@@ -51,8 +101,16 @@ input:not([type="checkbox"], [type="radio"]) {
   min-height: 1.75rem;
   box-sizing: border-box;
   padding: 0.1rem 0.4rem;
+  color: var(--text);
+  background: var(--surface-2);
   border: 1px solid var(--control-border);
-  border-radius: 3px;
+  border-radius: 6px;
+}
+
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"] {
+  accent-color: var(--accent);
 }
 
 nav {
@@ -61,7 +119,7 @@ nav {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: var(--menu);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
@@ -80,7 +138,7 @@ nav {
   margin: 0;
   border: 1px solid var(--control-border);
   border-radius: 1rem;
-  background: #fff;
+  background: var(--surface-2);
   cursor: pointer;
 }
 
@@ -97,16 +155,17 @@ nav {
 }
 
 .mode-switch input:checked {
-  background: var(--control-border);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .mode-switch input:checked::before {
   left: calc(100% - 1.4rem + 4px);
-  background: #fff;
+  background: var(--accent-text);
 }
 
 .mode-switch input:focus-visible {
-  outline: 3px solid #1d4ed8;
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -115,7 +174,7 @@ nav {
 }
 
 .panel-toggle[aria-expanded="true"] {
-  background: #e0e0e0;
+  background: var(--border);
 }
 
 nav details {
@@ -126,9 +185,10 @@ dialog.about {
   max-width: 36rem;
   max-height: 90vh;
   padding: 0;
-  color: #000;
-  background: #fff;
-  border: 2px solid #000;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 dialog.about > div { padding: 1rem 1.5rem; }
 dialog.about::backdrop { background: rgb(0 0 0 / 0.4); }
@@ -142,8 +202,9 @@ nav details ul {
   min-width: 16rem;
   max-width: 80vw;
   list-style: none;
-  background: #fff;
+  background: var(--surface-2);
   border: 1px solid var(--control-border);
+  border-radius: 6px;
 }
 
 nav details li button {
@@ -170,7 +231,21 @@ nav details li button {
   flex: 1;
   min-width: 0;
   overflow: auto;
-  background: #fff;
+  background: var(--surface);
+}
+
+/* On screen the chart is a sheet on the chrome; printed, it is the page. */
+@media screen {
+  .content {
+    padding: 0 1rem;
+  }
+
+  .content .chart {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  }
 }
 
 .content .toolbar {
@@ -182,7 +257,7 @@ nav details li button {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #fff;
+  background: var(--surface);
 }
 
 /* A bar scrolled into view while playing stops below the transport, not under it. */
@@ -196,7 +271,7 @@ aside {
   width: 20rem;
   padding: 0.75rem;
   overflow: auto;
-  background: var(--menu);
+  background: var(--surface);
   border-left: 1px solid var(--border);
 }
 
@@ -214,9 +289,9 @@ aside fieldset {
   min-width: 0;
   margin: 0 0 0.75rem;
   padding: 0 0.75rem 0.75rem;
-  background: #fff;
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 /* A floated legend sits inside the frame instead of on its border. */
@@ -259,7 +334,9 @@ aside button {
   flex: 1 1 22rem;
   box-sizing: border-box;
   padding: 1rem 1.25rem;
+  background: var(--surface-2);
   border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .start h2 {
@@ -290,7 +367,7 @@ aside button {
   margin-bottom: 0.5rem;
 }
 
-/* Tabs read as tabs (the selected one is joined to its panel), and Run is the only filled button. */
+/* Tabs read as tabs (the selected one is joined to its panel). */
 .importer [role="tablist"] {
   display: flex;
   gap: 0.25rem;
@@ -299,16 +376,16 @@ aside button {
 
 .importer [role="tab"] {
   border-color: transparent;
-  border-radius: 3px 3px 0 0;
+  border-radius: 6px 6px 0 0;
   background: transparent;
 }
 
 .importer [role="tab"][aria-selected="true"] {
   position: relative;
   font-weight: 600;
-  background: #fff;
+  background: var(--surface-2);
   border-color: var(--control-border);
-  border-bottom-color: #fff;
+  border-bottom-color: var(--surface-2);
 }
 
 .importer .tabpanels {
@@ -319,7 +396,7 @@ aside button {
   grid-area: 1 / 1;
   padding: 1rem;
   border: 1px solid var(--control-border);
-  border-radius: 0 3px 3px 3px;
+  border-radius: 0 6px 6px 6px;
   /* Long file names wrap instead of widening the panel (and unstacking the start screen). */
   overflow-wrap: anywhere;
 }
@@ -328,12 +405,12 @@ aside button {
   visibility: hidden;
 }
 
-/* Grayed legend under a label, indented to the label's text. #595959 is 7:1 on white. */
+/* Grayed legend under a label, indented to the label's text. */
 .importer .hint {
   display: block;
   margin-left: 1.6rem;
   font-size: 0.9rem;
-  color: #595959;
+  color: var(--text-muted);
 }
 
 .importer .hint > span {
@@ -342,20 +419,6 @@ aside button {
 
 .importer button[type="submit"] {
   padding: 0.1rem 1.5rem;
-  font-weight: 600;
-  color: #fff;
-  background: var(--text);
-  border-color: var(--text);
-}
-
-.importer button[type="submit"]:enabled:hover {
-  background: #000;
-}
-
-.importer button[type="submit"]:disabled {
-  color: #6b6b6b;
-  background: var(--menu);
-  border-color: var(--border);
 }
 
 /* Same specificity as the nav/aside rules above, so the print hiding lives here, after them. */

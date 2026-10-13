@@ -18,6 +18,22 @@
   padding: 2rem 1.5rem;
 }
 
+/* A dark sheet, one step lighter than the dark chrome. Screen only: printing keeps black on white. */
+@media screen and (prefers-color-scheme: dark) {
+  .chart {
+    --ink: #e6e6e6; /* off-white against halation; 12.1:1 on paper */
+    --paper: #26262a;
+    --muted: #a3a3a3; /* 6.0:1 on paper */
+    --hairline: #8a8a8a; /* 4.4:1 on paper */
+    --focus: #93c5fd; /* 8.4:1 on paper, 6.4:1 on selection */
+    --doubt: #fb923c; /* 6.7:1 on paper, 5.1:1 on selection */
+    --editing: #4a3f12; /* ink 8.4:1 on it */
+    --selection: #1e3a5f; /* ink 9.2:1 on it */
+    --playing: #4ade80; /* 8.7:1 on paper, 6.6:1 on selection */
+    color-scheme: dark;
+  }
+}
+
 @font-face {
   font-family: "Petaluma Script";
   src: url("../fonts/PetalumaScript.woff2") format("woff2");
@@ -210,7 +226,7 @@
   border: 1px solid var(--doubt);
 }
 
-/* The help overlay sits outside .chart, so it spells its colours out. */
+/* The help overlay sits outside .chart: it uses the chrome tokens (app.css). */
 .help {
   position: fixed;
   top: 50%;
@@ -219,9 +235,11 @@
   max-height: 90vh;
   overflow: auto;
   padding: 1rem 1.5rem;
-  color: #000;
-  background: #fff;
-  border: 2px solid #000;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
 }
 
 .help th {
@@ -240,7 +258,7 @@
 
 .field-error {
   margin-left: 0.25rem;
-  color: #a64200;
+  color: var(--danger);
 }
 
 /* Screen-reader-only text (the grid's live region). */

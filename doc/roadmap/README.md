@@ -106,7 +106,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M6-2 | [m6-step2-linux-bundle](m6-step2-linux-bundle.md) | done | 36cb421 |
 | M6-3 | [m6-step3-macos-bundle](m6-step3-macos-bundle.md) | done | this |
 | M6-4 | [m6-step4-user-docs](m6-step4-user-docs.md) | todo | |
-| M7-1 | [m7-step1-theme](m7-step1-theme.md) | todo | |
+| M7-1 | [m7-step1-theme](m7-step1-theme.md) | done | this |
 | M7-2 | [m7-step2-preferences](m7-step2-preferences.md) | todo | |
 | M7-3 | [m7-step3-sidebar](m7-step3-sidebar.md) | todo | |
 | M7-4 | [m7-step4-menu-ribbon](m7-step4-menu-ribbon.md) | todo | |

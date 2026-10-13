@@ -166,7 +166,7 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
             {!hasSections && <span>Installed on first use, requires a network connection</span>}
           </span>
         </p>
-        <button type="submit" disabled={job !== null || (tab === "file" && audioPath === null) || (tab === "url" && url === "")}>
+        <button type="submit" className="primary" disabled={job !== null || (tab === "file" && audioPath === null) || (tab === "url" && url === "")}>
           Run
         </button>
       </form>
