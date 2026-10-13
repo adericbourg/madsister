@@ -106,6 +106,12 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M6-2 | [m6-step2-linux-bundle](m6-step2-linux-bundle.md) | done | 36cb421 |
 | M6-3 | [m6-step3-macos-bundle](m6-step3-macos-bundle.md) | done | this |
 | M6-4 | [m6-step4-user-docs](m6-step4-user-docs.md) | todo | |
+| M7-1 | [m7-step1-theme](m7-step1-theme.md) | todo | |
+| M7-2 | [m7-step2-preferences](m7-step2-preferences.md) | todo | |
+| M7-3 | [m7-step3-sidebar](m7-step3-sidebar.md) | todo | |
+| M7-4 | [m7-step4-menu-ribbon](m7-step4-menu-ribbon.md) | todo | |
+| M7-5 | [m7-step5-tabs](m7-step5-tabs.md) | todo | |
+| M7-6 | [m7-step6-session-restore](m7-step6-session-restore.md) | todo | |
 
 Scope of the first unattended run (2026-09-30 night): M0 + M1. M2–M6 are written at a coarser level. Revise them
 after M0 (the model choices change M2/M4b/M6), and ask the user before starting them.

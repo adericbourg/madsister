@@ -253,6 +253,25 @@ Rules:
 ### 5.6 Structure detection (nice to have)
 - **F-ST-1** SHOULD auto-detect sections with labels (all-in-one). Falls back to a single section.
 
+### 5.7 Application shell (M7)
+The chart grid (§5.2, `grid.css`) keeps its look. These requirements cover the chrome around it.
+- **F-UI-1** Colour theme: a single accent hue for primary actions, the active tab, focus rings and the mode switch. Every
+  text/background pair meets WCAG 2.2 AA (4.5:1 for text, 3:1 for UI components).
+- **F-UI-2** Dark mode follows the OS (`prefers-color-scheme`). The chart goes dark too: an off-white ink on a sheet one step
+  lighter than the chrome. Printing always uses the light theme.
+- **F-UI-3** A Preferences dialog holds the user settings (F-DS-1/2, bars per row, font, Nashville minor convention, low-confidence
+  threshold, compact print). The sidebar no longer shows them.
+- **F-UI-4** The sidebar holds per-song panels only (Song, Transpose, Section, Bar). It collapses to an icon rail, and the collapsed
+  state is remembered.
+- **F-UI-5** Native menu, following platform conventions. On macOS, the app menu holds About, Settings… and Quit. On Linux and
+  Windows: File, Edit, View, Settings > Preferences…, Help > About. File holds New tab, Open…, Open recent ▸, Close tab, Save,
+  Save as…, Export ▸, Print…. Edit holds Undo/Redo plus the clipboard items. View holds Edit mode and Show sidebar.
+- **F-UI-6** A ribbon below the menu: New, Open, Save, Print on the left, and the View/Edit switch and Preferences on the right.
+- **F-UI-7** Several songs open at once, one tab each. The tab bar is shown as soon as one tab exists. New opens a tab on the
+  start screen (new grid / import audio). Opening an already-open file focuses its tab. Closing a dirty tab, or the window with
+  dirty tabs, asks for confirmation. Only the active tab plays.
+- **F-UI-8** The tabs that have a file are reopened at launch.
+
 ## 6. Non-functional requirements
 - **NF-1** Fully offline after setup (except yt-dlp downloads).
 - **NF-2** Transcription of a 4-min song SHOULD finish in < 2 min on a recent laptop CPU (no GPU required).
@@ -288,6 +307,7 @@ Each milestone is usable on its own.
 | **M4b** Modes | D7, F-IN-7: `--mode` in the engine and a mode picker in the UI. | Both modes run on `bench/`. `accurate` scores measurably better than `fast` in "edits needed", or it is dropped. |
 | **M5** Sources | F-IN-2 (yt-dlp), F-IN-3 (mic). F-ST-1 if not done in M2. | URL and recording both yield a grid. |
 | **M6** Packaging | Linux AppImage/deb with engine setup. Then macOS. | Installs on a clean machine with one command/package. |
+| **M7** Application shell | F-UI-*: theme and dark mode, preferences, sidebar, native menu and ribbon, tabs, session restore. | Two songs open in tabs, driven from the native menu, in light and dark mode. |
 
 ### 8.1 M0 results (provisional — proxy bench, GuitarSet)
 Measured on 72 GuitarSet solo-guitar takes, not on the user's songs; the user's bench (§7) confirms or overturns it. Details: [M0 results](roadmap/m0-results.md).
