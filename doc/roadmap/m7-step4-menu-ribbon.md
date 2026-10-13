@@ -35,6 +35,17 @@ M7-2 (Preferences), M7-3 (Show sidebar).
   text labels.
 - Remove the `<nav>` from `App.tsx`, together with the Recent `<details>`, the Export group and the About button.
 
+## Decisions (implementation)
+- No Rust change. The JS API takes the whole menu as plain options (`menu.ts` `menuItems`, a pure function), predefined
+  items included. `core:default` already grants the menu permissions; `core:window:allow-close` is added for Quit.
+- Quit is a custom item that closes the window (not the predefined Quit), so that M7-5's close-requested check catches it.
+- Cut/Copy/Paste/Select all are on macOS only: there the webview needs them, while on Linux (GTK) a Ctrl+C accelerator would
+  take the key before the webview, and break the grid's own bar copy/paste.
+- Undo/Redo are custom items: in a text field they run `document.execCommand("undo")`, elsewhere the song history (edit mode
+  only, like the grid). On macOS the grid's keydown handler sees ⌘Z first and prevents the menu item, so one press undoes once.
+- The platform comes from `keymap.ts` (`IS_MAC`, the `navigator.platform` test it already used), not from `plugin-os`.
+- About and Preferences are `<dialog>`s opened through a ref (React 19 `ref` prop).
+
 ## Tests
 vitest, with `@tauri-apps/api/menu` mocked:
 - `menu.ts`: given macOS, then the first submenu is the app menu with About and Quit, and File has no Quit. Given Linux, then File

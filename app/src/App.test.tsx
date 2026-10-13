@@ -31,7 +31,18 @@ vi.mock("@tauri-apps/api/webview", () => ({
   }),
 }));
 const setTitle = vi.hoisted(() => vi.fn());
-vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ setTitle }) }));
+const closeWindow = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ setTitle, close: closeWindow }) }));
+type MenuNode = { text?: string; id?: string; enabled?: boolean; checked?: boolean; items?: MenuNode[]; action?: (id: string) => void };
+const appMenu = vi.hoisted(() => ({ items: [] as MenuNode[] }));
+vi.mock("@tauri-apps/api/menu", () => ({
+  Menu: {
+    new: async ({ items }: { items: MenuNode[] }) => {
+      appMenu.items = items;
+      return { setAsAppMenu: async () => {} };
+    },
+  },
+}));
 vi.mock("@tauri-apps/api/path", () => ({ appConfigDir: async () => "/config", join: async (...p: string[]) => p.join("/") }));
 
 const song: Song = {
@@ -61,6 +72,20 @@ beforeEach(() => {
 
 const createGrid = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "Create grid" }));
 
+/** The native menu item at that path (Linux layout: jsdom isn't a Mac), once the menu shows it. */
+const menuItem = (...path: string[]) =>
+  vi.waitFor(() => {
+    let nodes = appMenu.items;
+    for (const text of path.slice(0, -1)) nodes = nodes.find((n) => n.text === text)!.items!;
+    const item = nodes.find((n) => n.text === path.at(-1));
+    if (item === undefined) throw new Error(`no menu item ${path.join(" > ")}`);
+    return item;
+  });
+const clickMenu = async (...path: string[]) => {
+  const item = await menuItem(...path);
+  await act(async () => item.action!(item.id!));
+};
+
 test("App_onStart_offersANewGridOrAnAudioImportButNoGridNorParameters", async () => {
   // Given / When the app just started
   const user = userEvent.setup();
@@ -71,7 +96,7 @@ test("App_onStart_offersANewGridOrAnAudioImportButNoGridNorParameters", async ()
   expect(screen.getByRole("button", { name: "Import audio…" })).toBeDefined();
   expect(screen.queryByRole("grid")).toBeNull();
   expect(screen.queryByRole("combobox", { name: "Chord style" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+  expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
 
   // When creating a grid
   await createGrid(user);
@@ -107,7 +132,7 @@ test("App_whenCollapsingTheSidebar_showsAnIconRailThatReopensItOnAPanel", async 
   expect(JSON.parse(files["/config/settings.json"]).isSidebarCollapsed).toBe(true);
 
   // When switching to view mode, Then the rail drops the editing panels
-  await user.keyboard("{Control>}e{/Control}");
+  await clickMenu("View", "Edit mode");
   expect(screen.getByRole("button", { name: "Transpose" })).toBeDefined();
   expect(screen.queryByRole("button", { name: "Section" })).toBeNull();
 
@@ -127,13 +152,13 @@ test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
   files["/bad.madsister.json"] = '{"version": 1}';
   render(<App />);
 
-  // When opening the valid file with Mod+O
+  // When opening the valid file from the menu
   vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
-  await user.keyboard("{Control>}o{/Control}");
+  await clickMenu("File", "Open…");
 
   // Then the song is loaded and the file is listed as recent
   expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
-  expect(screen.getByRole("button", { name: "blues.madsister.json" })).toBeDefined();
+  expect(await menuItem("File", "Open recent", "blues.madsister.json")).toBeDefined();
   expect(files["/config/recent.json"]).toBe('["/blues.madsister.json"]');
 
   // When opening the invalid file from the toolbar
@@ -144,20 +169,25 @@ test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
   expect((await screen.findByRole("alert")).textContent).toMatch(/meta/);
   expect(screen.getByRole("heading", { name: "Blues" })).toBeDefined();
 
-  // When the recent file has gone missing and is reopened from the open menu
+  // When the recent file has gone missing and is reopened from Open recent
   delete files["/blues.madsister.json"];
-  const recentMenu = screen.getByText("Recent").closest("details")!;
-  await user.click(screen.getByText("Recent"));
-  expect(recentMenu.open).toBe(true);
-  await user.click(screen.getByRole("button", { name: "blues.madsister.json" }));
+  await clickMenu("File", "Open recent", "blues.madsister.json");
 
-  // Then the menu closes and the file is dropped from the recent list
-  expect(recentMenu.open).toBe(false);
+  // Then the file is dropped from the recent list
   await vi.waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/not found/));
-  expect(screen.queryByRole("button", { name: "blues.madsister.json" })).toBeNull();
+  await vi.waitFor(() => expect((appMenu.items[0].items!.find((n) => n.text === "Open recent")!).enabled).toBe(false));
 
-  // When starting a new song with Mod+N
-  await user.keyboard("{Control>}n{/Control}");
+  // When reopening the valid file, then clearing the recent files
+  files["/blues.madsister.json"] = serializeSong(song);
+  vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
+  await clickMenu("File", "Open…");
+  await clickMenu("File", "Open recent", "Clear recent");
+
+  // Then the list is empty
+  await vi.waitFor(() => expect(files["/config/recent.json"]).toBe("[]"));
+
+  // When starting a new song from the menu
+  await clickMenu("File", "New tab");
 
   // Then the start screen replaces the loaded song
   expect(await screen.findByRole("button", { name: "Create grid" })).toBeDefined();
@@ -179,7 +209,7 @@ test("App_whenImportingAudio_loadsTheResultAndReportsErrors", async () => {
 
   // Then the song is loaded and listed as recent
   expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
-  expect(screen.getByRole("button", { name: "blues.madsister.json" })).toBeDefined();
+  expect(await menuItem("File", "Open recent", "blues.madsister.json")).toBeDefined();
 
   // When a second import fails, started from the start screen
   await user.click(screen.getByRole("button", { name: "New" }));
@@ -216,12 +246,12 @@ test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAud
   // Then the notice goes away, and the new path (relative to the song) and hash are saved
   await vi.waitFor(() => expect(screen.queryByText(/Audio file/)).toBeNull());
   vi.mocked(save).mockResolvedValueOnce("/blues2.madsister.json");
-  await user.click(screen.getByRole("button", { name: "Save as…" }));
+  await clickMenu("File", "Save as…");
   await vi.waitFor(() => expect(files["/blues2.madsister.json"]).toBeDefined());
   expect(JSON.parse(files["/blues2.madsister.json"]).audio).toEqual({ path: "music/found.mp3", sha256: "abc" });
 
   // When switching to edit mode and undoing, Then the old path is back with its notice (locating is one history entry)
-  await user.keyboard("{Control>}e{/Control}");
+  await clickMenu("View", "Edit mode");
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
   await user.keyboard("{Escape}{Control>}z{/Control}");
   expect(await screen.findByText("Audio file not found next to the song: /music/blues.mp3. The song can't be played until you locate it.")).toBeDefined();
@@ -242,9 +272,9 @@ test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {
   await createGrid(user);
   expect(setTitle).toHaveBeenLastCalledWith("Untitled — madsister");
 
-  // When saving it with Mod+S (no path yet: Save As)
+  // When saving it from the menu (no path yet: Save As)
   vi.mocked(save).mockResolvedValueOnce("/untitled.madsister.json");
-  await user.keyboard("{Control>}s{/Control}");
+  await clickMenu("File", "Save");
 
   // Then Save As proposes a name from the title and writes the song there
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.madsister.json" }));
@@ -252,6 +282,7 @@ test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {
   expect(JSON.parse(files["/untitled.madsister.json"])).toMatchObject({ meta: { title: "Untitled" } });
 
   // When editing the song, then waiting 2 s
+  await user.click(screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ }));
   await user.keyboard("C{Enter}");
   expect(setTitle).toHaveBeenLastCalledWith("• Untitled — madsister");
   await act(() => vi.advanceTimersByTimeAsync(2000));
@@ -262,14 +293,14 @@ test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {
   vi.useRealTimers();
 });
 
-test("App_onAboutClick_opensADialogWithAuthorModelAndFontCreditsThenTheRepoLink", async () => {
+test("App_onAboutMenu_opensADialogWithAuthorModelAndFontCreditsThenTheRepoLink", async () => {
   // Given the app just started, with no song
   const user = userEvent.setup();
   render(<App />);
   expect(screen.queryByRole("dialog")).toBeNull();
 
-  // When opening About
-  await user.click(screen.getByRole("button", { name: "About" }));
+  // When opening About from the menu
+  await clickMenu("Help", "About madsister");
 
   // Then a dialog credits the author, the models and every chart font, ending with the repo link
   const dialog = screen.getByRole("dialog", { name: "About madsister" });
@@ -372,7 +403,7 @@ test("App_whenUsingPreferencesAndTheToolbar_restylesTransposesEditsMetadataAndPe
   await user.selectOptions(screen.getByRole("combobox", { name: "Beat unit" }), "8");
   await createGrid(user);
   vi.mocked(save).mockResolvedValueOnce("/waltz.madsister.json");
-  await user.click(screen.getByRole("button", { name: "Save as…" }));
+  await clickMenu("File", "Save as…");
 
   // Then the new song has that meter
   await vi.waitFor(() => expect(files["/waltz.madsister.json"]).toBeDefined());
@@ -388,7 +419,7 @@ test("App_whenTheSongHasRecognizedChords_reviewsThemAgainstThePersistedThreshold
   files["/blues.madsister.json"] = serializeSong(recognized);
   render(<App />);
   vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
-  await user.keyboard("{Control>}o{/Control}");
+  await clickMenu("File", "Open…");
   await screen.findByRole("heading", { name: "Blues" });
   expect(screen.getByText("1 chord to review")).toBeDefined();
 
@@ -402,17 +433,16 @@ test("App_whenTheSongHasRecognizedChords_reviewsThemAgainstThePersistedThreshold
 
 });
 
-test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMusicXmlAndMidi", async () => {
+test("App_whenPrintingOrExporting_printsFromTheRibbonAndTheMenuAndWritesChordProMusicXmlAndMidi", async () => {
   // Given the app
   const user = userEvent.setup();
   const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
   render(<App />);
   await createGrid(user);
 
-  // When clicking Print, then pressing Mod+P from the grid
+  // When clicking Print on the ribbon, then in the menu
   await user.click(screen.getByRole("button", { name: "Print…" }));
-  await user.click(screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ }));
-  await user.keyboard("{Escape}{Meta>}p{/Meta}");
+  await clickMenu("File", "Print…");
 
   // Then the chart is printed twice
   expect(print).toHaveBeenCalledTimes(2);
@@ -420,7 +450,7 @@ test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMus
 
   // When exporting ChordPro to a picked path
   vi.mocked(save).mockResolvedValueOnce("/out/untitled.cho");
-  await user.click(screen.getByRole("button", { name: "ChordPro…" }));
+  await clickMenu("File", "Export", "ChordPro…");
 
   // Then the dialog proposes a .cho named after the title and the grid is written there
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.cho" }));
@@ -428,7 +458,7 @@ test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMus
 
   // When exporting MusicXML to a picked path
   vi.mocked(save).mockResolvedValueOnce("/out/untitled.musicxml");
-  await user.click(screen.getByRole("button", { name: "MusicXML…" }));
+  await clickMenu("File", "Export", "MusicXML…");
 
   // Then the dialog proposes a .musicxml named after the title and the score is written there
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.musicxml" }));
@@ -436,7 +466,7 @@ test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMus
 
   // When exporting MIDI to a picked path
   vi.mocked(save).mockResolvedValueOnce("/out/untitled.mid");
-  await user.click(screen.getByRole("button", { name: "MIDI…" }));
+  await clickMenu("File", "Export", "MIDI…");
 
   // Then the dialog proposes a .mid named after the title and a Standard MIDI File is written there as bytes
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.mid" }));
@@ -446,12 +476,10 @@ test("App_whenPrintingOrExporting_printsFromTheButtonAndModPAndWritesChordProMus
 });
 
 test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () => {
-  // Given the app, with a recent file so that every control is present
+  // Given the app, with a grid so that every control is present
   const user = userEvent.setup();
-  files["/config/recent.json"] = '["/blues.madsister.json"]';
   render(<App />);
   await createGrid(user);
-  await screen.findByText("Recent");
 
   // When tabbing forward past the end
   const reached = new Set<Element | null>();
@@ -461,7 +489,7 @@ test("App_whenTabbingThroughTheControls_reachesEveryEnabledControl", async () =>
   }
 
   // Then every enabled control and the grid's single tab stop were focused
-  const controls = [...document.querySelectorAll('button:not([disabled]), input, select:not([disabled]), summary, [tabindex="0"]')].filter(
+  const controls = [...document.querySelectorAll('button:not([disabled]), input, select:not([disabled]), [tabindex="0"]')].filter(
     (control) => !control.closest("dialog:not([open])"),
   );
   expect(controls.length).toBeGreaterThan(15);
@@ -518,7 +546,7 @@ test("App_whenCreatingANashvilleGrid_needsAKeyToSwitchNotationOrExport", async (
   expect(notation().value).toBe("nashville");
   expect(notation().disabled).toBe(true);
   expect(screen.getByText("Set a key to see the chords")).toBeDefined();
-  expect((screen.getByRole("button", { name: "ChordPro…" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((await menuItem("File", "Export", "ChordPro…")).enabled).toBe(false);
   expect(screen.getByRole("button", { name: "+1 semitone" }).matches(":disabled")).toBe(true);
 
   // When typing degrees
@@ -536,7 +564,7 @@ test("App_whenCreatingANashvilleGrid_needsAKeyToSwitchNotationOrExport", async (
   // Then the numbers stay and switching and exporting are possible
   expect([cell(1), cell(2), cell(3)]).toEqual(["1", "4m", "b7"]);
   expect(notation().disabled).toBe(false);
-  expect((screen.getByRole("button", { name: "ChordPro…" }) as HTMLButtonElement).disabled).toBe(false);
+  await vi.waitFor(async () => expect((await menuItem("File", "Export", "ChordPro…")).enabled).toBe(true));
 
   // When switching to chords, Then they are G, Cm and F (b7 of G)
   await user.selectOptions(notation(), "chords");
@@ -549,7 +577,7 @@ test("App_whenOpeningASong_startsInViewModeUntilSwitchedToEdit", async () => {
   files["/blues.madsister.json"] = serializeSong(song);
   render(<App />);
   vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
-  await user.keyboard("{Control>}o{/Control}");
+  await clickMenu("File", "Open…");
   await screen.findByRole("heading", { name: "Blues" });
   const editButton = () => screen.getByRole("switch", { name: "Edit mode" }) as HTMLInputElement;
 
@@ -558,16 +586,49 @@ test("App_whenOpeningASong_startsInViewModeUntilSwitchedToEdit", async () => {
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
   expect(screen.queryByRole("textbox", { name: "Chord" })).toBeNull();
 
-  // When pressing Mod+E, Then clicking a bar edits it, and Mod+E switches back
-  await user.keyboard("{Control>}e{/Control}");
+  // When choosing View > Edit mode, Then clicking a bar edits it, the menu item is checked, and the ribbon switch goes back
+  await clickMenu("View", "Edit mode");
   expect(editButton().checked).toBe(true);
+  await vi.waitFor(async () => expect((await menuItem("View", "Edit mode")).checked).toBe(true));
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
   expect(screen.getByRole("textbox", { name: "Chord" })).toBeDefined();
-  await user.keyboard("{Escape}{Control>}e{/Control}");
+  await user.keyboard("{Escape}");
+  await user.click(editButton());
   expect(editButton().checked).toBe(false);
 
   // When creating a new grid, Then it starts in edit mode
-  await user.keyboard("{Control>}n{/Control}");
+  await clickMenu("File", "New tab");
   await createGrid(user);
   expect(editButton().checked).toBe(true);
+});
+
+test("App_fromTheMenu_undoesShowsTheSidebarOpensPreferencesAndQuits", async () => {
+  // Given a grid with a chord typed, focus outside any text field
+  const user = userEvent.setup();
+  render(<App />);
+  await createGrid(user);
+  const firstSlot = () => screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ });
+  const empty = firstSlot().textContent;
+  await user.keyboard("C{Enter}");
+  expect(firstSlot().textContent).toBe("C");
+
+  // When choosing Edit > Undo, then Redo
+  await clickMenu("Edit", "Undo");
+  expect(firstSlot().textContent).toBe(empty);
+  await clickMenu("Edit", "Redo");
+  expect(firstSlot().textContent).toBe("C");
+
+  // When unticking View > Show sidebar, Then the sidebar is collapsed, and ticking it expands it again
+  await clickMenu("View", "Show sidebar");
+  expect(screen.getByRole("button", { name: "Parameters" }).getAttribute("aria-expanded")).toBe("false");
+  await clickMenu("View", "Show sidebar");
+  expect(screen.getByRole("button", { name: "Parameters" }).getAttribute("aria-expanded")).toBe("true");
+
+  // When choosing Settings > Preferences…, Then the dialog opens
+  await clickMenu("Settings", "Preferences…");
+  expect(screen.getByRole("dialog", { name: "Preferences" })).toBeDefined();
+
+  // When choosing Quit, Then the window is closed
+  await clickMenu("File", "Quit madsister");
+  expect(closeWindow).toHaveBeenCalled();
 });

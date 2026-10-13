@@ -108,8 +108,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M6-4 | [m6-step4-user-docs](m6-step4-user-docs.md) | todo | |
 | M7-1 | [m7-step1-theme](m7-step1-theme.md) | done | a51c731 |
 | M7-2 | [m7-step2-preferences](m7-step2-preferences.md) | done | df4cca6 |
-| M7-3 | [m7-step3-sidebar](m7-step3-sidebar.md) | done | this |
-| M7-4 | [m7-step4-menu-ribbon](m7-step4-menu-ribbon.md) | todo | |
+| M7-3 | [m7-step3-sidebar](m7-step3-sidebar.md) | done | 2338b92 |
+| M7-4 | [m7-step4-menu-ribbon](m7-step4-menu-ribbon.md) | done | this |
 | M7-5 | [m7-step5-tabs](m7-step5-tabs.md) | todo | |
 | M7-6 | [m7-step6-session-restore](m7-step6-session-restore.md) | todo | |
 

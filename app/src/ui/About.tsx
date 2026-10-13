@@ -1,5 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useRef } from "react";
+import type { Ref } from "react";
 
 const AUTHOR = "Alban Dericbourg";
 const REPO = "https://github.com/adericbourg/madsister";
@@ -19,9 +19,9 @@ const FONTS = [
   ["Petaluma", "Steinberg Media Technologies", "https://github.com/steinbergmedia/petaluma"],
 ] as const;
 
-export function About() {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const close = () => dialog.current?.close();
+/** Opened with `showModal()` on its ref, from the menu. */
+export function About({ ref }: { ref: Ref<HTMLDialogElement> }) {
+  const close = (e: { currentTarget: Element }) => e.currentTarget.closest("dialog")!.close();
   const link = (name: string, url: string) => (
     <a
       href={url}
@@ -35,42 +35,37 @@ export function About() {
   );
 
   return (
-    <>
-      <button type="button" onClick={() => dialog.current?.showModal()}>
-        About
+    <dialog
+      ref={ref}
+      className="about"
+      aria-labelledby="about-title"
+      onClick={(e) => e.target === e.currentTarget && close(e)}
+    >
+      <div>
+      <h2 id="about-title">About madsister</h2>
+      <h3>Author</h3>
+      <p>{AUTHOR}</p>
+      <h3>Models</h3>
+      <ul>
+        {MODELS.map(([name, author, license, url]) => (
+          <li key={name}>
+            {link(name, url)} by {author}, {license}
+          </li>
+        ))}
+      </ul>
+      <h3>Fonts</h3>
+      <ul>
+        {FONTS.map(([name, author, url]) => (
+          <li key={name}>
+            {link(name, url)} by {author}, SIL Open Font License 1.1
+          </li>
+        ))}
+      </ul>
+      <p>{link("Source code on GitHub", REPO)}</p>
+      <button type="button" autoFocus onClick={close}>
+        Close
       </button>
-      <dialog
-        ref={dialog}
-        className="about"
-        aria-labelledby="about-title"
-        onClick={(e) => e.target === e.currentTarget && close()}
-      >
-        <div>
-        <h2 id="about-title">About madsister</h2>
-        <h3>Author</h3>
-        <p>{AUTHOR}</p>
-        <h3>Models</h3>
-        <ul>
-          {MODELS.map(([name, author, license, url]) => (
-            <li key={name}>
-              {link(name, url)} by {author}, {license}
-            </li>
-          ))}
-        </ul>
-        <h3>Fonts</h3>
-        <ul>
-          {FONTS.map(([name, author, url]) => (
-            <li key={name}>
-              {link(name, url)} by {author}, SIL Open Font License 1.1
-            </li>
-          ))}
-        </ul>
-        <p>{link("Source code on GitHub", REPO)}</p>
-        <button type="button" autoFocus onClick={close}>
-          Close
-        </button>
-        </div>
-      </dialog>
-    </>
+      </div>
+    </dialog>
   );
 }

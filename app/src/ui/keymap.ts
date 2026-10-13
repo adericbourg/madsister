@@ -38,7 +38,8 @@ export type Command =
   | { kind: "type"; text: string }
   | { kind: "rename" | "undo" | "redo" | "help" | "play" | "playFromCursor" | "refused" };
 
-export const MOD_LABEL = /Mac|iP/.test(navigator.platform) ? "⌘" : "Ctrl";
+export const IS_MAC = /Mac|iP/.test(navigator.platform);
+export const MOD_LABEL = IS_MAC ? "⌘" : "Ctrl";
 
 export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["← → ↑ ↓", "Move between slots and rows"],

@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { Menu } from "@tauri-apps/api/menu";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useRef, useState } from "react";
 import { toChordPro } from "./model/export/chordpro";
 import { toMidi } from "./model/export/midi";
 import { toMusicXml } from "./model/export/musicxml";
@@ -15,7 +17,6 @@ import {
   pickSavePath,
   printSong,
   pushRecent,
-  shortestUniquePaths,
   readConfigJson,
   readSong,
   relativeAudioPath,
@@ -27,6 +28,9 @@ import {
 import { parseSettings, Toolbar, type Settings } from "./ui/Toolbar";
 import { About } from "./ui/About";
 import { Preferences } from "./ui/Preferences";
+import { IS_MAC } from "./ui/keymap";
+import { menuItems, RECENT_PREFIX, type MenuState } from "./ui/menu";
+import { Ribbon } from "./ui/Ribbon";
 import { Sidebar } from "./ui/Sidebar";
 import { useHistory } from "./ui/useHistory";
 
@@ -52,6 +56,8 @@ function App() {
   const [newUnit, setNewUnit] = useState<2 | 4 | 8>(4);
   const [newNotation, setNewNotation] = useState<Notation>("chords");
   const [audioNotice, setAudioNotice] = useState<string | null>(null);
+  const preferences = useRef<HTMLDialogElement>(null);
+  const about = useRef<HTMLDialogElement>(null);
   const isSongDirty = song !== savedSong;
   // The exports write real notes, which a key-less Nashville song (chords relative to C) doesn't have.
   const isExportLocked = song.meta.notation === "nashville" && song.meta.key === undefined;
@@ -153,87 +159,60 @@ function App() {
     return () => clearTimeout(timer);
   });
 
-  // Re-bound on every render so the handler sees the current song; the grid lets Mod+N/O/P/S bubble up.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      const key = e.key.toLowerCase();
-      const action = { e: toggleMode, n: newSong, o: () => openSong(), p: printSong, s: e.shiftKey ? saveAs : saveSong }[key];
-      if (action === undefined || (!hasSong && "eps".includes(key))) return;
-      e.preventDefault();
-      void action();
+  const runMenu = (id: string) => {
+    if (id.startsWith(RECENT_PREFIX)) return void openSong(id.slice(RECENT_PREFIX.length));
+    const isInText = document.activeElement?.matches("input, textarea") ?? false;
+    const actions: Record<string, () => unknown> = {
+      new: newSong,
+      open: () => openSong(),
+      "clear-recent": () => updateRecent([]),
+      close: newSong,
+      save: saveSong,
+      "save-as": saveAs,
+      chordpro: () => exportSong(song, "ChordPro", "cho", toChordPro).catch(fail),
+      musicxml: () => exportSong(song, "MusicXML", "musicxml", toMusicXml).catch(fail),
+      midi: () => exportSong(song, "MIDI", "mid", toMidi).catch(fail),
+      print: printSong,
+      // A text field undoes its own typing; otherwise the song history, which is read-only in view mode like the grid.
+      undo: () => (isInText ? document.execCommand("undo") : mode === "edit" && history.undo()),
+      redo: () => (isInText ? document.execCommand("redo") : mode === "edit" && history.redo()),
+      "edit-mode": toggleMode,
+      sidebar: () => changeSettings({ ...settings, isSidebarCollapsed: !settings.isSidebarCollapsed }),
+      preferences: () => preferences.current?.showModal(),
+      about: () => about.current?.showModal(),
+      quit: () => getCurrentWindow().close(),
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
+    void actions[id]();
+  };
+  // The menu calls the current render's actions; it is rebuilt only when what it shows changes.
+  const runMenuRef = useRef(runMenu);
+  runMenuRef.current = runMenu;
+  const menuState: MenuState = { isMac: IS_MAC, hasSong, isExportLocked, isEditing: mode === "edit", isSidebarShown: !settings.isSidebarCollapsed, recent };
+  const menuKey = JSON.stringify(menuState);
+  useEffect(() => {
+    let isCurrent = true;
+    void Menu.new({ items: menuItems(menuState, (id) => runMenuRef.current(id)) }).then((menu) => {
+      if (isCurrent) void menu.setAsAppMenu();
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [menuKey]);
 
   return (
     <main className={[settings.compactPrint && "compact-print", `font-${settings.font}`].filter(Boolean).join(" ")}>
-      <nav aria-label="File">
-        {hasSong && (
-          <>
-            <button type="button" onClick={newSong}>
-              New
-            </button>
-            <button type="button" onClick={() => openSong()}>
-              Open…
-            </button>
-            <button type="button" className="primary" onClick={saveSong}>
-              Save
-            </button>
-            <button type="button" onClick={saveAs}>
-              Save as…
-            </button>
-            <button type="button" onClick={printSong}>
-              Print…
-            </button>
-            <span role="group" aria-label="Export">
-              Export{" "}
-              {isExportLocked && <span id="export-hint">(set a key to export)</span>}{" "}
-              <button type="button" disabled={isExportLocked} aria-describedby={isExportLocked ? "export-hint" : undefined} onClick={() => exportSong(song, "ChordPro", "cho", toChordPro).catch(fail)}>
-                ChordPro…
-              </button>
-              <button type="button" disabled={isExportLocked} aria-describedby={isExportLocked ? "export-hint" : undefined} onClick={() => exportSong(song, "MusicXML", "musicxml", toMusicXml).catch(fail)}>
-                MusicXML…
-              </button>
-              <button type="button" disabled={isExportLocked} aria-describedby={isExportLocked ? "export-hint" : undefined} onClick={() => exportSong(song, "MIDI", "mid", toMidi).catch(fail)}>
-                MIDI…
-              </button>
-            </span>
-          </>
-        )}
-        {!hasSong && (
-          <button type="button" onClick={() => openSong()}>
-            Open…
-          </button>
-        )}
-        {recent.length > 0 && (
-          <details>
-            <summary>Recent</summary>
-            <ul>
-              {shortestUniquePaths(recent).map((label, i) => (
-                <li key={recent[i]}>
-                  <button type="button" title={recent[i]} onClick={(e) => {
-                      e.currentTarget.closest("details")!.open = false;
-                      openSong(recent[i]);
-                    }}>
-                    {label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-        <Preferences settings={settings} onSettingsChange={changeSettings} />
-        <About />
-        {hasSong && (
-          <label className="mode-switch">
-            View
-            <input type="checkbox" role="switch" aria-label="Edit mode" checked={mode === "edit"} onChange={toggleMode} />
-            Edit
-          </label>
-        )}
-      </nav>
+      <Ribbon
+        hasSong={hasSong}
+        isEditing={mode === "edit"}
+        onNew={newSong}
+        onOpen={() => openSong()}
+        onSave={saveSong}
+        onPrint={printSong}
+        onToggleMode={toggleMode}
+        onPreferences={() => preferences.current?.showModal()}
+      />
+      <Preferences ref={preferences} settings={settings} onSettingsChange={changeSettings} />
+      <About ref={about} />
       {error !== null && <p role="alert">{error}</p>}
       {hasSong ? (
         <div className="workspace">
