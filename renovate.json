@@ -4,7 +4,6 @@
     "config:recommended"
   ],
   "minimumReleaseAge": "3 days",
-  "internalChecksFilter": "flexible",
   "prConcurrentLimit": 10,
   "prHourlyLimit": 10,
   "packageRules": [
