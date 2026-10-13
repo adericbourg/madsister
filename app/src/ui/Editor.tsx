@@ -11,6 +11,7 @@ import type { Bar, Song } from "../model/song";
 import { confirmDeleteSection } from "./fileActions";
 import { Grid } from "./Grid";
 import type { MenuTarget } from "./SectionBlock";
+import { Panel } from "./Sidebar";
 import { Field } from "./Toolbar";
 import { clampCursor, countFlagged, hasConfidence, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
 import type { useHistory } from "./useHistory";
@@ -267,8 +268,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
     <>
       {isEditable && inPanel(
         <>
-          <fieldset className="toolbar">
-            <legend>Section</legend>
+          <Panel id="section">
             <select aria-label="Section" value={cursor.section} onChange={(e) => selectSection(Number(e.target.value))}>
               {song.sections.map((s, i) => (
                 <option key={s.id} value={i}>
@@ -309,12 +309,11 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
             <button type="button" onClick={() => editSection((s) => addSection(s, cursor.section + 1, "New section"), cursor.section + 1)}>
               Add section
             </button>
-            <button type="button" onClick={() => void removeSection()}>
+            <button type="button" className="danger" onClick={() => void removeSection()}>
               Delete section
             </button>
-          </fieldset>
-          <fieldset className="toolbar" disabled={barMeter === undefined}>
-            <legend>Bar</legend>
+          </Panel>
+          <Panel id="bar" disabled={barMeter === undefined}>
             <label>
               Beats in this bar{" "}
               <input
@@ -329,9 +328,8 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
               />
             </label>{" "}
             /{barMeter?.unit ?? song.meta.meter.unit}
-          </fieldset>
-          <fieldset className="toolbar">
-            <legend>Bar lines</legend>
+          </Panel>
+          <Panel id="bar-lines">
             <button type="button" onClick={() => shift(-1)}>
               Whole song −1 beat
             </button>
@@ -344,9 +342,8 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
             <button type="button" disabled={cursorBar === undefined} onClick={() => shift(1, cursor)}>
               From this bar +1 beat
             </button>
-          </fieldset>
-          <fieldset className="toolbar">
-            <legend>Tempo</legend>
+          </Panel>
+          <Panel id="tempo">
             <button type="button" onClick={() => history.apply((s) => halveTempo(s))}>
               Whole song half tempo
             </button>
@@ -359,7 +356,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
             <button type="button" disabled={cursorBar === undefined} onClick={() => history.apply((s) => doubleTempo(s, cursor))}>
               From this bar double tempo
             </button>
-          </fieldset>
+          </Panel>
         </>,
       )}
       {song.audio !== undefined && (

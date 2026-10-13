@@ -5,10 +5,11 @@ import { setKey, setNotation } from "../model/commands";
 import type { MinorConvention } from "../model/nashville";
 import type { Notation, Song } from "../model/song";
 import { transposeSong, type Spelling } from "../model/transpose";
+import { Panel } from "./Sidebar";
 import type { useHistory } from "./useHistory";
 
 /** User preferences (spec F-ED-1, F-DS-1), stored in `<appConfigDir>/settings.json`, not in the song. */
-export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont; minorConvention: MinorConvention };
+export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont; minorConvention: MinorConvention; isSidebarCollapsed: boolean };
 
 export const CHART_FONTS = [
   ["kalam", "Kalam"],
@@ -32,6 +33,7 @@ export const parseSettings = (json: unknown): Settings => {
     compactPrint: raw.compactPrint === true,
     font: CHART_FONTS.find(([value]) => value === raw.font)?.[0] ?? "petaluma-script",
     minorConvention: raw.minorConvention === "tonic" ? "tonic" : "relative",
+    isSidebarCollapsed: raw.isSidebarCollapsed === true,
   };
 };
 
@@ -105,27 +107,7 @@ export const Toolbar = ({ history, settings }: Props) => {
     history.apply((s) => setTransposition(transposeSong(s, semitones, spelling), transposition(s) + semitones));
   return (
     <div className="toolbar">
-      <fieldset disabled={isTransposeLocked}>
-        <legend>Transpose</legend>
-        <label>
-          Spelling{" "}
-          <select value={spelling} onChange={(e) => setSpelling(e.target.value as Spelling)}>
-            <option value="sharp">Sharps (♯)</option>
-            <option value="flat">Flats (♭)</option>
-          </select>
-        </label>
-        <button type="button" onClick={() => transpose(-1)}>
-          −1 semitone
-        </button>
-        <button type="button" onClick={() => transpose(1)}>
-          +1 semitone
-        </button>
-        <button type="button" disabled={offset % 12 === 0} onClick={() => transpose(-offset)}>
-          Reset
-        </button>
-      </fieldset>
-      <fieldset>
-        <legend>Song</legend>
+      <Panel id="song">
         <Field label="Title" value={meta.title} check={(t) => (t === "" ? "a song needs a title" : null)} onCommit={(title) => setMeta({ title })} />
         <Field label="Artist" value={meta.artist ?? ""} onCommit={(t) => setMeta({ artist: t || undefined })} />
         <Field
@@ -158,7 +140,25 @@ export const Toolbar = ({ history, settings }: Props) => {
           check={(t) => (t === "" || Number(t) > 0 ? null : "the tempo must be a positive number")}
           onCommit={(t) => setMeta({ tempoBpm: t === "" ? undefined : Number(t) })}
         />
-      </fieldset>
+      </Panel>
+      <Panel id="transpose" disabled={isTransposeLocked}>
+        <label>
+          Spelling{" "}
+          <select value={spelling} onChange={(e) => setSpelling(e.target.value as Spelling)}>
+            <option value="sharp">Sharps (♯)</option>
+            <option value="flat">Flats (♭)</option>
+          </select>
+        </label>
+        <button type="button" onClick={() => transpose(-1)}>
+          −1 semitone
+        </button>
+        <button type="button" onClick={() => transpose(1)}>
+          +1 semitone
+        </button>
+        <button type="button" disabled={offset % 12 === 0} onClick={() => transpose(-offset)}>
+          Reset
+        </button>
+      </Panel>
     </div>
   );
 };

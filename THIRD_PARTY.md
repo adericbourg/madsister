@@ -26,5 +26,6 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | Patrick Hand (Patrick Wagesreiter) | Chart font, via `@fontsource/patrick-hand` | — | SIL OFL 1.1 | https://github.com/google/fonts/tree/main/ofl/patrickhand |
 | Kalam (Indian Type Foundry) | Chart font, via `@fontsource/kalam` | — | SIL OFL 1.1 | https://github.com/google/fonts/tree/main/ofl/kalam |
 | Petaluma Script, Petaluma Text (Steinberg Media Technologies) | Chart fonts, vendored in `app/src/fonts/` | — | SIL OFL 1.1 (`Petaluma-OFL.txt`) | https://github.com/steinbergmedia/petaluma |
+| Lucide | Interface icons, via `lucide-react` (bundled in the app) | ISC (icons from Feather: MIT) | — | https://github.com/lucide-icons/lucide |
 | pytest | Tests only (`dev` group), not shipped | MIT | — | https://github.com/pytest-dev/pytest |
 | GuitarSet (Xi et al., ISMIR 2018) | Proxy bench data (`bench/`), downloaded by `bench/fetch_guitarset.py`; not shipped | — | CC BY 4.0 (data) | https://zenodo.org/records/3371780 |

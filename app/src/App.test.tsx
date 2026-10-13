@@ -84,26 +84,40 @@ test("App_onStart_offersANewGridOrAnAudioImportButNoGridNorParameters", async ()
   expect(screen.queryByRole("button", { name: "Create grid" })).toBeNull();
 });
 
-test("App_whenTogglingTheParametersPanel_hidesAndShowsTheParameters", async () => {
-  // Given a grid and its open parameters panel
+test("App_whenCollapsingTheSidebar_showsAnIconRailThatReopensItOnAPanel", async () => {
+  // Given a grid in edit mode, and its expanded sidebar
   const user = userEvent.setup();
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
   render(<App />);
   await createGrid(user);
   const toggle = screen.getByRole("button", { name: "Parameters" });
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
   expect(screen.getByRole("combobox", { name: "Spelling" })).toBeDefined();
   expect(screen.getByRole("group", { name: "Section" })).toBeDefined();
+  expect(screen.queryByRole("button", { name: "Transpose" })).toBeNull();
 
-  // When folding the panel, Then the parameters are gone and the grid stays
+  // When collapsing it, Then the panels give way to one rail button each, the grid stays, and the state is saved
   await user.click(toggle);
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   expect(screen.queryByRole("combobox", { name: "Spelling" })).toBeNull();
   expect(screen.queryByRole("group", { name: "Section" })).toBeNull();
+  for (const name of ["Song", "Transpose", "Section", "Bar", "Bar lines", "Tempo"]) expect(screen.getByRole("button", { name })).toBeDefined();
   expect(screen.getByRole("grid")).toBeDefined();
+  expect(JSON.parse(files["/config/settings.json"]).isSidebarCollapsed).toBe(true);
 
-  // When unfolding it, Then they are back
-  await user.click(toggle);
+  // When switching to view mode, Then the rail drops the editing panels
+  await user.keyboard("{Control>}e{/Control}");
+  expect(screen.getByRole("button", { name: "Transpose" })).toBeDefined();
+  expect(screen.queryByRole("button", { name: "Section" })).toBeNull();
+
+  // When clicking Transpose on the rail, Then the sidebar expands, scrolled to that panel
+  await user.click(screen.getByRole("button", { name: "Transpose" }));
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
   expect(screen.getByRole("combobox", { name: "Spelling" })).toBeDefined();
+  expect(scrollIntoView.mock.contexts.at(-1)).toBe(screen.getByRole("group", { name: "Transpose" }));
+  expect(JSON.parse(files["/config/settings.json"]).isSidebarCollapsed).toBe(false);
+  delete (Element.prototype as Partial<Element>).scrollIntoView;
 });
 
 test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
@@ -290,7 +304,7 @@ test("App_whenUsingPreferencesAndTheToolbar_restylesTransposesEditsMetadataAndPe
   await user.click(screen.getByRole("button", { name: "Preferences" }));
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
   expect(firstSlot().textContent).toBe("C7M");
-  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false, font: "petaluma-script", minorConvention: "relative" });
+  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false, font: "petaluma-script", minorConvention: "relative", isSidebarCollapsed: false });
 
   // When switching to the Latin style, Then the root is spelled Do and the setting saved
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "latin");

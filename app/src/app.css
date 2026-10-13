@@ -79,6 +79,14 @@ button:disabled {
   border-color: var(--border);
 }
 
+button.danger:enabled {
+  color: var(--danger);
+}
+
+button.danger:enabled:hover {
+  border-color: var(--danger);
+}
+
 button.primary {
   font-weight: 600;
   color: var(--accent-text);
@@ -167,14 +175,6 @@ nav {
 .mode-switch input:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
-}
-
-.panel-toggle {
-  margin-left: auto;
-}
-
-.panel-toggle[aria-expanded="true"] {
-  background: var(--border);
 }
 
 nav details {
@@ -280,15 +280,55 @@ nav details li button {
 
 aside {
   flex: none;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   width: 20rem;
-  padding: 0.75rem;
-  overflow: auto;
   background: var(--surface);
   border-left: 1px solid var(--border);
 }
 
-aside[hidden] {
+aside.is-collapsed {
+  width: auto;
+}
+
+/* Expanded: a row holding the collapse button. Collapsed: a column of panel icons. */
+aside .rail {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem;
+}
+
+aside.is-collapsed .rail {
+  flex-direction: column;
+}
+
+aside .rail button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+aside .rail button:enabled:hover {
+  color: var(--accent);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+aside .panels {
+  flex: 1;
+  min-height: 0;
+  padding: 0 0.75rem 0.75rem;
+  overflow: auto;
+}
+
+aside .panels[hidden] {
   display: none;
 }
 
@@ -313,6 +353,11 @@ aside legend {
   width: 100%;
   padding: 0.75rem 0 0.5rem;
   font-weight: 600;
+}
+
+aside legend svg {
+  vertical-align: -3px;
+  color: var(--accent);
 }
 
 aside legend + * {

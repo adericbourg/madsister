@@ -8,7 +8,9 @@ describe("mergeSettings", () => {
   });
 
   it("uses the defaults when nothing is saved", () => {
-    expect(mergeSettings(null, { style: "intl" })).toMatchObject({ style: "intl", barsPerRow: 4 });
+    expect(mergeSettings(null, { style: "intl" })).toMatchObject({ style: "intl", barsPerRow: 4, isSidebarCollapsed: false });
+    expect(mergeSettings({ isSidebarCollapsed: "yes" }, {}).isSidebarCollapsed).toBe(false);
+    expect(mergeSettings({ isSidebarCollapsed: true }, {}).isSidebarCollapsed).toBe(true);
   });
 
   it("rejects an invalid override instead of falling back to the default", () => {

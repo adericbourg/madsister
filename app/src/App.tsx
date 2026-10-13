@@ -27,6 +27,7 @@ import {
 import { parseSettings, Toolbar, type Settings } from "./ui/Toolbar";
 import { About } from "./ui/About";
 import { Preferences } from "./ui/Preferences";
+import { Sidebar } from "./ui/Sidebar";
 import { useHistory } from "./ui/useHistory";
 
 const RECENT = "recent.json";
@@ -41,7 +42,6 @@ function App() {
   const [savedSong, setSavedSong] = useState(initial);
   const [path, setPath] = useState<string | null>(null);
   const [hasSong, setHasSong] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [panel, setPanel] = useState<HTMLElement | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
@@ -233,11 +233,6 @@ function App() {
             Edit
           </label>
         )}
-        {hasSong && (
-          <button type="button" className="panel-toggle" aria-expanded={isPanelOpen} aria-controls="parameters" onClick={() => setIsPanelOpen(!isPanelOpen)}>
-            Parameters
-          </button>
-        )}
       </nav>
       {error !== null && <p role="alert">{error}</p>}
       {hasSong ? (
@@ -255,9 +250,9 @@ function App() {
               <Editor history={history} mode={mode} barsPerRow={settings.barsPerRow} compactPrint={settings.compactPrint} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} audioPath={song.audio && resolveAudioPath(path, song.audio.path)} onLocateAudio={locateAudio} />
             )}
           </div>
-          <aside id="parameters" aria-label="Parameters" hidden={!isPanelOpen} ref={setPanel}>
+          <Sidebar isCollapsed={settings.isSidebarCollapsed} isEditing={mode === "edit"} onCollapsedChange={(isSidebarCollapsed) => changeSettings({ ...settings, isSidebarCollapsed })} panelsRef={setPanel}>
             <Toolbar history={history} settings={settings} />
-          </aside>
+          </Sidebar>
         </div>
       ) : (
         <div className="start">
