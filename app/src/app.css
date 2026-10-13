@@ -490,6 +490,26 @@ aside button {
   margin: 0 0.25rem 0.25rem 0;
 }
 
+/* [−] value [+]: the value keeps a fixed width so the buttons don't shift as it changes. */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.stepper button {
+  flex: 1;
+  margin: 0;
+}
+
+.stepper output {
+  min-width: 3ch;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .start {
   display: flex;
   flex-wrap: wrap;

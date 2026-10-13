@@ -527,14 +527,18 @@ test("App_whenResettingTheTranspose_restoresTheInitialKey", async () => {
   await user.keyboard("Cmaj7{Enter}");
   const firstSlot = () => screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ });
   const reset = screen.getByRole("button", { name: "Reset" });
+  const offset = within(screen.getByRole("group", { name: "Transpose" })).getByRole("status");
   expect((reset as HTMLButtonElement).disabled).toBe(true);
+  expect(offset.textContent).toBe("0");
   await user.click(screen.getByRole("button", { name: "+1 semitone" }));
   await user.click(screen.getByRole("button", { name: "+1 semitone" }));
   expect(firstSlot().textContent).toBe("D7M");
+  expect(offset.textContent).toBe("+2");
 
-  // When resetting, Then the chord is back and Reset is disabled again
+  // When resetting, Then the chord is back, the offset is 0 and Reset is disabled again
   await user.click(reset);
   expect(firstSlot().textContent).toBe("C7M");
+  expect(offset.textContent).toBe("0");
   expect((reset as HTMLButtonElement).disabled).toBe(true);
 });
 

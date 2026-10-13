@@ -150,12 +150,15 @@ export const Toolbar = ({ history, settings }: Props) => {
             <option value="flat">Flats (♭)</option>
           </select>
         </label>
-        <button type="button" onClick={() => transpose(-1)}>
-          −1 semitone
-        </button>
-        <button type="button" onClick={() => transpose(1)}>
-          +1 semitone
-        </button>
+        <div className="stepper">
+          <button type="button" onClick={() => transpose(-1)}>
+            −1 semitone
+          </button>
+          <output aria-live="polite">{offset > 0 ? `+${offset}` : offset}</output>
+          <button type="button" onClick={() => transpose(1)}>
+            +1 semitone
+          </button>
+        </div>
         <button type="button" disabled={offset % 12 === 0} onClick={() => transpose(-offset)}>
           Reset
         </button>
