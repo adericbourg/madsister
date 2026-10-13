@@ -210,15 +210,19 @@
   outline-offset: -3px;
 }
 
-.slot-input {
+/* Two classes to outrank app.css's `input:not([type=…])`, which is loaded after this file. */
+.slot .slot-input {
+  display: block;
   box-sizing: border-box;
   width: 100%;
   min-width: 4ch;
+  min-height: 0;
   font: inherit;
   color: inherit;
   padding: 0.6rem 0.5rem;
   background: transparent;
   border: 0;
+  border-radius: 0;
   outline: none;
   caret-color: var(--ink);
 }
