@@ -444,7 +444,6 @@ aside .panels[hidden] {
 /* Firefox-settings style: each parameter group is a white frame on the gray panel. */
 aside .toolbar {
   display: block;
-  margin: 0;
 }
 
 aside fieldset {
