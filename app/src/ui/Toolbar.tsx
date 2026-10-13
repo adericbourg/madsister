@@ -5,13 +5,12 @@ import { setKey, setNotation } from "../model/commands";
 import type { MinorConvention } from "../model/nashville";
 import type { Notation, Song } from "../model/song";
 import { transposeSong, type Spelling } from "../model/transpose";
-import { hasConfidence } from "./keymap";
 import type { useHistory } from "./useHistory";
 
 /** User preferences (spec F-ED-1, F-DS-1), stored in `<appConfigDir>/settings.json`, not in the song. */
 export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont; minorConvention: MinorConvention };
 
-const CHART_FONTS = [
+export const CHART_FONTS = [
   ["kalam", "Kalam"],
   ["patrick-hand", "Patrick Hand"],
   ["petaluma-script", "Petaluma Script"],
@@ -21,7 +20,7 @@ const CHART_FONTS = [
 
 export type ChartFont = (typeof CHART_FONTS)[number][0];
 
-const isThreshold = (v: unknown): v is number => typeof v === "number" && v >= 0 && v <= 1;
+export const isThreshold = (v: unknown): v is number => typeof v === "number" && v >= 0 && v <= 1;
 
 /** Anything missing or invalid falls back to the default. */
 export const parseSettings = (json: unknown): Settings => {
@@ -93,9 +92,9 @@ export const Field = ({ label, value, type = "text", check = () => null, onCommi
   );
 };
 
-type Props = { history: ReturnType<typeof useHistory>; settings: Settings; onSettingsChange: (settings: Settings) => void };
+type Props = { history: ReturnType<typeof useHistory>; settings: Settings };
 
-export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
+export const Toolbar = ({ history, settings }: Props) => {
   const [spelling, setSpelling] = useState<Spelling>("sharp");
   const { meta } = history.song;
   const setMeta = (patch: Partial<Song["meta"]>) => history.apply((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
@@ -106,64 +105,6 @@ export const Toolbar = ({ history, settings, onSettingsChange }: Props) => {
     history.apply((s) => setTransposition(transposeSong(s, semitones, spelling), transposition(s) + semitones));
   return (
     <div className="toolbar">
-      <fieldset>
-        <legend>Display</legend>
-        <label>
-          Chord style{" "}
-          <select value={settings.style} onChange={(e) => onSettingsChange({ ...settings, style: e.target.value as DisplayStyle })}>
-            <option value="fr">French (C7M)</option>
-            <option value="intl">International (Cmaj7)</option>
-            <option value="latin">Latin (Sol7M)</option>
-          </select>
-        </label>
-        <label>
-          Font{" "}
-          <select value={settings.font} onChange={(e) => onSettingsChange({ ...settings, font: e.target.value as ChartFont })}>
-            {CHART_FONTS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Nashville numbers in minor keys{" "}
-          <select value={settings.minorConvention} onChange={(e) => onSettingsChange({ ...settings, minorConvention: e.target.value as MinorConvention })}>
-            <option value="relative">From the relative major (Am: 6m)</option>
-            <option value="tonic">From the minor tonic (Am: 1m)</option>
-          </select>
-        </label>
-        <label>
-          Bars per row{" "}
-          <select
-            value={settings.barsPerRow}
-            onChange={(e) => onSettingsChange({ ...settings, barsPerRow: Number(e.target.value) as Settings["barsPerRow"] })}
-          >
-            <option>2</option>
-            <option>4</option>
-            <option>8</option>
-          </select>
-        </label>
-        {hasConfidence(history.song) && (
-          <label>
-            Review chords below confidence{" "}
-            <input
-              type="number"
-              min={0}
-              max={1}
-              step={0.05}
-              value={settings.lowConfidenceThreshold}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (e.target.value !== "" && isThreshold(n)) onSettingsChange({ ...settings, lowConfidenceThreshold: n });
-              }}
-            />
-          </label>
-        )}
-        <label>
-          <input type="checkbox" checked={settings.compactPrint} onChange={(e) => onSettingsChange({ ...settings, compactPrint: e.target.checked })} /> Compact print (2 columns)
-        </label>
-      </fieldset>
       <fieldset disabled={isTransposeLocked}>
         <legend>Transpose</legend>
         <label>

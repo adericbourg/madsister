@@ -76,10 +76,11 @@ test("App_onStart_offersANewGridOrAnAudioImportButNoGridNorParameters", async ()
   // When creating a grid
   await createGrid(user);
 
-  // Then the empty song is shown with its parameters
+  // Then the empty song is shown with its own parameters, the user settings staying in Preferences
   expect(screen.getByRole("heading", { name: "Untitled" })).toBeDefined();
   expect(screen.getAllByRole("gridcell", { name: /^Verse, bar \d, beat 1: no chord$/ })).toHaveLength(4);
-  expect(screen.getByRole("combobox", { name: "Chord style" })).toBeDefined();
+  expect(screen.getByRole("combobox", { name: "Spelling" })).toBeDefined();
+  expect(screen.queryByRole("combobox", { name: "Chord style" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Create grid" })).toBeNull();
 });
 
@@ -90,19 +91,19 @@ test("App_whenTogglingTheParametersPanel_hidesAndShowsTheParameters", async () =
   await createGrid(user);
   const toggle = screen.getByRole("button", { name: "Parameters" });
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
-  expect(screen.getByRole("combobox", { name: "Chord style" })).toBeDefined();
+  expect(screen.getByRole("combobox", { name: "Spelling" })).toBeDefined();
   expect(screen.getByRole("group", { name: "Section" })).toBeDefined();
 
   // When folding the panel, Then the parameters are gone and the grid stays
   await user.click(toggle);
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
-  expect(screen.queryByRole("combobox", { name: "Chord style" })).toBeNull();
+  expect(screen.queryByRole("combobox", { name: "Spelling" })).toBeNull();
   expect(screen.queryByRole("group", { name: "Section" })).toBeNull();
   expect(screen.getByRole("grid")).toBeDefined();
 
   // When unfolding it, Then they are back
   await user.click(toggle);
-  expect(screen.getByRole("combobox", { name: "Chord style" })).toBeDefined();
+  expect(screen.getByRole("combobox", { name: "Spelling" })).toBeDefined();
 });
 
 test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
@@ -274,7 +275,7 @@ test("App_onAboutClick_opensADialogWithAuthorModelAndFontCreditsThenTheRepoLink"
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings", async () => {
+test("App_whenUsingPreferencesAndTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings", async () => {
   // Given saved settings (international style, 2 bars per row) and Cmaj7 typed in the first slot
   const user = userEvent.setup();
   files["/config/settings.json"] = '{"style":"intl","barsPerRow":2}';
@@ -285,7 +286,8 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   const firstSlot = () => screen.getByRole("gridcell", { name: /^Verse, bar 1, beat 1/ });
   expect(firstSlot().textContent).toBe("Cmaj7");
 
-  // When switching to the French style, Then the chord is re-rendered and the setting saved
+  // When opening Preferences and switching to the French style, Then the chord is re-rendered and the setting saved
+  await user.click(screen.getByRole("button", { name: "Preferences" }));
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
   expect(firstSlot().textContent).toBe("C7M");
   expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false, font: "petaluma-script", minorConvention: "relative" });
@@ -296,8 +298,8 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(JSON.parse(files["/config/settings.json"]).style).toBe("latin");
   await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
 
-  // Then the review threshold is hidden, as the grid went through no chord recognition
-  expect(screen.queryByRole("spinbutton", { name: "Review chords below confidence" })).toBeNull();
+  // Then the review threshold is offered, though the grid went through no chord recognition
+  expect(screen.getByRole("spinbutton", { name: "Review chords below confidence" })).toBeDefined();
 
   // When ticking Compact print, Then the setting is saved and the app root carries the print class
   await user.click(screen.getByRole("checkbox", { name: "Compact print (2 columns)" }));
@@ -317,6 +319,8 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
     expect(screen.getByRole("main").className).toBe(`compact-print font-${font}`);
   }
   await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "petaluma-script");
+  await user.click(within(screen.getByRole("dialog", { name: "Preferences" })).getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
 
   // When transposing up twice with flats, then undoing once
   await user.selectOptions(screen.getByRole("combobox", { name: "Spelling" }), "flat");
@@ -361,7 +365,7 @@ test("App_whenUsingTheToolbar_restylesTransposesEditsMetadataAndPersistsSettings
   expect(JSON.parse(files["/waltz.madsister.json"]).meta.meter).toEqual({ beats: 7, unit: 8 });
 });
 
-test("App_whenTheSongHasRecognizedChords_offersTheReviewThresholdAndPersistsIt", async () => {
+test("App_whenTheSongHasRecognizedChords_reviewsThemAgainstThePersistedThreshold", async () => {
   // Given a song whose first chord carries a recognition confidence
   const user = userEvent.setup();
   const [first, ...others] = song.sections;
@@ -374,7 +378,8 @@ test("App_whenTheSongHasRecognizedChords_offersTheReviewThresholdAndPersistsIt",
   await screen.findByRole("heading", { name: "Blues" });
   expect(screen.getByText("1 chord to review")).toBeDefined();
 
-  // When raising the low-confidence threshold, Then the setting is saved; an out-of-range value is ignored
+  // When raising the low-confidence threshold in Preferences, Then the setting is saved; an out-of-range value is ignored
+  await user.click(screen.getByRole("button", { name: "Preferences" }));
   const threshold = screen.getByRole("spinbutton", { name: "Review chords below confidence" });
   fireEvent.change(threshold, { target: { value: "0.7" } });
   fireEvent.change(threshold, { target: { value: "2" } });

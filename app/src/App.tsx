@@ -26,6 +26,7 @@ import {
 } from "./ui/fileActions";
 import { parseSettings, Toolbar, type Settings } from "./ui/Toolbar";
 import { About } from "./ui/About";
+import { Preferences } from "./ui/Preferences";
 import { useHistory } from "./ui/useHistory";
 
 const RECENT = "recent.json";
@@ -223,6 +224,7 @@ function App() {
             </ul>
           </details>
         )}
+        <Preferences settings={settings} onSettingsChange={changeSettings} />
         <About />
         {hasSong && (
           <label className="mode-switch">
@@ -254,7 +256,7 @@ function App() {
             )}
           </div>
           <aside id="parameters" aria-label="Parameters" hidden={!isPanelOpen} ref={setPanel}>
-            <Toolbar history={history} settings={settings} onSettingsChange={changeSettings} />
+            <Toolbar history={history} settings={settings} />
           </aside>
         </div>
       ) : (

@@ -21,7 +21,7 @@ M7-1.
 - Until M7-4, open the dialog from a "Preferences" button in the current `<nav>`.
 
 ## Tests
-vitest (`Preferences.test.tsx`), adapting the Display cases already in `Editor.test.tsx`/`App.test.tsx`:
+vitest: the Display cases already in `App.test.tsx`, enriched (no separate test file):
 - Given the dialog is open, when the user changes the font, then `onSettingsChange` gets the new font.
 - Given a song without confidence data, when the dialog opens, then the threshold field is shown.
 - Given the sidebar is open, then it has no chord-style select.

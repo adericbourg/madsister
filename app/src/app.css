@@ -181,7 +181,7 @@ nav details {
   position: relative;
 }
 
-dialog.about {
+dialog {
   max-width: 36rem;
   max-height: 90vh;
   padding: 0;
@@ -190,8 +190,21 @@ dialog.about {
   border: 1px solid var(--border);
   border-radius: 8px;
 }
-dialog.about > div { padding: 1rem 1.5rem; }
-dialog.about::backdrop { background: rgb(0 0 0 / 0.4); }
+dialog > div { padding: 1rem 1.5rem; }
+dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+
+/* One setting per row: label above its control, the checkbox inline. */
+dialog.preferences label {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+dialog.preferences select,
+dialog.preferences input:not([type="checkbox"]) {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+}
 
 nav details ul {
   position: absolute;
