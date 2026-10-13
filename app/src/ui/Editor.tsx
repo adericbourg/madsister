@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
+import { AudioLines, Flag } from "lucide-react";
 import { Menu } from "@tauri-apps/api/menu";
 import { createPortal } from "react-dom";
 import { parseChord } from "../model/chord";
@@ -376,8 +377,10 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
       )}
       <div className="transport">
         {song.audio !== undefined && (
-          <fieldset className="toolbar playback" disabled={!player.isReady}>
-            <legend>Playback</legend>
+          <fieldset className="toolbar playback" disabled={!player.isReady} aria-labelledby={`${id}-playback`}>
+            <h2 id={`${id}-playback`}>
+              <AudioLines size={16} /> Playback
+            </h2>
             <audio {...player.audioProps} />
             <button type="button" onClick={player.toggle}>
               {player.isPlaying ? "Pause" : "Play"}
@@ -397,8 +400,10 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
           </fieldset>
         )}
         {hasConfidence(song) && (
-          <fieldset className="toolbar review-status">
-            <legend>Review</legend>
+          <fieldset className="toolbar review-status" aria-labelledby={`${id}-review`}>
+            <h2 id={`${id}-review`}>
+              <Flag size={16} /> Review
+            </h2>
             <span aria-live="polite">{flaggedCount === 0 ? "No chords to review" : `${flaggedCount} chord${flaggedCount === 1 ? "" : "s"} to review`}</span>
             <button type="button" aria-label="Previous chord to review" disabled={flaggedCount === 0} onClick={() => review(-1)}>
               ‹

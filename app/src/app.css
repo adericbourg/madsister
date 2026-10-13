@@ -307,6 +307,8 @@ dialog.preferences input:not([type="checkbox"]) {
 .content {
   /* Contains the chart's absolutely positioned bits (live region, slot errors); otherwise they stretch the window. */
   position: relative;
+  /* Lets the transport switch to one column on the chart area's width, which the sidebar changes. */
+  container-type: inline-size;
   flex: 1;
   min-width: 0;
   overflow: auto;
@@ -336,10 +338,48 @@ dialog.preferences input:not([type="checkbox"]) {
   position: sticky;
   top: 0;
   z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  /* Half the chart's width per block, one column when the chart area is narrow; edges aligned with the chart's
+     (ui/grid.css: max-width 60rem + 2 × 1.5rem padding = 63rem, centered). */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 31rem));
+  justify-content: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0;
   background: var(--surface);
+}
+
+@container (max-width: 40rem) {
+  .content .transport {
+    grid-template-columns: minmax(0, 63rem);
+  }
+}
+
+/* Same white frame as the sidebar's parameter groups. */
+.content .transport fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0 0.75rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Titled like the sidebar's legends: icon + title on their own row, inside the frame. */
+.content .transport h2 {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0.75rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.content .transport h2 svg {
+  vertical-align: -3px;
+  color: var(--accent);
+}
+
+.content .playback input[type="range"] {
+  flex: 1;
 }
 
 /* A bar scrolled into view while playing stops below the transport, not under it. */
