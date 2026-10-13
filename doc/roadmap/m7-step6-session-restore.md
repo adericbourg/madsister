@@ -19,6 +19,10 @@ M7-5.
   `active` is out of range, the first tab is active.
 - Invalid JSON is treated as an empty session.
 
+## Decisions (implementation)
+- The restored tabs replace the start screen; the session is only written once the restore is done, so an early write can't
+  wipe it. `active` is the active tab's index among the saved paths (0 when the active tab has no file).
+
 ## Tests
 vitest, with the config and fs mocks:
 - Given `session.json` with two existing paths and `active: 1`, when the app starts, then two tabs open and the second is active.

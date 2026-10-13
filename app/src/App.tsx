@@ -14,6 +14,7 @@ import { TabBar, tabId } from "./ui/TabBar";
 
 const RECENT = "recent.json";
 const SETTINGS = "settings.json";
+const SESSION = "session.json";
 
 type Tab = { id: number; initial: { song: Song; path: string } | null };
 
@@ -31,6 +32,7 @@ function App() {
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(() => parseSettings(null));
+  const [isRestored, setIsRestored] = useState(false);
   const preferences = useRef<HTMLDialogElement>(null);
   const about = useRef<HTMLDialogElement>(null);
   const status = (id: number) => statuses[id] ?? START;
@@ -91,6 +93,29 @@ function App() {
     readConfigJson(SETTINGS).then((json) => setSettings(parseSettings(json)));
     readConfigJson(RECENT).then((json) => Array.isArray(json) && setRecent(json.filter((p) => typeof p === "string")));
   }, []);
+
+  // F-UI-8: the tabs that have a file come back at launch; the files that can't be read any more are skipped.
+  useEffect(() => {
+    void readConfigJson(SESSION).then(async (json) => {
+      const raw = (typeof json === "object" && json !== null ? json : {}) as { paths?: unknown; active?: unknown };
+      const paths = Array.isArray(raw.paths) ? raw.paths.filter((p): p is string => typeof p === "string") : [];
+      const opened = (await Promise.all(paths.map((path) => readSong(path).then((song) => ({ song, path }), () => null)))).filter((t) => t !== null);
+      if (opened.length > 0) {
+        const restored = opened.map((initial) => ({ id: nextId.current++, initial }));
+        const activePath = typeof raw.active === "number" ? paths[raw.active] : undefined;
+        setTabs(restored);
+        setActiveId((restored.find((t) => t.initial.path === activePath) ?? restored[0]).id);
+      }
+      setIsRestored(true);
+    });
+  }, []);
+
+  // A restored tab has its path before it reports its status.
+  const sessionPaths = tabs.map((t) => statuses[t.id]?.path ?? t.initial?.path ?? null).filter((p) => p !== null);
+  const session = JSON.stringify({ paths: sessionPaths, active: Math.max(0, sessionPaths.indexOf(active.path ?? "")) });
+  useEffect(() => {
+    if (isRestored) writeConfigJson(SESSION, JSON.parse(session)).catch(fail);
+  }, [session, isRestored]);
 
   useEffect(() => {
     void setWindowTitle(`${active.isDirty ? "• " : ""}${active.title} — madsister`);

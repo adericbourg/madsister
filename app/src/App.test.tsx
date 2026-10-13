@@ -741,3 +741,29 @@ test("App_whenClosingTabsOrTheWindow_asksBeforeDroppingUnsavedWork", async () =>
   expect(await screen.findByRole("button", { name: "Create grid" })).toBeDefined();
   expect(screen.queryByRole("tablist", { name: "Songs" })).toBeNull();
 });
+
+test("App_atLaunch_reopensTheTabsOfThePreviousSessionThatStillHaveTheirFile", async () => {
+  // Given a session of three files, the second one active, and the third gone
+  const user = userEvent.setup();
+  files["/blues.madsister.json"] = serializeSong(song);
+  files["/waltz.madsister.json"] = serializeSong({ ...song, meta: { ...song.meta, title: "Waltz" } });
+  files["/config/session.json"] = JSON.stringify({ paths: ["/blues.madsister.json", "/waltz.madsister.json", "/gone.madsister.json"], active: 1 });
+
+  // When the app starts
+  render(<App />);
+
+  // Then the two remaining songs are back in their tabs, the second in front, without any error
+  expect(await screen.findByRole("heading", { name: "Waltz" })).toBeDefined();
+  const tabs = () => within(screen.getByRole("tablist", { name: "Songs" })).getAllByRole("tab");
+  expect(tabs().map((t) => t.textContent)).toEqual(["Blues", "Waltz"]);
+  expect(tabs()[1].getAttribute("aria-selected")).toBe("true");
+  expect(screen.queryByRole("alert")).toBeNull();
+
+  // When adding an untitled grid and coming back to the first song
+  await clickMenu("File", "New tab");
+  await createGrid(user);
+  await user.click(tabs()[0]);
+
+  // Then the session keeps the saved songs only, with the first one active
+  await vi.waitFor(() => expect(JSON.parse(files["/config/session.json"])).toEqual({ paths: ["/blues.madsister.json", "/waltz.madsister.json"], active: 0 }));
+});

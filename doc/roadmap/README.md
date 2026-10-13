@@ -110,8 +110,8 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M7-2 | [m7-step2-preferences](m7-step2-preferences.md) | done | df4cca6 |
 | M7-3 | [m7-step3-sidebar](m7-step3-sidebar.md) | done | 2338b92 |
 | M7-4 | [m7-step4-menu-ribbon](m7-step4-menu-ribbon.md) | done | 0be3285 |
-| M7-5 | [m7-step5-tabs](m7-step5-tabs.md) | done | this |
-| M7-6 | [m7-step6-session-restore](m7-step6-session-restore.md) | todo | |
+| M7-5 | [m7-step5-tabs](m7-step5-tabs.md) | done | c6a8108 |
+| M7-6 | [m7-step6-session-restore](m7-step6-session-restore.md) | done | this |
 
 Scope of the first unattended run (2026-09-30 night): M0 + M1. M2–M6 are written at a coarser level. Revise them
 after M0 (the model choices change M2/M4b/M6), and ask the user before starting them.
