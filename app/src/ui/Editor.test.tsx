@@ -272,8 +272,22 @@ test("Editor_whenReviewingLowConfidenceChords_jumpsToThemAndCountsDown", async (
   const review = screen.getByText("2 chords to review");
   expect(review.getAttribute("aria-live")).toBe("polite");
 
-  // When pressing F8, Then the cursor jumps to the first flagged chord
-  await user.keyboard("{F8}");
+  // When clicking the review arrows, Then the cursor goes to the next/previous flagged bar, wrapping around
+  const isCursor = (name: string) => screen.getByRole("gridcell", { name }).getAttribute("tabindex") === "0";
+  const next = screen.getByRole("button", { name: "Next chord to review" });
+  const previous = screen.getByRole("button", { name: "Previous chord to review" });
+  await user.click(next);
+  expect(isCursor("Verse, bar 2, beat 1: G, low confidence")).toBe(true);
+  await user.click(next);
+  expect(isCursor("Verse, bar 4, beat 1: F, low confidence")).toBe(true);
+  await user.click(next);
+  expect(isCursor("Verse, bar 2, beat 1: G, low confidence")).toBe(true);
+  await user.click(previous);
+  expect(isCursor("Verse, bar 4, beat 1: F, low confidence")).toBe(true);
+
+  // When pressing F8 from the last flagged chord, Then the cursor wraps to the first one
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 4, beat 1: F, low confidence" }));
+  await user.keyboard("{Escape}{F8}");
   expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G, low confidence" }));
 
   // When confirming it by typing the same chord, Then its flag is cleared and the counter updates
@@ -285,9 +299,11 @@ test("Editor_whenReviewingLowConfidenceChords_jumpsToThemAndCountsDown", async (
   await user.keyboard("{Shift>}{F8}{/Shift}");
   expect(document.activeElement).toBe(screen.getByRole("gridcell", { name: "Verse, bar 4, beat 1: F, low confidence" }));
 
-  // When correcting it, Then nothing is left to review and F8 is refused
+  // When correcting it, Then nothing is left to review, the arrows are disabled and F8 is refused
   await user.keyboard("Fmaj7{Enter}");
   expect(review.textContent).toBe("No chords to review");
+  expect(screen.getByRole("button", { name: "Next chord to review" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Previous chord to review" }).hasAttribute("disabled")).toBe(true);
   await user.keyboard("{F8}");
   expect(screen.getByRole("status").textContent).toBe("Not possible here");
 });

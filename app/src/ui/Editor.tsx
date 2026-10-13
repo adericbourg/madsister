@@ -13,7 +13,7 @@ import { Grid } from "./Grid";
 import type { MenuTarget } from "./SectionBlock";
 import { Panel } from "./Sidebar";
 import { Field } from "./Toolbar";
-import { clampCursor, countFlagged, hasConfidence, keyToCommand, MOD_LABEL, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
+import { clampCursor, countFlagged, hasConfidence, keyToCommand, MOD_LABEL, nextFlaggedBar, nextSlot, selectedBars, SHORTCUTS } from "./keymap";
 import type { useHistory } from "./useHistory";
 import { usePlayer } from "./usePlayer";
 
@@ -225,6 +225,15 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
     void Menu.new({ items }).then((menu) => menu.popup(at));
   };
 
+  const review = (step: 1 | -1) => {
+    const target = nextFlaggedBar(song, cursor, lowConfidenceThreshold, step);
+    if (target === undefined) return;
+    const startSec = song.sections[target.section].bars[target.bar].startSec;
+    if (startSec !== undefined) player.seek(startSec);
+    setCursor(target);
+    setAnchor(null);
+  };
+
   const closeHelp = () => {
     setIsHelpOpen(false);
     helpOpener.current?.focus();
@@ -365,27 +374,41 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
           </Panel>
         </>,
       )}
-      {song.audio !== undefined && (
-        <fieldset className="toolbar playback" disabled={!player.isReady}>
-          <legend>Playback</legend>
-          <audio {...player.audioProps} />
-          <button type="button" onClick={player.toggle}>
-            {player.isPlaying ? "Pause" : "Play"}
-          </button>
-          <input
-            type="range"
-            aria-label="Seek"
-            min={0}
-            max={player.duration}
-            step={0.1}
-            value={Math.min(player.time, player.duration)}
-            onChange={(e) => player.seek(Number(e.target.value))}
-          />
-          <span>
-            {minutes(player.time)}/{minutes(player.duration)}
-          </span>
-        </fieldset>
-      )}
+      <div className="transport">
+        {song.audio !== undefined && (
+          <fieldset className="toolbar playback" disabled={!player.isReady}>
+            <legend>Playback</legend>
+            <audio {...player.audioProps} />
+            <button type="button" onClick={player.toggle}>
+              {player.isPlaying ? "Pause" : "Play"}
+            </button>
+            <input
+              type="range"
+              aria-label="Seek"
+              min={0}
+              max={player.duration}
+              step={0.1}
+              value={Math.min(player.time, player.duration)}
+              onChange={(e) => player.seek(Number(e.target.value))}
+            />
+            <span>
+              {minutes(player.time)}/{minutes(player.duration)}
+            </span>
+          </fieldset>
+        )}
+        {hasConfidence(song) && (
+          <fieldset className="toolbar review-status">
+            <legend>Review</legend>
+            <span aria-live="polite">{flaggedCount === 0 ? "No chords to review" : `${flaggedCount} chord${flaggedCount === 1 ? "" : "s"} to review`}</span>
+            <button type="button" aria-label="Previous chord to review" disabled={flaggedCount === 0} onClick={() => review(-1)}>
+              ‹
+            </button>
+            <button type="button" aria-label="Next chord to review" disabled={flaggedCount === 0} onClick={() => review(1)}>
+              ›
+            </button>
+          </fieldset>
+        )}
+      </div>
       {song.audio !== undefined && player.error !== null && (
         // Outside the fieldset: it's disabled until the audio loads, which a missing file never does.
         <p role="alert" className="field-error audio-notice">
@@ -425,11 +448,6 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
           setDraft({ kind: "chord", text: show(chord), select: "all" });
         }}
       />
-      {hasConfidence(song) && (
-        <p aria-live="polite" className="review-status">
-          {flaggedCount === 0 ? "No chords to review" : `${flaggedCount} chord${flaggedCount === 1 ? "" : "s"} to review`}
-        </p>
-      )}
       <p role="status" className="visually-hidden">
         {notice}
       </p>

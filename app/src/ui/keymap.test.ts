@@ -16,7 +16,7 @@ import {
   type SlotRef,
 } from "../model/commands";
 import type { Song } from "../model/song";
-import { keyToCommand, type EditorState } from "./keymap";
+import { keyToCommand, nextFlaggedBar, type EditorState } from "./keymap";
 
 const song: Song = {
   version: 1,
@@ -118,6 +118,29 @@ test("keyToCommand_ofF8_jumpsToTheNextOrPreviousLowConfidenceSlotWrappingAround"
   // And the threshold decides what is flagged; with nothing flagged, the key is refused
   expect(f8(at(1, 0), false, 0.3)).toEqual(at(0, 1, 1));
   expect(f8(at(0, 0), false, 0.1)).toEqual({ kind: "refused" });
+});
+
+test("nextFlaggedBar_whenTheBarHasSeveralFlaggedSlots_skipsToTheNextBar", () => {
+  // Given both slots of Verse bar 2 flagged, and Chorus bar 1 flagged
+  const verse = song.sections[0];
+  const flagged: Song = {
+    ...song,
+    sections: [
+      {
+        ...verse,
+        bars: [verse.bars[0], { chords: [{ chord: "F:maj", beats: 2, confidence: 0.1 }, { chord: "G:maj", beats: 2, confidence: 0.2 }] }, verse.bars[2]],
+      },
+      { ...song.sections[1], bars: [{ chords: [{ chord: "N", beats: 4, confidence: 0.4 }] }] },
+      song.sections[2],
+    ],
+  };
+
+  // Then forward from either slot of bar 2 lands on the Chorus, and backward from the Chorus on bar 2, wrapping around
+  expect(nextFlaggedBar(flagged, at(0, 1, 0), 0.5, 1)).toEqual(at(1, 0));
+  expect(nextFlaggedBar(flagged, at(1, 0), 0.5, 1)).toEqual(at(0, 1, 0));
+  expect(nextFlaggedBar(flagged, at(0, 1, 1), 0.5, -1)).toEqual(at(1, 0));
+  expect(nextFlaggedBar(flagged, at(1, 0), 0.5, -1)).toEqual(at(0, 1, 1));
+  expect(nextFlaggedBar(flagged, at(0, 0), 0.05, 1)).toBeUndefined();
 });
 
 test("keyToCommand_ofShiftArrows_extendsTheBarSelectionWithinTheSection", () => {

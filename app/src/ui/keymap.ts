@@ -108,6 +108,12 @@ const nextFlagged = (song: Song, cursor: SlotRef, threshold: number, step: 1 | -
   return [...all.slice(i + 1), ...all.slice(0, i + 1)].find((p) => isFlagged(song, p, threshold));
 };
 
+/** Like nextFlagged, but skips the rest of the cursor's bar: a bar with several flagged slots counts once. */
+export const nextFlaggedBar = (song: Song, cursor: SlotRef, threshold: number, step: 1 | -1): SlotRef | undefined => {
+  const lastSlot = (song.sections[cursor.section].bars[cursor.bar]?.chords.length ?? 1) - 1;
+  return nextFlagged(song, { ...cursor, slot: step === 1 ? lastSlot : 0 }, threshold, step);
+};
+
 export const nextSlot = (song: Song, cursor: SlotRef, step: 1 | -1): SlotRef => {
   const all = positions(song);
   const i = all.findIndex((p) => p.section === cursor.section && p.bar === cursor.bar && p.slot === cursor.slot);

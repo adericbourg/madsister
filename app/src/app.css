@@ -332,10 +332,13 @@ dialog.preferences input:not([type="checkbox"]) {
 }
 
 /* Stays in view while the chart scrolls; hidden when printing via .toolbar. */
-.content .playback {
+.content .transport {
   position: sticky;
   top: 0;
   z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   background: var(--surface);
 }
 
