@@ -1,14 +1,22 @@
 // Audio import (spec F-IN-1..4, NF-4): pick a file (dialog or drag & drop), a URL or the microphone, set the options, then Run → engine jobs with progress and cancel.
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { cancel, engineHasSections, fetchAudio, record, setupEngine, stop, transcribe, type EngineEvent, type ForcedMeter } from "./engine";
 import { AUDIO_EXTENSIONS, canWrite, pickAudioPath } from "./fileActions";
 
 type Job = { id: number | null; stage: string; pct: number; elapsedSec?: number };
 type Failure = { message: string; stderr: string };
 
-export const Importer = ({ onResult }: { onResult: (path: string) => void }) => {
+type Props = {
+  /** Only the active tab's importer takes a dropped file. */
+  isActive?: boolean;
+  onRunningChange?: (isRunning: boolean) => void;
+  onResult: (path: string) => void;
+};
+
+export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) => {
+  const id = useId();
   const [job, setJob] = useState<Job | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [shouldDetectSections, setShouldDetectSections] = useState(false);
@@ -66,15 +74,16 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
   };
 
   // The drop listener and the engine callbacks outlive renders: they go through the latest props and state.
-  const latest = useRef({ onResult, selectFile, transcribeFile, isRunning: job !== null });
-  latest.current = { onResult, selectFile, transcribeFile, isRunning: job !== null };
+  const latest = useRef({ onResult, selectFile, transcribeFile, isRunning: job !== null, isActive });
+  latest.current = { onResult, selectFile, transcribeFile, isRunning: job !== null, isActive };
   useEffect(() => {
     void engineHasSections().then(setHasSections);
     const unlisten = getCurrentWebview().onDragDropEvent(({ payload }) => {
-      if (payload.type === "drop" && payload.paths.length > 0 && !latest.current.isRunning) latest.current.selectFile(payload.paths[0]);
+      if (payload.type === "drop" && payload.paths.length > 0 && latest.current.isActive && !latest.current.isRunning) latest.current.selectFile(payload.paths[0]);
     });
     return () => void unlisten.then((f) => f());
   }, []);
+  useEffect(() => onRunningChange?.(job !== null), [job !== null]);
 
   const importAudio = async () => {
     const path = await pickAudioPath();
@@ -118,30 +127,30 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
         }}
       >
         <div role="tablist" aria-label="Audio source">
-          <button type="button" role="tab" id="import-tab-file" aria-selected={tab === "file"} aria-controls="import-panel-file" onClick={() => setTab("file")}>
+          <button type="button" role="tab" id={`${id}-import-tab-file`} aria-selected={tab === "file"} aria-controls={`${id}-import-panel-file`} onClick={() => setTab("file")}>
             From file
           </button>
-          <button type="button" role="tab" id="import-tab-url" aria-selected={tab === "url"} aria-controls="import-panel-url" onClick={() => setTab("url")}>
+          <button type="button" role="tab" id={`${id}-import-tab-url`} aria-selected={tab === "url"} aria-controls={`${id}-import-panel-url`} onClick={() => setTab("url")}>
             From URL
           </button>
-          <button type="button" role="tab" id="import-tab-record" aria-selected={tab === "record"} aria-controls="import-panel-record" onClick={() => setTab("record")}>
+          <button type="button" role="tab" id={`${id}-import-tab-record`} aria-selected={tab === "record"} aria-controls={`${id}-import-panel-record`} onClick={() => setTab("record")}>
             Record
           </button>
         </div>
         {/* The panels share one grid cell, so the box keeps the height of the tallest one; the inactive ones are hidden. */}
         <div className="tabpanels">
-          <div role="tabpanel" id="import-panel-file" aria-labelledby="import-tab-file" aria-hidden={tab !== "file"}>
+          <div role="tabpanel" id={`${id}-import-panel-file`} aria-labelledby={`${id}-import-tab-file`} aria-hidden={tab !== "file"}>
             <button type="button" onClick={importAudio} disabled={job !== null}>
               Import audio…
             </button>{" "}
             <span>{audioPath !== null ? /[^/\\]+$/.exec(audioPath)?.[0] : "or drop an audio file on the window."}</span>
           </div>
-          <div role="tabpanel" id="import-panel-url" aria-labelledby="import-tab-url" aria-hidden={tab !== "url"}>
+          <div role="tabpanel" id={`${id}-import-panel-url`} aria-labelledby={`${id}-import-tab-url`} aria-hidden={tab !== "url"}>
             <label>
               Audio URL <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} />
             </label>
           </div>
-          <div role="tabpanel" id="import-panel-record" aria-labelledby="import-tab-record" aria-hidden={tab !== "record"}>
+          <div role="tabpanel" id={`${id}-import-panel-record`} aria-labelledby={`${id}-import-tab-record`} aria-hidden={tab !== "record"}>
             Records the default audio input. Press Run, then Stop.
           </div>
         </div>
@@ -158,10 +167,10 @@ export const Importer = ({ onResult }: { onResult: (path: string) => void }) => 
         </p>
         <p>
           <label>
-            <input type="checkbox" aria-describedby="sections-hint" checked={shouldDetectSections} onChange={(e) => setShouldDetectSections(e.target.checked)} /> Detect
+            <input type="checkbox" aria-describedby={`${id}-sections-hint`} checked={shouldDetectSections} onChange={(e) => setShouldDetectSections(e.target.checked)} /> Detect
             sections
           </label>
-          <span id="sections-hint" className="hint">
+          <span id={`${id}-sections-hint`} className="hint">
             <span>Slower (~6 min for a 4-min song)</span>
             {!hasSections && <span>Installed on first use, requires a network connection</span>}
           </span>

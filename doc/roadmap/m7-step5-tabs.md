@@ -29,8 +29,20 @@ M7-4.
 - Playback: only the active tab plays. Switching tabs pauses the player of the tab you leave.
 - The window title is the active tab's title.
 
+## Decisions (implementation)
+- Ref handle: each `SongTab` exposes a `TabHandle` (save, export, undo, mode…) to App, and reports a `TabStatus` (title, path,
+  dirty, mode, export lock, idle) that the tab bar, the menu and the window title read. App reads a file before opening it, so a
+  bad file never gets a tab.
+- There is always at least one tab: closing the last one leaves a fresh start screen, and the tab bar hides while that lone
+  start screen is all there is.
+- "Untouched start screen" = no song and no import running (`isIdle`): opening a file while a tab imports gives it its own tab.
+- Hidden tabs stay mounted, so DOM ids are made unique with `useId` (start screen, importer, sidebar, notation hint, chord
+  error, help). Only the active tab's importer takes a dropped file. The sidebar finds its panels by `data-panel` in its own
+  `<aside>`.
+- The close-requested handler needs `core:window:allow-destroy` (it destroys the window once nothing is unsaved).
+
 ## Tests
-vitest (`App.test.tsx`, `TabBar.test.tsx`), with the fs/dialog mocks already used:
+vitest (`App.test.tsx`, enriched; `Editor.test.tsx` for the pause), with the fs/dialog mocks already used:
 - Given one open song, when the user opens a second file, then there are two tabs and the second is active.
 - Given a file already open in a tab, when the user opens it again, then no tab is added and its tab is active.
 - Given a dirty tab, when the user closes it and declines the confirm, then the tab stays.

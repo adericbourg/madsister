@@ -98,6 +98,7 @@ type Props = { history: ReturnType<typeof useHistory>; settings: Settings };
 
 export const Toolbar = ({ history, settings }: Props) => {
   const [spelling, setSpelling] = useState<Spelling>("sharp");
+  const hintId = useId();
   const { meta } = history.song;
   const setMeta = (patch: Partial<Song["meta"]>) => history.apply((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
   // A key-less Nashville song keeps its chords relative to C: transposing would break that.
@@ -121,7 +122,7 @@ export const Toolbar = ({ history, settings }: Props) => {
           <select
             value={meta.notation ?? "chords"}
             disabled={meta.key === undefined}
-            aria-describedby={meta.key === undefined ? "notation-hint" : undefined}
+            aria-describedby={meta.key === undefined ? hintId : undefined}
             onChange={(e) => history.apply((s) => setNotation(s, e.target.value as Notation))}
           >
             <option value="chords">Chords</option>
@@ -129,7 +130,7 @@ export const Toolbar = ({ history, settings }: Props) => {
           </select>
         </label>
         {meta.key === undefined && (
-          <span id="notation-hint" className="field-hint">
+          <span id={hintId} className="field-hint">
             {meta.notation === "nashville" ? "Set a key to see the chords" : "Set a key to switch to Nashville numbers"}
           </span>
         )}

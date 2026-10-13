@@ -1,66 +1,42 @@
 import { Menu } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
-import { toChordPro } from "./model/export/chordpro";
-import { toMidi } from "./model/export/midi";
-import { toMusicXml } from "./model/export/musicxml";
-import { emptySong, type Notation, type Song } from "./model/song";
-import { Editor } from "./ui/Editor";
-import { EngineSetup } from "./ui/EngineSetup";
-import { Importer } from "./ui/Importer";
-import {
-  audioSha256,
-  confirmDiscard,
-  exportSong,
-  pickAudioPath,
-  pickOpenPath,
-  pickSavePath,
-  printSong,
-  pushRecent,
-  readConfigJson,
-  readSong,
-  relativeAudioPath,
-  resolveAudioPath,
-  setWindowTitle,
-  writeConfigJson,
-  writeSong,
-} from "./ui/fileActions";
-import { parseSettings, Toolbar, type Settings } from "./ui/Toolbar";
+import type { Song } from "./model/song";
+import { confirmDiscard, pickOpenPath, printSong, pushRecent, readConfigJson, readSong, setWindowTitle, writeConfigJson } from "./ui/fileActions";
+import { parseSettings, type Settings } from "./ui/Toolbar";
 import { About } from "./ui/About";
 import { Preferences } from "./ui/Preferences";
 import { IS_MAC } from "./ui/keymap";
 import { menuItems, RECENT_PREFIX, type MenuState } from "./ui/menu";
 import { Ribbon } from "./ui/Ribbon";
-import { Sidebar } from "./ui/Sidebar";
-import { useHistory } from "./ui/useHistory";
+import { SongTab, type TabHandle, type TabStatus } from "./ui/SongTab";
+import { TabBar, tabId } from "./ui/TabBar";
 
 const RECENT = "recent.json";
 const SETTINGS = "settings.json";
-const BEATS_OPTIONS = Array.from({ length: 16 }, (_, i) => i + 1);
-const UNIT_OPTIONS = [2, 4, 8] as const;
+
+type Tab = { id: number; initial: { song: Song; path: string } | null };
+
+/** A tab before it reports its status: the start screen. */
+const START: TabStatus = { title: "Untitled", path: null, hasSong: false, isDirty: false, isEditing: false, isExportLocked: false, isIdle: true };
+
+const panelId = (id: number) => `song-panel-${id}`;
 
 function App() {
-  const [initial] = useState(emptySong);
-  const history = useHistory(initial);
-  const { song } = history;
-  const [savedSong, setSavedSong] = useState(initial);
-  const [path, setPath] = useState<string | null>(null);
-  const [hasSong, setHasSong] = useState(false);
-  const [mode, setMode] = useState<"view" | "edit">("view");
-  const [panel, setPanel] = useState<HTMLElement | null>(null);
+  const [tabs, setTabs] = useState<Tab[]>([{ id: 0, initial: null }]);
+  const [activeId, setActiveId] = useState(0);
+  const [statuses, setStatuses] = useState<Record<number, TabStatus>>({});
+  const nextId = useRef(1);
+  const handles = useRef<Record<number, TabHandle | null>>({});
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(() => parseSettings(null));
-  // ponytail: the meter is only chosen for new songs; changing it on an existing song would invalidate every bar.
-  const [newBeats, setNewBeats] = useState(4);
-  const [newUnit, setNewUnit] = useState<2 | 4 | 8>(4);
-  const [newNotation, setNewNotation] = useState<Notation>("chords");
-  const [audioNotice, setAudioNotice] = useState<string | null>(null);
   const preferences = useRef<HTMLDialogElement>(null);
   const about = useRef<HTMLDialogElement>(null);
-  const isSongDirty = song !== savedSong;
-  // The exports write real notes, which a key-less Nashville song (chords relative to C) doesn't have.
-  const isExportLocked = song.meta.notation === "nashville" && song.meta.key === undefined;
+  const status = (id: number) => statuses[id] ?? START;
+  const active = status(activeId);
+  // Tabs show up with the first song: a lone start screen has none.
+  const isTabBarShown = tabs.length > 1 || active.hasSong;
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
   const updateRecent = (next: string[]) => {
@@ -71,77 +47,45 @@ function App() {
     setSettings(next);
     writeConfigJson(SETTINGS, next).catch(fail);
   };
-  const load = (next: Song, nextPath: string | null, nextMode: "view" | "edit" = "view") => {
-    history.reset(next);
-    setMode(nextMode);
-    setSavedSong(next);
-    setPath(nextPath);
-    setHasSong(true);
-    setError(null);
-  };
-  const toggleMode = () => setMode((m) => (m === "edit" ? "view" : "edit"));
-  const canDiscard = async () => !isSongDirty || (await confirmDiscard());
-
-  const createGrid = () => load(emptySong({ beats: newBeats, unit: newUnit }, newNotation === "nashville" ? "nashville" : undefined), null, "edit");
-  // Back to the start screen; the song is reset so that it isn't dirty or autosaved behind it.
-  const newSong = async () => {
-    if (!(await canDiscard())) return;
-    load(emptySong(), null);
-    setHasSong(false);
+  const addTab = (initial: Tab["initial"]) => {
+    const id = nextId.current++;
+    setTabs((t) => [...t, { id, initial }]);
+    setActiveId(id);
   };
   const openSong = async (from?: string) => {
-    if (!(await canDiscard())) return;
     const p = from ?? (await pickOpenPath());
     if (p === null) return;
+    const openTab = tabs.find((t) => status(t.id).path === p);
+    if (openTab !== undefined) return setActiveId(openTab.id);
     try {
-      load(await readSong(p), p);
+      const song = await readSong(p);
+      // An untouched start screen becomes the song; otherwise the song gets its own tab.
+      if (active.isIdle) handles.current[activeId]!.load(song, p);
+      else addTab({ song, path: p });
       updateRecent(pushRecent(recent, p));
+      setError(null);
     } catch (e) {
       fail(e);
       if (from !== undefined) updateRecent(recent.filter((r) => r !== p));
     }
   };
-  const saveTo = async (p: string) => {
-    try {
-      await writeSong(p, song);
-      setSavedSong(song);
-      setError(null);
-      if (p !== path) {
-        setPath(p);
-        updateRecent(pushRecent(recent, p));
-      }
-    } catch (e) {
-      fail(e);
+  const closeTab = async (id: number) => {
+    if (status(id).isDirty && !(await confirmDiscard())) return;
+    const rest = tabs.filter((t) => t.id !== id);
+    if (rest.length === 0) {
+      const fresh = nextId.current++;
+      setTabs([{ id: fresh, initial: null }]);
+      setActiveId(fresh);
+    } else {
+      setTabs(rest);
+      if (id === activeId) setActiveId(rest[Math.min(tabs.findIndex((t) => t.id === id), rest.length - 1)].id);
     }
+    setStatuses(({ [id]: _, ...others }) => others);
   };
-  const saveAs = async () => {
-    const p = await pickSavePath(song);
-    if (p !== null) await saveTo(p);
+  const cycleTab = (step: number) => {
+    const i = tabs.findIndex((t) => t.id === activeId);
+    setActiveId(tabs[(i + step + tabs.length) % tabs.length].id);
   };
-  const saveSong = () => (path === null ? saveAs() : saveTo(path));
-  const locateAudio = async () => {
-    const p = await pickAudioPath();
-    if (p === null) return;
-    const sha256 = await audioSha256(p);
-    if (sha256 === null) fail(new Error(`Can't read ${p}`));
-    else history.apply((s) => ({ ...s, audio: { ...s.audio, path: relativeAudioPath(path, p), sha256 } }));
-  };
-
-  // Checked after the song is shown, and again whenever the reference changes (locate, undo).
-  useEffect(() => {
-    setAudioNotice(null);
-    const audio = song.audio;
-    if (audio === undefined) return;
-    let isCurrent = true;
-    const audioPath = resolveAudioPath(path, audio.path);
-    void audioSha256(audioPath).then((sha256) => {
-      if (!isCurrent || sha256 === audio.sha256) return;
-      setAudioNotice(sha256 === null ? `Audio file not found next to the song: ${audioPath}. The song can't be played until you locate it.` : `Audio file has changed since the transcription: ${audioPath}`);
-    });
-    return () => {
-      isCurrent = false;
-    };
-  }, [song.audio, path]);
 
   useEffect(() => {
     readConfigJson(SETTINGS).then((json) => setSettings(parseSettings(json)));
@@ -149,34 +93,49 @@ function App() {
   }, []);
 
   useEffect(() => {
-    void setWindowTitle(`${isSongDirty ? "• " : ""}${song.meta.title} — madsister`);
-  }, [isSongDirty, song.meta.title]);
+    void setWindowTitle(`${active.isDirty ? "• " : ""}${active.title} — madsister`);
+  }, [active.isDirty, active.title]);
 
-  // ponytail: songs without a path aren't autosaved (no temp/recovery file); add one if the user loses work.
+  // Closing the window (or Quit) with unsaved songs asks first.
+  const statusesRef = useRef(statuses);
+  statusesRef.current = statuses;
   useEffect(() => {
-    if (path === null || !isSongDirty) return;
-    const timer = setTimeout(() => void saveTo(path), 2000);
-    return () => clearTimeout(timer);
+    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      if (Object.values(statusesRef.current).some((s) => s.isDirty) && !(await confirmDiscard())) event.preventDefault();
+    });
+    return () => void unlisten.then((f) => f());
+  }, []);
+
+  // Re-bound on every render so the handler sees the current tabs.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.key !== "Tab") return;
+      e.preventDefault();
+      cycleTab(e.shiftKey ? -1 : 1);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   });
 
   const runMenu = (id: string) => {
     if (id.startsWith(RECENT_PREFIX)) return void openSong(id.slice(RECENT_PREFIX.length));
+    const tab = handles.current[activeId];
+    // A text field undoes its own typing; otherwise the song history.
     const isInText = document.activeElement?.matches("input, textarea") ?? false;
     const actions: Record<string, () => unknown> = {
-      new: newSong,
+      new: () => addTab(null),
       open: () => openSong(),
       "clear-recent": () => updateRecent([]),
-      close: newSong,
-      save: saveSong,
-      "save-as": saveAs,
-      chordpro: () => exportSong(song, "ChordPro", "cho", toChordPro).catch(fail),
-      musicxml: () => exportSong(song, "MusicXML", "musicxml", toMusicXml).catch(fail),
-      midi: () => exportSong(song, "MIDI", "mid", toMidi).catch(fail),
+      close: () => closeTab(activeId),
+      save: () => tab?.save(),
+      "save-as": () => tab?.saveAs(),
+      chordpro: () => tab?.exportAs("chordpro"),
+      musicxml: () => tab?.exportAs("musicxml"),
+      midi: () => tab?.exportAs("midi"),
       print: printSong,
-      // A text field undoes its own typing; otherwise the song history, which is read-only in view mode like the grid.
-      undo: () => (isInText ? document.execCommand("undo") : mode === "edit" && history.undo()),
-      redo: () => (isInText ? document.execCommand("redo") : mode === "edit" && history.redo()),
-      "edit-mode": toggleMode,
+      undo: () => (isInText ? document.execCommand("undo") : tab?.undo()),
+      redo: () => (isInText ? document.execCommand("redo") : tab?.redo()),
+      "edit-mode": () => tab?.toggleMode(),
       sidebar: () => changeSettings({ ...settings, isSidebarCollapsed: !settings.isSidebarCollapsed }),
       preferences: () => preferences.current?.showModal(),
       about: () => about.current?.showModal(),
@@ -187,7 +146,14 @@ function App() {
   // The menu calls the current render's actions; it is rebuilt only when what it shows changes.
   const runMenuRef = useRef(runMenu);
   runMenuRef.current = runMenu;
-  const menuState: MenuState = { isMac: IS_MAC, hasSong, isExportLocked, isEditing: mode === "edit", isSidebarShown: !settings.isSidebarCollapsed, recent };
+  const menuState: MenuState = {
+    isMac: IS_MAC,
+    hasSong: active.hasSong,
+    isExportLocked: active.isExportLocked,
+    isEditing: active.isEditing,
+    isSidebarShown: !settings.isSidebarCollapsed,
+    recent,
+  };
   const menuKey = JSON.stringify(menuState);
   useEffect(() => {
     let isCurrent = true;
@@ -202,70 +168,49 @@ function App() {
   return (
     <main className={[settings.compactPrint && "compact-print", `font-${settings.font}`].filter(Boolean).join(" ")}>
       <Ribbon
-        hasSong={hasSong}
-        isEditing={mode === "edit"}
-        onNew={newSong}
+        hasSong={active.hasSong}
+        isEditing={active.isEditing}
+        onNew={() => addTab(null)}
         onOpen={() => openSong()}
-        onSave={saveSong}
+        onSave={() => void handles.current[activeId]?.save()}
         onPrint={printSong}
-        onToggleMode={toggleMode}
+        onToggleMode={() => handles.current[activeId]?.toggleMode()}
         onPreferences={() => preferences.current?.showModal()}
       />
       <Preferences ref={preferences} settings={settings} onSettingsChange={changeSettings} />
       <About ref={about} />
-      {error !== null && <p role="alert">{error}</p>}
-      {hasSong ? (
-        <div className="workspace">
-          <div className="content">
-            {audioNotice !== null && (
-              <p role="status" className="audio-notice">
-                <span>{audioNotice}</span>{" "}
-                <button type="button" onClick={locateAudio}>
-                  Locate audio…
-                </button>
-              </p>
-            )}
-            {panel && (
-              <Editor history={history} mode={mode} barsPerRow={settings.barsPerRow} compactPrint={settings.compactPrint} style={settings.style} minorConvention={settings.minorConvention} lowConfidenceThreshold={settings.lowConfidenceThreshold} panel={panel} audioPath={song.audio && resolveAudioPath(path, song.audio.path)} onLocateAudio={locateAudio} />
-            )}
-          </div>
-          <Sidebar isCollapsed={settings.isSidebarCollapsed} isEditing={mode === "edit"} onCollapsedChange={(isSidebarCollapsed) => changeSettings({ ...settings, isSidebarCollapsed })} panelsRef={setPanel}>
-            <Toolbar history={history} settings={settings} />
-          </Sidebar>
-        </div>
-      ) : (
-        <div className="start">
-          <section aria-labelledby="new-grid-title" className="new-grid">
-            <h2 id="new-grid-title">New grid</h2>
-            <label htmlFor="new-beats">Beats per bar</label>
-            <select id="new-beats" value={newBeats} onChange={(e) => setNewBeats(Number(e.target.value))}>
-              {BEATS_OPTIONS.map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </select>
-            <label htmlFor="new-unit">Beat unit</label>
-            <select id="new-unit" value={newUnit} onChange={(e) => setNewUnit(Number(e.target.value) as 2 | 4 | 8)}>
-              {UNIT_OPTIONS.map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </select>
-            <label htmlFor="new-notation">Notation</label>
-            <select id="new-notation" value={newNotation} onChange={(e) => setNewNotation(e.target.value as Notation)}>
-              <option value="chords">Chords</option>
-              <option value="nashville">Nashville numbers</option>
-            </select>
-            <button type="button" className="primary" onClick={createGrid}>
-              Create grid
-            </button>
-          </section>
-          <section aria-labelledby="import-title">
-            <h2 id="import-title">Import audio</h2>
-            <EngineSetup>
-              <Importer onResult={(p) => void openSong(p)} />
-            </EngineSetup>
-          </section>
-        </div>
+      {isTabBarShown && (
+        <TabBar
+          tabs={tabs.map(({ id }) => ({ id, title: status(id).hasSong ? status(id).title : "New tab", isDirty: status(id).isDirty }))}
+          activeId={activeId}
+          panelId={panelId}
+          onSelect={setActiveId}
+          onClose={(id) => void closeTab(id)}
+        />
       )}
+      {error !== null && <p role="alert">{error}</p>}
+      {tabs.map(({ id, initial }) => (
+        <div
+          key={id}
+          id={panelId(id)}
+          role={isTabBarShown ? "tabpanel" : undefined}
+          aria-labelledby={isTabBarShown ? tabId(id) : undefined}
+          className="tabpanel"
+          hidden={id !== activeId}
+        >
+          <SongTab
+            ref={(handle) => {
+              handles.current[id] = handle;
+            }}
+            isActive={id === activeId}
+            initial={initial}
+            settings={settings}
+            onSettingsChange={changeSettings}
+            onStatus={(next) => setStatuses((s) => ({ ...s, [id]: next }))}
+            onFile={(p) => updateRecent(pushRecent(recent, p))}
+          />
+        </div>
+      ))}
     </main>
   );
 }

@@ -45,8 +45,8 @@ test("Importer_whenDroppingAnAudioFile_waitsForRunThenShowsProgressAndReportsThe
   render(<Importer onResult={onResult} />);
 
   // Then "Detect sections" warns about its duration, and not about an install since sections are installed
-  expect(screen.getByRole("checkbox", { name: "Detect sections" }).getAttribute("aria-describedby")).toBe("sections-hint");
-  expect(document.getElementById("sections-hint")!.textContent).toContain("Slower (~6 min for a 4-min song)");
+  const hintId = screen.getByRole("checkbox", { name: "Detect sections" }).getAttribute("aria-describedby")!;
+  expect(document.getElementById(hintId)!.textContent).toContain("Slower (~6 min for a 4-min song)");
   expect(screen.queryByText(/Installed on first use/)).toBeNull();
 
   // When dropping an mp3

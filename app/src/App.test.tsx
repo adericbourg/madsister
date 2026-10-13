@@ -32,7 +32,17 @@ vi.mock("@tauri-apps/api/webview", () => ({
 }));
 const setTitle = vi.hoisted(() => vi.fn());
 const closeWindow = vi.hoisted(() => vi.fn());
-vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ setTitle, close: closeWindow }) }));
+const closeRequest = vi.hoisted(() => ({ handler: async (_: { preventDefault: () => void }) => {} }));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    setTitle,
+    close: closeWindow,
+    onCloseRequested: async (handler: typeof closeRequest.handler) => {
+      closeRequest.handler = handler;
+      return () => {};
+    },
+  }),
+}));
 type MenuNode = { text?: string; id?: string; enabled?: boolean; checked?: boolean; items?: MenuNode[]; action?: (id: string) => void };
 const appMenu = vi.hoisted(() => ({ items: [] as MenuNode[] }));
 vi.mock("@tauri-apps/api/menu", () => ({
@@ -169,7 +179,8 @@ test("App_whenOpeningFiles_loadsValidOnesAndReportsInvalidOnes", async () => {
   expect((await screen.findByRole("alert")).textContent).toMatch(/meta/);
   expect(screen.getByRole("heading", { name: "Blues" })).toBeDefined();
 
-  // When the recent file has gone missing and is reopened from Open recent
+  // When the song is closed, its file goes missing, and it is reopened from Open recent
+  await clickMenu("File", "Close tab");
   delete files["/blues.madsister.json"];
   await clickMenu("File", "Open recent", "blues.madsister.json");
 
@@ -631,4 +642,102 @@ test("App_fromTheMenu_undoesShowsTheSidebarOpensPreferencesAndQuits", async () =
   // When choosing Quit, Then the window is closed
   await clickMenu("File", "Quit madsister");
   expect(closeWindow).toHaveBeenCalled();
+});
+
+test("App_withSeveralSongs_opensEachInItsOwnTabWithItsOwnState", async () => {
+  // Given two saved songs, and the app on its start screen: no tabs yet
+  const user = userEvent.setup();
+  files["/blues.madsister.json"] = serializeSong(song);
+  files["/waltz.madsister.json"] = serializeSong({ ...song, meta: { ...song.meta, title: "Waltz" } });
+  render(<App />);
+  expect(screen.queryByRole("tablist", { name: "Songs" })).toBeNull();
+  const tabs = () => within(screen.getByRole("tablist", { name: "Songs" })).getAllByRole("tab");
+  const activeTab = () => tabs().find((t) => t.getAttribute("aria-selected") === "true")!;
+
+  // When opening the first song, Then it takes the start screen's place, in a single tab
+  vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
+  await clickMenu("File", "Open…");
+  await screen.findByRole("heading", { name: "Blues" });
+  expect(tabs().map((t) => t.textContent)).toEqual(["Blues"]);
+
+  // When opening the second one, Then it opens in a new, active tab, in front of the first song
+  vi.mocked(open).mockResolvedValueOnce("/waltz.madsister.json");
+  await clickMenu("File", "Open…");
+  await screen.findByRole("heading", { name: "Waltz" });
+  expect(tabs().map((t) => t.textContent)).toEqual(["Blues", "Waltz"]);
+  expect(activeTab().textContent).toBe("Waltz");
+  expect(screen.queryByRole("heading", { name: "Blues" })).toBeNull();
+  expect(setTitle).toHaveBeenLastCalledWith("Waltz — madsister");
+
+  // When opening the first song again, Then its tab comes back to the front, no tab added
+  await clickMenu("File", "Open recent", "blues.madsister.json");
+  await vi.waitFor(() => expect(activeTab().textContent).toBe("Blues"));
+  expect(tabs()).toHaveLength(2);
+
+  // When editing the first song, then cycling to the other tab and back with Ctrl+Tab
+  await clickMenu("View", "Edit mode");
+  const firstSlot = () => screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ });
+  await user.click(firstSlot());
+  await user.keyboard("G{Enter}");
+  expect(activeTab().textContent).toBe("•Blues");
+  await user.keyboard("{Control>}{Tab}{/Control}");
+  expect(activeTab().textContent).toBe("Waltz");
+  expect(firstSlot().textContent).toBe("C7");
+  await user.keyboard("{Control>}{Shift>}{Tab}{/Shift}{/Control}");
+
+  // Then the first song kept its edit, its mode and its undo history
+  expect(activeTab().textContent).toBe("•Blues");
+  expect(firstSlot().textContent).toBe("G");
+  await user.keyboard("{Escape}");
+  await clickMenu("Edit", "Undo");
+  expect(firstSlot().textContent).toBe("C7");
+
+  // When pressing the right arrow on the focused tab, Then the next tab is shown and focused
+  activeTab().focus();
+  await user.keyboard("{ArrowRight}");
+  expect(activeTab().textContent).toBe("Waltz");
+  expect(document.activeElement).toBe(activeTab());
+});
+
+test("App_whenClosingTabsOrTheWindow_asksBeforeDroppingUnsavedWork", async () => {
+  // Given a saved song, and a new unsaved grid in a second tab
+  const user = userEvent.setup();
+  files["/blues.madsister.json"] = serializeSong(song);
+  render(<App />);
+  vi.mocked(open).mockResolvedValueOnce("/blues.madsister.json");
+  await clickMenu("File", "Open…");
+  await screen.findByRole("heading", { name: "Blues" });
+  await clickMenu("File", "New tab");
+  await createGrid(user);
+  await user.keyboard("C{Enter}");
+  const tabs = () => within(screen.getByRole("tablist", { name: "Songs" })).queryAllByRole("tab");
+  expect(tabs().map((t) => t.textContent)).toEqual(["Blues", "•Untitled"]);
+
+  // When the window is asked to close and the user declines, Then it stays open
+  vi.mocked(confirm).mockResolvedValueOnce(false);
+  const event = { preventDefault: vi.fn() };
+  await act(() => closeRequest.handler(event));
+  expect(event.preventDefault).toHaveBeenCalled();
+
+  // When closing the unsaved tab and declining, Then it stays
+  vi.mocked(confirm).mockResolvedValueOnce(false);
+  await user.click(screen.getByRole("button", { name: "Close Untitled" }));
+  expect(tabs()).toHaveLength(2);
+
+  // When closing it and accepting, Then it goes, and the saved song is in front again
+  await user.click(screen.getByRole("button", { name: "Close Untitled" }));
+  await vi.waitFor(() => expect(tabs().map((t) => t.textContent)).toEqual(["Blues"]));
+  expect(screen.getByRole("heading", { name: "Blues" })).toBeDefined();
+
+  // When the window is asked to close with nothing unsaved, Then it closes without asking
+  vi.mocked(confirm).mockClear();
+  const clean = { preventDefault: vi.fn() };
+  await act(() => closeRequest.handler(clean));
+  expect(confirm).not.toHaveBeenCalled();
+  expect(clean.preventDefault).not.toHaveBeenCalled();
+
+  // When closing the last tab with File > Close tab, Then the start screen is back, without tabs
+  await clickMenu("File", "Close tab");
+  expect(await screen.findByRole("button", { name: "Create grid" })).toBeDefined();
+  expect(screen.queryByRole("tablist", { name: "Songs" })).toBeNull();
 });

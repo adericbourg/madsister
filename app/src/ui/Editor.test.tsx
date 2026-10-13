@@ -22,11 +22,11 @@ vi.mock("@tauri-apps/api/menu", () => ({ Menu: { new: (o: { items: MenuItem[] })
 afterEach(cleanup);
 
 let song: Song | undefined;
-const Harness = ({ from = emptySong, mode, audioPath, onLocateAudio }: { from?: () => Song; mode?: "view" | "edit"; audioPath?: string; onLocateAudio?: () => void }) => {
+const Harness = ({ from = emptySong, mode, audioPath, onLocateAudio, isActive }: { from?: () => Song; mode?: "view" | "edit"; audioPath?: string; onLocateAudio?: () => void; isActive?: boolean }) => {
   const [initial] = useState(from);
   const history = useHistory(initial);
   song = history.song;
-  return <Editor history={history} mode={mode} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={audioPath ?? initial.audio?.path} onLocateAudio={onLocateAudio} />;
+  return <Editor history={history} mode={mode} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={audioPath ?? initial.audio?.path} onLocateAudio={onLocateAudio} isActive={isActive} />;
 };
 
 const bar = (...chords: [string, number][]) => ({ chords: chords.map(([chord, beats]) => ({ chord, beats })) });
@@ -460,6 +460,13 @@ test("Editor_whenPlayingTheAudio_highlightsTheBarBeingPlayed", async () => {
   await user.click(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }));
   expect(currentTime).toBe(0);
   expect(screen.getByRole("button", { name: "Pause" })).toBeDefined();
+
+  // When the song's tab goes to the background while playing, Then the playback pauses, and stays paused once back
+  rerender(<Harness from={from} isActive={false} />);
+  expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
+  rerender(<Harness from={from} />);
+  expect(screen.getByRole("button", { name: "Play" })).toBeDefined();
+  await user.click(screen.getByRole("button", { name: "Play" }));
 
   // When opening another song's audio while playing, Then the playback stops and the element unloads the old file
   const audio = document.querySelector("audio")!;

@@ -1,5 +1,5 @@
 import { ArrowUpDown, Columns2, Gauge, Music, PanelRightClose, PanelRightOpen, Rows3, SeparatorVertical, type LucideIcon } from "lucide-react";
-import { useEffect, useState, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from "react";
 
 /** The per-song panels (F-UI-4), in sidebar order; the editing ones only show in edit mode. */
 const PANELS = {
@@ -19,7 +19,7 @@ const EDIT_PANELS = Object.keys(PANELS) as PanelId[];
 export const Panel = ({ id, disabled, children }: { id: PanelId; disabled?: boolean; children: ReactNode }) => {
   const [title, Icon] = PANELS[id];
   return (
-    <fieldset id={`panel-${id}`} className="toolbar" disabled={disabled}>
+    <fieldset data-panel={id} className="toolbar" disabled={disabled}>
       <legend>
         <Icon size={16} /> {title}
       </legend>
@@ -39,17 +39,19 @@ type Props = {
 
 export const Sidebar = ({ isCollapsed, isEditing, onCollapsedChange, panelsRef, children }: Props) => {
   const [target, setTarget] = useState<PanelId | null>(null);
+  const aside = useRef<HTMLElement>(null);
+  const panelsId = useId();
   // Scrolls once the panels are shown again.
   useEffect(() => {
     if (target === null) return;
-    document.getElementById(`panel-${target}`)?.scrollIntoView({ block: "start" });
+    aside.current!.querySelector(`[data-panel="${target}"]`)?.scrollIntoView({ block: "start" });
     setTarget(null);
   }, [target]);
   const ToggleIcon = isCollapsed ? PanelRightOpen : PanelRightClose;
   return (
-    <aside id="parameters" aria-label="Parameters" className={isCollapsed ? "is-collapsed" : undefined}>
+    <aside ref={aside} aria-label="Parameters" className={isCollapsed ? "is-collapsed" : undefined}>
       <div className="rail">
-        <button type="button" title={isCollapsed ? "Show parameters" : "Hide parameters"} aria-expanded={!isCollapsed} aria-controls="panels" onClick={() => onCollapsedChange(!isCollapsed)}>
+        <button type="button" title={isCollapsed ? "Show parameters" : "Hide parameters"} aria-expanded={!isCollapsed} aria-controls={panelsId} onClick={() => onCollapsedChange(!isCollapsed)}>
           <ToggleIcon size={18} />
           <span className="visually-hidden">Parameters</span>
         </button>
@@ -72,7 +74,7 @@ export const Sidebar = ({ isCollapsed, isEditing, onCollapsedChange, panelsRef, 
             );
           })}
       </div>
-      <div id="panels" className="panels" hidden={isCollapsed} ref={panelsRef}>
+      <div id={panelsId} className="panels" hidden={isCollapsed} ref={panelsRef}>
         {children}
       </div>
     </aside>

@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu } from "@tauri-apps/api/menu";
 import { createPortal } from "react-dom";
@@ -32,6 +32,8 @@ type Props = {
   onLocateAudio?: () => void;
   /** View is read-only: clicking a bar only moves the cursor and the audio. */
   mode?: "view" | "edit";
+  /** False while the song's tab is in the background: playback pauses. */
+  isActive?: boolean;
 };
 // `select` is where the caret lands on focus: "all" selects the whole text, "end" keeps a typed first character.
 type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; error?: string };
@@ -39,7 +41,8 @@ type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; err
 const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, compactPrint, style, minorConvention, lowConfidenceThreshold, panel, audioPath, onLocateAudio, mode = "edit" }: Props) => {
+export const Editor = ({ history, barsPerRow, compactPrint, style, minorConvention, lowConfidenceThreshold, panel, audioPath, onLocateAudio, mode = "edit", isActive = true }: Props) => {
+  const id = useId();
   const { song } = history;
   const isEditable = mode === "edit";
   // Nashville: chords are typed and shown as degrees of this tonic; undefined = chord names.
@@ -58,6 +61,9 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
   const cursor = clampCursor(song, rawCursor);
   const flaggedCount = countFlagged(song, lowConfidenceThreshold);
   const player = usePlayer(audioPath);
+  useEffect(() => {
+    if (!isActive && player.isPlaying) player.toggle();
+  }, [isActive]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const command = keyToCommand(e, { song, cursor, anchor, clipboard, barsPerRow, lowConfidenceThreshold });
@@ -230,7 +236,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
         className="slot-input"
         aria-label={draft.kind === "chord" ? "Chord" : "Section name"}
         aria-invalid={draft.error !== undefined}
-        aria-describedby={draft.error === undefined ? undefined : "draft-error"}
+        aria-describedby={draft.error === undefined ? undefined : `${id}-draft-error`}
         value={draft.text}
         autoFocus
         onFocus={(e) => {
@@ -255,7 +261,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
         }}
       />
       {draft.error !== undefined && (
-        <span id="draft-error" role="alert" className="slot-error">
+        <span id={`${id}-draft-error`} role="alert" className="slot-error">
           {draft.error}
         </span>
       )}
@@ -428,8 +434,8 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
         {notice}
       </p>
       {isHelpOpen && (
-        <div role="dialog" aria-modal="true" aria-labelledby="help-title" className="help" onKeyDown={(e) => e.key === "Escape" && closeHelp()}>
-          <h2 id="help-title">Keyboard shortcuts</h2>
+        <div role="dialog" aria-modal="true" aria-labelledby={`${id}-help-title`} className="help" onKeyDown={(e) => e.key === "Escape" && closeHelp()}>
+          <h2 id={`${id}-help-title`}>Keyboard shortcuts</h2>
           <table>
             <tbody>
               {SHORTCUTS.map(([keys, what]) => (
