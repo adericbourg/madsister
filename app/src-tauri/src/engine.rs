@@ -97,11 +97,7 @@ pub fn engine_command(
         (Some(cmd), _) if !cmd.trim().is_empty() => {
             cmd.split_whitespace().map(String::from).collect()
         }
-        (_, Some(packaged)) => vec![packaged
-            .env
-            .join("bin/madsister-engine")
-            .display()
-            .to_string()],
+        (_, Some(packaged)) => vec![venv_engine(&packaged.env).display().to_string()],
         _ => [
             "uv",
             "run",
@@ -117,11 +113,18 @@ pub fn engine_command(
 
 const DEV_PROJECT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../engine");
 
+/// The engine's launcher in a venv: `Scripts\madsister-engine.exe` on Windows.
+fn venv_engine(venv: &Path) -> PathBuf {
+    if cfg!(windows) {
+        venv.join("Scripts").join("madsister-engine.exe")
+    } else {
+        venv.join("bin").join("madsister-engine")
+    }
+}
+
 /// How to install the dev engine when `command` is it and it's missing: `uv run --no-sync` never installs it.
 pub fn missing_dev_engine(command: &[String]) -> Option<String> {
-    let installed = Path::new(DEV_PROJECT)
-        .join(".venv/bin/madsister-engine")
-        .exists();
+    let installed = venv_engine(&Path::new(DEV_PROJECT).join(".venv")).exists();
     (command == engine_command(None, None) && !installed).then(|| {
         "the dev engine isn't installed: run `cd engine && uv sync --group beats-madmom --group chords-cnnlstm \
          --group beats-allinone --group fetch --group record --group separate` (see CONTRIBUTING.md)"
@@ -341,7 +344,7 @@ mod tests {
         );
         assert_eq!(
             engine_command(Some(" ".into()), Some(&packaged)),
-            ["/data/env/bin/madsister-engine"]
+            [venv_engine(Path::new("/data/env")).display().to_string()]
         );
         let dev = engine_command(None, None);
         assert_eq!(dev[..2], ["uv", "run"]);
@@ -352,9 +355,7 @@ mod tests {
     fn missing_dev_engine_only_flags_the_dev_command_without_its_env() {
         // Given / When / Then
         assert_eq!(missing_dev_engine(&["python".into()]), None);
-        let installed = Path::new(DEV_PROJECT)
-            .join(".venv/bin/madsister-engine")
-            .exists();
+        let installed = venv_engine(&Path::new(DEV_PROJECT).join(".venv")).exists();
         assert_eq!(
             missing_dev_engine(&engine_command(None, None)).is_some(),
             !installed
