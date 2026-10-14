@@ -10,6 +10,7 @@
   --accent-hover: #4338ca;
   --accent-text: #fff; /* 6.3:1 on accent */
   --danger: #b42318; /* 6.0:1 on surface */
+  --warning: #b54708; /* frames and tints the audio notice */
   --focus: #4f46e5;
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
@@ -29,6 +30,7 @@
     --accent-hover: #a5b4fc;
     --accent-text: #14142b; /* 6.0:1 on accent */
     --danger: #f97066; /* 5.1:1 on surface-2 */
+    --warning: #fdb022;
     --focus: #a5b4fc;
   }
 }
@@ -374,6 +376,26 @@ dialog.preferences input:not([type="checkbox"]) {
 
 .content .playback input[type="range"] {
   flex: 1;
+}
+
+/* Same width as the transport below it; warning-tinted. */
+.content fieldset.audio-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  max-width: 63rem;
+  margin: 0.5rem auto 0;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+}
+
+.content fieldset.audio-notice p {
+  flex-basis: 100%;
+  margin: 0;
 }
 
 /* A bar scrolled into view while playing stops below the transport, not under it. */

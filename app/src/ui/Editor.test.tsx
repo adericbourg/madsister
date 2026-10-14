@@ -23,11 +23,11 @@ vi.mock("@tauri-apps/api/menu", () => ({ Menu: { new: (o: { items: MenuItem[] })
 afterEach(cleanup);
 
 let song: Song | undefined;
-const Harness = ({ from = emptySong, mode, audioPath, onLocateAudio, isActive }: { from?: () => Song; mode?: "view" | "edit"; audioPath?: string; onLocateAudio?: () => void; isActive?: boolean }) => {
+const Harness = ({ from = emptySong, mode, audioPath, isActive }: { from?: () => Song; mode?: "view" | "edit"; audioPath?: string; isActive?: boolean }) => {
   const [initial] = useState(from);
   const history = useHistory(initial);
   song = history.song;
-  return <Editor history={history} mode={mode} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={audioPath ?? initial.audio?.path} onLocateAudio={onLocateAudio} isActive={isActive} />;
+  return <Editor history={history} mode={mode} barsPerRow={4} style="fr" minorConvention="relative" lowConfidenceThreshold={0.5} audioPath={audioPath ?? initial.audio?.path} isActive={isActive} />;
 };
 
 const bar = (...chords: [string, number][]) => ({ chords: chords.map(([chord, beats]) => ({ chord, beats })) });
@@ -662,18 +662,14 @@ test("Editor_rightClickInViewMode_leavesTheBrowserMenu", () => {
   expect(menuNew).not.toHaveBeenCalled();
 });
 
-test("Editor_whenTheAudioFileIsMissing_offersToLocateIt", async () => {
+test("Editor_whenTheAudioFileCantBeRead_showsThePlayerError", async () => {
   // Given a song whose audio file can't be read
-  const user = userEvent.setup();
   vi.mocked(invoke).mockRejectedValue("can't read /music/song.mp3: No such file or directory (os error 2)");
-  const onLocateAudio = vi.fn();
   const from = () => ({ ...emptySong(), audio: { path: "/music/song.mp3", sha256: "x" } });
 
   // When showing it
-  render(<Harness from={from} onLocateAudio={onLocateAudio} />);
+  render(<Harness from={from} />);
 
-  // Then the error comes with an enabled button to pick the file
+  // Then the player's error is shown
   expect((await screen.findByRole("alert")).textContent).toContain("Can't play this audio: can't read /music/song.mp3");
-  await user.click(screen.getByRole("button", { name: "Locate audio…" }));
-  expect(onLocateAudio).toHaveBeenCalledOnce();
 });

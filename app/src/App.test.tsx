@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { confirm, open, save } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -12,7 +12,7 @@ import { transcribe } from "./ui/engine";
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ readTextFile: vi.fn(), writeTextFile: vi.fn(), writeFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(), revealItemInDir: vi.fn(async () => {}) }));
 // jsdom has no modal <dialog>: only expose it in the accessibility tree while open
 HTMLDialogElement.prototype.showModal = function () {
   this.setAttribute("open", "");
@@ -248,7 +248,12 @@ test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAud
 
   // Then the song is shown, with a notice that the audio is missing
   expect(await screen.findByRole("heading", { name: "Blues" })).toBeDefined();
-  expect(await screen.findByText("Audio file not found next to the song: /music/blues.mp3. The song can't be played until you locate it.")).toBeDefined();
+  expect((await screen.findByText(/Audio file not found/)).textContent).toBe("Audio file not found next to the song: blues.mp3.The song can't be played until you locate it.");
+  expect(screen.getAllByRole("button", { name: "Locate audio…" })).toHaveLength(1);
+
+  // When showing the song file, Then its folder opens
+  await user.click(screen.getByRole("button", { name: "Show song file" }));
+  expect(revealItemInDir).toHaveBeenCalledWith("/blues.madsister.json");
 
   // When locating the audio
   vi.mocked(open).mockResolvedValueOnce("/music/found.mp3");
@@ -265,14 +270,14 @@ test("App_whenOpeningASongWithMissingOrChangedAudio_showsANoticeAndLocatesTheAud
   await clickMenu("View", "Edit mode");
   await user.click(screen.getByRole("gridcell", { name: /^Chorus, bar 1, beat 1/ }));
   await user.keyboard("{Escape}{Control>}z{/Control}");
-  expect(await screen.findByText("Audio file not found next to the song: /music/blues.mp3. The song can't be played until you locate it.")).toBeDefined();
+  expect(await screen.findByText(/Audio file not found/)).toBeDefined();
 
   // When opening a song whose audio has changed since transcription
   vi.mocked(open).mockResolvedValueOnce("/changed.madsister.json");
   await user.click(screen.getByRole("button", { name: "Open…" }));
 
   // Then the notice says so
-  expect(await screen.findByText("Audio file has changed since the transcription: /music/changed.mp3")).toBeDefined();
+  expect((await screen.findByText(/Audio file has changed/)).textContent).toBe("Audio file has changed since the transcription: changed.mp3");
 });
 
 test("App_whenSaving_writesTheSerializedSongThenAutosavesEdits", async () => {

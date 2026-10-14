@@ -18,6 +18,7 @@
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "https://github.com/**" }]
     },
+    "opener:allow-reveal-item-in-dir",
     {
       "identifier": "fs:allow-read-text-file",
       "allow": [{ "path": "$APPCONFIG/*" }, { "path": "$HOME/**/*.madsister.json" }, { "path": "$APPDATA/sources/*.madsister.json" }]

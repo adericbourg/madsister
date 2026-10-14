@@ -1,3 +1,4 @@
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useId, useImperativeHandle, useState, type Ref } from "react";
 import { toChordPro } from "../model/export/chordpro";
 import { toMidi } from "../model/export/midi";
@@ -18,6 +19,7 @@ const EXPORTS = {
   musicxml: ["MusicXML", "musicxml", toMusicXml],
   midi: ["MIDI", "mid", toMidi],
 } as const;
+const fileName = (p: string) => p.split(/[\\/]/).pop();
 
 /** What the app shows of a tab: its tab label, the window title, the menu's enabled items. */
 export type TabStatus = { title: string; path: string | null; hasSong: boolean; isDirty: boolean; isEditing: boolean; isExportLocked: boolean; isIdle: boolean };
@@ -61,7 +63,7 @@ export const SongTab = ({ ref, isActive, initial, settings, onSettingsChange, on
   const [newUnit, setNewUnit] = useState<2 | 4 | 8>(4);
   const [newNotation, setNewNotation] = useState<Notation>("chords");
   const [isImporting, setIsImporting] = useState(false);
-  const [audioNotice, setAudioNotice] = useState<string | null>(null);
+  const [audioState, setAudioState] = useState<"missing" | "changed" | null>(null);
   const id = useId();
   const isDirty = song !== savedSong;
   // The exports write real notes, which a key-less Nashville song (chords relative to C) doesn't have.
@@ -128,16 +130,17 @@ export const SongTab = ({ ref, isActive, initial, settings, onSettingsChange, on
   const statusKey = JSON.stringify(status);
   useEffect(() => onStatus(status), [statusKey]);
 
+  const audioPath = song.audio && resolveAudioPath(path, song.audio.path);
+
   // Checked after the song is shown, and again whenever the reference changes (locate, undo).
   useEffect(() => {
-    setAudioNotice(null);
+    setAudioState(null);
     const audio = song.audio;
-    if (audio === undefined) return;
+    if (audio === undefined || audioPath === undefined) return;
     let isCurrent = true;
-    const audioPath = resolveAudioPath(path, audio.path);
     void audioSha256(audioPath).then((sha256) => {
       if (!isCurrent || sha256 === audio.sha256) return;
-      setAudioNotice(sha256 === null ? `Audio file not found next to the song: ${audioPath}. The song can't be played until you locate it.` : `Audio file has changed since the transcription: ${audioPath}`);
+      setAudioState(sha256 === null ? "missing" : "changed");
     });
     return () => {
       isCurrent = false;
@@ -157,13 +160,28 @@ export const SongTab = ({ ref, isActive, initial, settings, onSettingsChange, on
       {hasSong ? (
         <div className="workspace">
           <div className="content">
-            {audioNotice !== null && (
-              <p role="status" className="audio-notice">
-                <span>{audioNotice}</span>{" "}
-                <button type="button" onClick={locateAudio}>
+            {audioState !== null && audioPath !== undefined && (
+              <fieldset role="status" className="audio-notice">
+                {audioState === "missing" ? (
+                  <p>
+                    Audio file not found next to the song: <span title={audioPath}>{fileName(audioPath)}</span>.
+                    <br />
+                    The song can't be played until you locate it.
+                  </p>
+                ) : (
+                  <p>
+                    Audio file has changed since the transcription: <span title={audioPath}>{fileName(audioPath)}</span>
+                  </p>
+                )}
+                <button type="button" className="primary" onClick={locateAudio}>
                   Locate audio…
                 </button>
-              </p>
+                {path !== null && (
+                  <button type="button" onClick={() => revealItemInDir(path).catch(fail)}>
+                    Show song file
+                  </button>
+                )}
+              </fieldset>
             )}
             {panel && (
               <Editor
@@ -176,8 +194,8 @@ export const SongTab = ({ ref, isActive, initial, settings, onSettingsChange, on
                 minorConvention={settings.minorConvention}
                 lowConfidenceThreshold={settings.lowConfidenceThreshold}
                 panel={panel}
-                audioPath={song.audio && resolveAudioPath(path, song.audio.path)}
-                onLocateAudio={locateAudio}
+                // A missing file would only fail to load, repeating the notice above.
+                audioPath={audioState === "missing" ? undefined : audioPath}
                 onShowPanels={() => onSettingsChange({ ...settings, isSidebarCollapsed: false })}
               />
             )}
