@@ -272,7 +272,7 @@ The chart grid (§5.2, `grid.css`) keeps its look. These requirements cover the 
 - **F-UI-7** Several songs open at once, one tab each. The tab bar is shown as soon as one tab exists. New opens a tab on the
   start screen (new grid / import audio). Opening an already-open file focuses its tab. Closing a dirty tab, or the window with
   dirty tabs, asks for confirmation. Only the active tab plays.
-- **F-UI-8** The tabs that have a file are reopened at launch.
+- **F-UI-8** The tabs that have a file are reopened at launch, unless the "Reopen previous tabs on launch" preference (`reopenTabs`, on by default) is turned off.
 
 ## 6. Non-functional requirements
 - **NF-1** Fully offline after setup (except yt-dlp downloads).

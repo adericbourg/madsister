@@ -9,7 +9,7 @@ import { Panel } from "./Sidebar";
 import type { useHistory } from "./useHistory";
 
 /** User preferences (spec F-ED-1, F-DS-1), stored in `<appConfigDir>/settings.json`, not in the song. */
-export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont; minorConvention: MinorConvention; isSidebarCollapsed: boolean };
+export type Settings = { style: DisplayStyle; barsPerRow: 2 | 4 | 8; lowConfidenceThreshold: number; compactPrint: boolean; font: ChartFont; minorConvention: MinorConvention; isSidebarCollapsed: boolean; reopenTabs: boolean };
 
 export const CHART_FONTS = [
   ["kalam", "Kalam"],
@@ -34,6 +34,7 @@ export const parseSettings = (json: unknown): Settings => {
     font: CHART_FONTS.find(([value]) => value === raw.font)?.[0] ?? "petaluma-script",
     minorConvention: raw.minorConvention === "tonic" ? "tonic" : "relative",
     isSidebarCollapsed: raw.isSidebarCollapsed === true,
+    reopenTabs: raw.reopenTabs !== false,
   };
 };
 

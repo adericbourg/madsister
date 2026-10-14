@@ -68,6 +68,9 @@ export function Preferences({ ref, settings: saved, onSettingsChange }: Props) {
         <label>
           <input type="checkbox" checked={settings.compactPrint} onChange={(e) => set({ compactPrint: e.target.checked })} /> Compact print (2 columns)
         </label>
+        <label>
+          <input type="checkbox" checked={settings.reopenTabs} onChange={(e) => set({ reopenTabs: e.target.checked })} /> Reopen previous tabs on launch
+        </label>
         <div className="actions">
           <button type="button" autoFocus onClick={close}>
             Cancel

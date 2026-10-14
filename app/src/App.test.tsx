@@ -366,7 +366,7 @@ test("App_whenUsingPreferencesAndTheToolbar_restylesTransposesEditsMetadataAndPe
   // When switching to the French style and saving, Then the chord is re-rendered and the setting saved
   await editPreferences(() => user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr"));
   expect(firstSlot().textContent).toBe("C7M");
-  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false, font: "petaluma-script", minorConvention: "relative", isSidebarCollapsed: false });
+  expect(JSON.parse(files["/config/settings.json"])).toEqual({ style: "fr", barsPerRow: 2, lowConfidenceThreshold: 0.5, compactPrint: false, font: "petaluma-script", minorConvention: "relative", isSidebarCollapsed: false, reopenTabs: true });
 
   // When switching to the Latin style, Then the root is spelled Do and the setting saved
   await editPreferences(() => user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "latin"));
@@ -379,9 +379,10 @@ test("App_whenUsingPreferencesAndTheToolbar_restylesTransposesEditsMetadataAndPe
     // Then the review threshold is offered, though the grid went through no chord recognition
     expect(screen.getByRole("spinbutton", { name: "Review chords below confidence" })).toBeDefined();
     await user.click(screen.getByRole("checkbox", { name: "Compact print (2 columns)" }));
+    await user.click(screen.getByRole("checkbox", { name: "Reopen previous tabs on launch" }));
     await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "kalam");
   });
-  expect(JSON.parse(files["/config/settings.json"])).toMatchObject({ style: "fr", compactPrint: true, font: "kalam" });
+  expect(JSON.parse(files["/config/settings.json"])).toMatchObject({ style: "fr", compactPrint: true, font: "kalam", reopenTabs: false });
   expect(screen.getByRole("main").className).toBe("compact-print font-kalam");
   for (const font of ["serif", "petaluma-text", "petaluma-script"]) {
     await editPreferences(() => user.selectOptions(screen.getByRole("combobox", { name: "Font" }), font));
@@ -782,4 +783,18 @@ test("App_atLaunch_reopensTheTabsOfThePreviousSessionThatStillHaveTheirFile", as
 
   // Then the session keeps the saved songs only, with the first one active
   await vi.waitFor(() => expect(JSON.parse(files["/config/session.json"])).toEqual({ paths: ["/blues.madsister.json", "/waltz.madsister.json"], active: 0 }));
+});
+
+test("App_atLaunch_whenReopenTabsIsDisabled_startsWithoutTabs", async () => {
+  // Given a previous session and the reopenTabs setting turned off
+  files["/blues.madsister.json"] = serializeSong(song);
+  files["/config/session.json"] = JSON.stringify({ paths: ["/blues.madsister.json"], active: 0 });
+  files["/config/settings.json"] = '{"reopenTabs":false}';
+
+  // When the app starts
+  render(<App />);
+
+  // Then the start screen is shown, without tabs
+  expect(await screen.findByRole("button", { name: "Create grid" })).toBeDefined();
+  expect(screen.queryByRole("tablist", { name: "Songs" })).toBeNull();
 });

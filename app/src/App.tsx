@@ -96,9 +96,10 @@ function App() {
 
   // F-UI-8: the tabs that have a file come back at launch; the files that can't be read any more are skipped.
   useEffect(() => {
-    void readConfigJson(SESSION).then(async (json) => {
+    void Promise.all([readConfigJson(SETTINGS), readConfigJson(SESSION)]).then(async ([settingsJson, json]) => {
       const raw = (typeof json === "object" && json !== null ? json : {}) as { paths?: unknown; active?: unknown };
-      const paths = Array.isArray(raw.paths) ? raw.paths.filter((p): p is string => typeof p === "string") : [];
+      const isEnabled = parseSettings(settingsJson).reopenTabs;
+      const paths = isEnabled && Array.isArray(raw.paths) ? raw.paths.filter((p): p is string => typeof p === "string") : [];
       const opened = (await Promise.all(paths.map((path) => readSong(path).then((song) => ({ song, path }), () => null)))).filter((t) => t !== null);
       if (opened.length > 0) {
         const restored = opened.map((initial) => ({ id: nextId.current++, initial }));

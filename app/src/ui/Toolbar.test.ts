@@ -11,6 +11,9 @@ describe("mergeSettings", () => {
     expect(mergeSettings(null, { style: "intl" })).toMatchObject({ style: "intl", barsPerRow: 4, isSidebarCollapsed: false });
     expect(mergeSettings({ isSidebarCollapsed: "yes" }, {}).isSidebarCollapsed).toBe(false);
     expect(mergeSettings({ isSidebarCollapsed: true }, {}).isSidebarCollapsed).toBe(true);
+    expect(mergeSettings(null, {}).reopenTabs).toBe(true);
+    expect(mergeSettings({ reopenTabs: "no" }, {}).reopenTabs).toBe(true);
+    expect(mergeSettings({ reopenTabs: false }, {}).reopenTabs).toBe(false);
   });
 
   it("rejects an invalid override instead of falling back to the default", () => {
