@@ -11,26 +11,30 @@ runs on your machine; nothing is sent anywhere.
 
 ## Features
 
-- Import from an audio file (or drop it on the window), a URL, or a recording of the default audio input.
-- Automatic beats, downbeats and chords; meter forced to 4/4, 3/4 or 6/8 if detection gets it wrong; optional section
-  detection (intro, verse, chorus…).
-- Low-confidence chords are highlighted: <kbd>F8</kbd> / <kbd>Shift</kbd>+<kbd>F8</kbd> jumps from one to the next.
-- Keyboard-first grid editor: type chords, split and merge slots, insert, duplicate and copy bars, fix bar lines and
-  half/double tempo, split, repeat and reorder sections, undo/redo. Press <kbd>?</kbd> in the app for every shortcut.
-- Playback of the source audio with a cursor on the grid; click a bar to move the playback there.
-- Transposition, French (C7M), international (Cmaj7) or Latin (Sol7M) chord names, Nashville numbers, several chart fonts.
-- Print (with a compact two-column layout), and export to ChordPro, MusicXML and MIDI.
-- Charts are saved as plain JSON files (`*.madsister.json`).
+- Import from an audio file (or drop it on the window), a URL, or a recording; an optional accurate mode separates the
+  instruments first, and optional section detection labels the intro, verses, choruses…
+- Automatic beats, bars and chords. Low-confidence chords are highlighted and counted in the Review block: its arrows,
+  or <kbd>F8</kbd> / <kbd>Shift</kbd>+<kbd>F8</kbd>, jump from one to the next.
+- Keyboard-first grid editor, with right-click menus too; click the title, artist, key, tempo or a time signature to
+  edit it. Press <kbd>?</kbd> in the app for every shortcut.
+- Playback of the source audio with a cursor on the grid.
+- Several songs open in tabs, reopened at the next launch; dark mode follows the system.
+- Transposition, French (C7M), international (Cmaj7) or Latin (Sol7M) chord names, Nashville numbers.
+- Print (with a compact two-column layout), export to ChordPro, MusicXML and MIDI; charts are saved as plain JSON files
+  (`*.madsister.json`).
 
 ## Quick start
 
 ![The start screen: create an empty grid or import audio](doc/images/import.png)
 
-1. Import a song (or start a new chart with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>N</kbd>) and click **Run**.
-2. Correct the chords: move with the arrow keys, type a chord, <kbd>Enter</kbd>.
-3. Review the highlighted chords with <kbd>F8</kbd>, using playback (<kbd>Space</kbd>) to check by ear.
-4. Print (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd>) or export.
-5. Save (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>S</kbd>).
+1. Import a song and click **Run** (or create an empty grid). Tick **Accurate** for better chords, at the cost of time.
+2. A transcribed song opens read-only: flip the **View / Edit** switch in the toolbar to edit it.
+3. Correct the chords: move with the arrow keys, type a chord, <kbd>Enter</kbd>.
+4. Review the highlighted chords with <kbd>F8</kbd>, using playback (<kbd>Space</kbd>) to check by ear.
+5. Print (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd>) or export.
+6. Save (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>S</kbd>).
+
+Chord names, chart font, bars per row and the review threshold are in **Preferences**.
 
 ## Print many charts
 
@@ -42,7 +46,7 @@ madsister print ~/charts/*.madsister.json
 madsister print --compact --font kalam --bars-per-row 8 --out-dir ~/pdf song.madsister.json
 ```
 
-- Options left out use the app's settings: `--style fr|intl|latin`, `--font kalam|patrick-hand|petaluma-script|petaluma-text|serif`,
+- Options left out use the app's preferences: `--style fr|intl|latin`, `--font kalam|patrick-hand|petaluma-script|petaluma-text|serif`,
   `--bars-per-row 2|4|8`, `--compact` or `--no-compact`.
 - It exits with 1 if a chart failed, after printing the others.
 - Linux and macOS. It opens a hidden window, so it needs a desktop session. On macOS, the command is inside the app:
