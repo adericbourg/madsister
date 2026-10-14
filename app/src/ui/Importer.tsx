@@ -2,7 +2,7 @@
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useId, useRef, useState } from "react";
-import { cancel, engineHasSections, fetchAudio, record, setupEngine, stop, transcribe, type EngineEvent, type ForcedMeter } from "./engine";
+import { cancel, engineHas, FEATURES, fetchAudio, record, setupEngine, stop, transcribe, type EngineEvent, type Feature, type ForcedMeter } from "./engine";
 import { AUDIO_EXTENSIONS, canWrite, pickAudioPath } from "./fileActions";
 
 type Job = { id: number | null; stage: string; pct: number; elapsedSec?: number };
@@ -20,11 +20,13 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
   const [job, setJob] = useState<Job | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [shouldDetectSections, setShouldDetectSections] = useState(false);
+  const [isAccurate, setIsAccurate] = useState(false);
   const [meter, setMeter] = useState<ForcedMeter | null>(null);
   const [url, setUrl] = useState("");
   const [tab, setTab] = useState<"file" | "url" | "record">("file");
   const [audioPath, setAudioPath] = useState<string | null>(null);
-  const [hasSections, setHasSections] = useState(true); // false only once the engine says sections aren't installed
+  // A feature counts as installed until the engine says it isn't.
+  const [installed, setInstalled] = useState<Record<Feature, boolean>>({ sections: true, separate: true });
 
   /** Runs one engine job; its result goes to `onDone`. */
   const run = async (begin: (onEvent: (event: EngineEvent) => void) => Promise<number>, onDone: (path: string) => void) => {
@@ -50,16 +52,20 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
 
   /** Transcribes into `<stem>.madsister.json` next to the audio. */
   const transcribeFile = async (audioPath: string) => {
-    if (shouldDetectSections && !(await engineHasSections())) {
-      await run((onEvent) => setupEngine(true, onEvent), () => {
-        setHasSections(true);
+    const wanted = FEATURES.filter((f) => (f === "sections" ? shouldDetectSections : isAccurate));
+    const isInstalled = await Promise.all(wanted.map(engineHas));
+    const missing = wanted.filter((_, i) => !isInstalled[i]);
+    if (missing.length > 0) {
+      await run((onEvent) => setupEngine(missing, onEvent), () => {
+        setInstalled((current) => ({ ...current, ...Object.fromEntries(missing.map((f) => [f, true])) }));
         void latest.current.transcribeFile(audioPath); // one-time install, then back here
       });
       return;
     }
     const outPath = `${audioPath.replace(/\.[^./\\]+$/, "")}.madsister.json`;
     if (!(await canWrite(outPath))) return;
-    await run((onEvent) => transcribe(audioPath, outPath, meter, shouldDetectSections, onEvent), (path) => latest.current.onResult(path));
+    const mode = isAccurate ? "accurate" : "fast";
+    await run((onEvent) => transcribe(audioPath, outPath, meter, shouldDetectSections, mode, onEvent), (path) => latest.current.onResult(path));
   };
 
   const selectFile = (path: string) => {
@@ -77,7 +83,7 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
   const latest = useRef({ onResult, selectFile, transcribeFile, isRunning: job !== null, isActive });
   latest.current = { onResult, selectFile, transcribeFile, isRunning: job !== null, isActive };
   useEffect(() => {
-    void engineHasSections().then(setHasSections);
+    for (const f of FEATURES) void engineHas(f).then((has) => setInstalled((current) => ({ ...current, [f]: has })));
     const unlisten = getCurrentWebview().onDragDropEvent(({ payload }) => {
       if (payload.type === "drop" && payload.paths.length > 0 && latest.current.isActive && !latest.current.isRunning) latest.current.selectFile(payload.paths[0]);
     });
@@ -172,7 +178,17 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
           </label>
           <span id={`${id}-sections-hint`} className="hint">
             <span>Slower (~6 min for a 4-min song)</span>
-            {!hasSections && <span>Installed on first use, requires a network connection</span>}
+            {!installed.sections && <span>Installed on first use, requires a network connection</span>}
+          </span>
+        </p>
+        <p>
+          <label>
+            <input type="checkbox" aria-describedby={`${id}-accurate-hint`} checked={isAccurate} onChange={(e) => setIsAccurate(e.target.checked)} /> Accurate
+            (slower)
+          </label>
+          <span id={`${id}-accurate-hint`} className="hint">
+            <span>Separates the instruments first (~+1 min for a 4-min song)</span>
+            {!installed.separate && <span>Installed on first use, requires a network connection</span>}
           </span>
         </p>
         <button type="submit" className="primary" disabled={job !== null || (tab === "file" && audioPath === null) || (tab === "url" && url === "")}>

@@ -19,14 +19,14 @@ test("transcribe_invokesTheCommandAndForwardsChannelEvents", async () => {
   const events: EngineEvent[] = [];
 
   // When transcribing, then the backend sends an event on the channel
-  const jobId = await transcribe("/a.mp3", "/a.madsister.json", "6/8", true, (event) => events.push(event));
+  const jobId = await transcribe("/a.mp3", "/a.madsister.json", "6/8", true, "accurate", (event) => events.push(event));
   const [command, args] = vi.mocked(invoke).mock.calls[0] as [string, { onEvent: Channel<EngineEvent> }];
   args.onEvent.onmessage({ type: "progress", stage: "beats", pct: 40 });
 
-  // Then the command gets the paths, meter and sections flag, and the event reaches the callback
+  // Then the command gets the paths, meter, sections flag and mode, and the event reaches the callback
   expect(jobId).toBe(42);
   expect(command).toBe("transcribe");
-  expect(args).toMatchObject({ audioPath: "/a.mp3", outPath: "/a.madsister.json", meter: "6/8", sections: true });
+  expect(args).toMatchObject({ audioPath: "/a.mp3", outPath: "/a.madsister.json", meter: "6/8", sections: true, mode: "accurate" });
   expect(events).toEqual([{ type: "progress", stage: "beats", pct: 40 }]);
 });
 
@@ -35,13 +35,13 @@ test("fetchAudio_record_and_setupEngine_invokeTheirCommandsWithAChannel", async 
   const onEvent = () => {};
   await fetchAudio("https://x/v", "/data/sources", onEvent);
   await record("/data/sources/r.wav", onEvent);
-  await setupEngine(true, onEvent);
+  await setupEngine(["sections"], onEvent);
   await engineNeedsSetup();
 
   // Then each command gets its arguments and a channel
   expect(invoke).toHaveBeenNthCalledWith(1, "fetch", { url: "https://x/v", outDir: "/data/sources", onEvent: expect.any(Object) });
   expect(invoke).toHaveBeenNthCalledWith(2, "record", { outPath: "/data/sources/r.wav", onEvent: expect.any(Object) });
-  expect(invoke).toHaveBeenNthCalledWith(3, "setup_engine", { sections: true, onEvent: expect.any(Object) });
+  expect(invoke).toHaveBeenNthCalledWith(3, "setup_engine", { features: ["sections"], onEvent: expect.any(Object) });
   expect(invoke).toHaveBeenNthCalledWith(4, "engine_needs_setup");
 });
 

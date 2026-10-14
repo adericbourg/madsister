@@ -45,6 +45,9 @@ pub struct Packaged {
 
 const SETUP_SCRIPT: &str = include_str!("../setup-engine.sh");
 
+/// What `setup-engine.sh` installs on demand: `sections` (all-in-one), `separate` (Demucs, accurate mode).
+pub const FEATURES: [&str; 2] = ["sections", "separate"];
+
 impl Packaged {
     /// No env yet, or one set up by another app version.
     pub fn needs_setup(&self) -> bool {
@@ -52,14 +55,14 @@ impl Packaged {
             != Some(self.version.clone())
     }
 
-    /// All-in-one (section detection) is installed for this app version: `setup_command(true)` ran after the last setup.
-    pub fn has_sections(&self) -> bool {
-        std::fs::read_to_string(self.env.join(".madsister-sections")).ok()
+    /// One of `FEATURES` is installed for this app version.
+    pub fn has(&self, feature: &str) -> bool {
+        std::fs::read_to_string(self.env.join(format!(".madsister-{feature}"))).ok()
             == Some(self.version.clone())
     }
 
-    /// `sections`: also install all-in-one (slow opt-in, on demand).
-    pub fn setup_command(&self, sections: bool) -> Vec<String> {
+    /// Installs the env with the `requested` features plus the ones already installed for this version (a sync is exact).
+    pub fn setup_command(&self, requested: &[String]) -> Vec<String> {
         let path = |p: &PathBuf| p.display().to_string();
         let mut command = vec![
             "sh".into(),
@@ -71,9 +74,12 @@ impl Packaged {
             path(&self.env),
             self.version.clone(),
         ];
-        if sections {
-            command.push("sections".into());
-        }
+        command.extend(
+            FEATURES
+                .into_iter()
+                .filter(|f| requested.iter().any(|r| r == f) || self.has(f))
+                .map(String::from),
+        );
         command
     }
 }
@@ -110,13 +116,15 @@ pub fn engine_command(
 }
 
 /// `transcribe` arguments after the engine command. `sections`: all-in-one beats + sections (slow opt-in, ~18× madmom).
+/// `mode`: `fast` or `accurate` (D7), checked by the engine.
 pub fn transcribe_args(
     audio_path: String,
     out_path: String,
     meter: Option<String>,
     sections: bool,
+    mode: String,
 ) -> Vec<String> {
-    let mut args = vec!["transcribe".into(), audio_path, "--out".into(), out_path];
+    let mut args = vec!["transcribe".into(), audio_path, "--out".into(), out_path, "--mode".into(), mode];
     if let Some(meter) = meter {
         args.extend(["--meter".into(), meter]);
     }
@@ -262,15 +270,19 @@ mod tests {
     }
 
     #[test]
-    fn transcribe_args_adds_meter_and_allinone_only_when_asked() {
+    fn transcribe_args_adds_the_mode_then_meter_and_allinone_only_when_asked() {
         // Given / When / Then
-        let args = |meter, sections| {
-            transcribe_args("/a.mp3".into(), "/a.json".into(), meter, sections).join(" ")
+        let args = |meter, sections, mode: &str| {
+            transcribe_args("/a.mp3".into(), "/a.json".into(), meter, sections, mode.into())
+                .join(" ")
         };
-        assert_eq!(args(None, false), "transcribe /a.mp3 --out /a.json");
         assert_eq!(
-            args(Some("6/8".into()), true),
-            "transcribe /a.mp3 --out /a.json --meter 6/8 --beats allinone"
+            args(None, false, "fast"),
+            "transcribe /a.mp3 --out /a.json --mode fast"
+        );
+        assert_eq!(
+            args(Some("6/8".into()), true, "accurate"),
+            "transcribe /a.mp3 --out /a.json --mode accurate --meter 6/8 --beats allinone"
         );
     }
 
@@ -291,11 +303,15 @@ mod tests {
     }
 
     fn packaged(root: &std::path::Path) -> Packaged {
+        packaged_at(root, "1.2.3")
+    }
+
+    fn packaged_at(root: &std::path::Path, version: &str) -> Packaged {
         Packaged {
             uv: root.join("uv"),
             project: root.join("engine"),
             env: root.join("env"),
-            version: "1.2.3".into(),
+            version: version.into(),
         }
     }
 
@@ -348,7 +364,7 @@ chmod +x "$UV_PROJECT_ENVIRONMENT/bin/madsister-engine"
         // When running the setup command to its end
         let (send, receive) = std::sync::mpsc::channel();
         Jobs::default()
-            .spawn(&packaged.setup_command(false), false, move |e| {
+            .spawn(&packaged.setup_command(&[]), false, move |e| {
                 send.send(e).unwrap()
             })
             .unwrap();
@@ -382,30 +398,34 @@ chmod +x "$UV_PROJECT_ENVIRONMENT/bin/madsister-engine"
         assert!(calls[1].starts_with("pip install --python "));
         assert!(calls[1].ends_with("/engine/wheels/madmom-0.17-cp311.whl"));
         assert!(!calls[0].contains("beats-allinone"));
-        assert!(!packaged.has_sections());
+        assert!(!packaged.has("sections"));
 
-        // When installing section detection on demand
-        let run = |sections| {
+        // When installing section detection on demand, then Demucs (accurate mode)
+        let run = |packaged: &Packaged, features: &[&str]| {
+            let features: Vec<String> = features.iter().map(|f| f.to_string()).collect();
             let (send, receive) = std::sync::mpsc::channel();
             Jobs::default()
-                .spawn(&packaged.setup_command(sections), false, move |e| {
+                .spawn(&packaged.setup_command(&features), false, move |e| {
                     send.send(e).unwrap()
                 })
                 .unwrap();
             receive.iter().count()
         };
-        run(true);
+        run(&packaged, &["sections"]);
+        assert!(packaged.has("sections") && !packaged.has("separate"));
+        run(&packaged, &["separate"]);
 
-        // Then uv synced with all-in-one and the env remembers it, until a plain setup (an update) drops it
+        // Then uv synced with all-in-one, then with all-in-one kept beside Demucs (a sync is exact), and the env remembers both
         let calls = std::fs::read_to_string(root.join("env.log")).unwrap();
-        assert!(calls
-            .lines()
-            .nth(2)
-            .unwrap()
-            .contains("--group beats-allinone"));
-        assert!(packaged.has_sections());
-        run(false);
-        assert!(!packaged.has_sections());
+        let calls: Vec<&str> = calls.lines().collect();
+        assert!(calls[2].contains("--group beats-allinone") && !calls[2].contains("--group separate"));
+        assert!(calls[4].contains("--group beats-allinone --group separate"));
+        assert!(packaged.has("sections") && packaged.has("separate"));
+
+        // When an update runs the plain setup, Then both are dropped
+        let updated = packaged_at(&root, "1.2.4");
+        run(&updated, &[]);
+        assert!(!updated.has("sections") && !updated.has("separate"));
         std::fs::remove_dir_all(&root).unwrap();
     }
 

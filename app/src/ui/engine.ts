@@ -11,6 +11,13 @@ export type EngineEvent =
 /** A forced meter, as `madsister-engine transcribe --meter` takes it; null = auto. */
 export type ForcedMeter = "3" | "4" | "6/8";
 
+/** `madsister-engine transcribe --mode` (D7): `accurate` separates the sources first. */
+export type Mode = "fast" | "accurate";
+
+/** What a packaged engine installs on demand (`engine::FEATURES`): all-in-one for "Detect sections", Demucs for "Accurate". */
+export const FEATURES = ["sections", "separate"] as const;
+export type Feature = (typeof FEATURES)[number];
+
 /** Starts an engine command and returns its job id. Rejects when the engine can't be started. */
 const start = (command: string, args: Record<string, unknown>, onEvent: (event: EngineEvent) => void): Promise<number> => {
   const channel = new Channel<EngineEvent>();
@@ -24,8 +31,9 @@ export const transcribe = (
   outPath: string,
   meter: ForcedMeter | null,
   sections: boolean,
+  mode: Mode,
   onEvent: (event: EngineEvent) => void,
-): Promise<number> => start("transcribe", { audioPath, outPath, meter, sections }, onEvent);
+): Promise<number> => start("transcribe", { audioPath, outPath, meter, sections, mode }, onEvent);
 
 /** Downloads the URL's audio into `outDir`; the result is the file's path. */
 export const fetchAudio = (url: string, outDir: string, onEvent: (event: EngineEvent) => void): Promise<number> =>
@@ -43,9 +51,9 @@ export const cancel = (jobId: number): Promise<void> => invoke("cancel", { jobId
 /** True on a packaged app's first launch (and after an update): `setupEngine` must run before the commands above. */
 export const engineNeedsSetup = (): Promise<boolean> => invoke("engine_needs_setup");
 
-/** Installs the packaged engine: an `install` progress (uv), then `setup`'s per model, then a result. `sections`: also all-in-one (slow, once). */
-export const setupEngine = (sections: boolean, onEvent: (event: EngineEvent) => void): Promise<number> =>
-  start("setup_engine", { sections }, onEvent);
+/** Installs the packaged engine: an `install` progress (uv), then `setup`'s per model, then a result. `features` are added to the installed ones (large downloads, once). */
+export const setupEngine = (features: Feature[], onEvent: (event: EngineEvent) => void): Promise<number> =>
+  start("setup_engine", { features }, onEvent);
 
-/** True when "Detect sections" can run (always outside a packaged app). */
-export const engineHasSections = (): Promise<boolean> => invoke("engine_has_sections");
+/** True when the feature can run (always outside a packaged app). */
+export const engineHas = (feature: Feature): Promise<boolean> => invoke("engine_has", { feature });

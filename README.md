@@ -92,8 +92,10 @@ brew install --cask madsister
 - Linux (amd64) and macOS (Apple silicon) only.
 - Recognition targets pop, rock, chanson and folk harmony; jazz extensions (9, 11, 13, alterations) can be typed but
   aren't detected.
-- Section detection is slow (about 6 minutes for a 4-minute song) and downloads its models on first use.
-- Network access is needed only for the first launch, the first section detection and URL imports.
+- Section detection is slow (about 6 minutes for a 4-minute song) and downloads its models on first use. So does the
+  accurate mode (source separation, about one more minute for a 4-minute song).
+- Network access is needed only for the first launch, the first section detection or accurate transcription, and URL
+  imports.
 
 ## License
 

@@ -37,6 +37,7 @@ fn spawn(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // one per IPC field
 fn transcribe(
     jobs: State<Jobs>,
     engine: State<Engine>,
@@ -44,9 +45,10 @@ fn transcribe(
     out_path: String,
     meter: Option<String>,
     sections: bool,
+    mode: String,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
-    let args = engine::transcribe_args(audio_path, out_path, meter, sections);
+    let args = engine::transcribe_args(audio_path, out_path, meter, sections, mode);
     start(jobs, engine, args, false, on_event)
 }
 
@@ -83,23 +85,27 @@ fn engine_needs_setup(engine: State<Engine>) -> bool {
     engine.0.as_ref().is_some_and(Packaged::needs_setup)
 }
 
-/// Installs the packaged engine (`setup-engine.sh`): same events as the engine commands. `sections`: also all-in-one
-/// (slow: a large download).
+/// Installs the packaged engine (`setup-engine.sh`): same events as the engine commands. `features`: some of
+/// `engine::FEATURES` (large downloads), on top of the installed ones.
 #[tauri::command]
 fn setup_engine(
     jobs: State<Jobs>,
     engine: State<Engine>,
-    sections: bool,
+    features: Vec<String>,
     on_event: Channel<EngineEvent>,
 ) -> Result<u32, String> {
+    if let Some(f) = features.iter().find(|f| !engine::FEATURES.contains(&f.as_str())) {
+        return Err(format!("unknown engine feature: {f}"));
+    }
     let packaged = engine.0.as_ref().ok_or("the engine isn't packaged")?;
-    spawn(jobs, packaged.setup_command(sections), false, on_event)
+    spawn(jobs, packaged.setup_command(&features), false, on_event)
 }
 
-/// True when "Detect sections" can run: always in dev or with `MADSISTER_ENGINE`, else once `setup_engine` ran with `sections`.
+/// True when a feature ("Detect sections", "Accurate") can run: always in dev or with `MADSISTER_ENGINE`, else once
+/// `setup_engine` installed it.
 #[tauri::command]
-fn engine_has_sections(engine: State<Engine>) -> bool {
-    engine.0.as_ref().is_none_or(Packaged::has_sections)
+fn engine_has(engine: State<Engine>, feature: String) -> bool {
+    engine.0.as_ref().is_none_or(|p| p.has(&feature))
 }
 
 fn packaged_engine(app: &tauri::App) -> Option<Packaged> {
@@ -255,7 +261,7 @@ pub fn run() {
             cancel,
             engine_needs_setup,
             setup_engine,
-            engine_has_sections,
+            engine_has,
             audio_sha256,
             read_audio,
             print_plan,

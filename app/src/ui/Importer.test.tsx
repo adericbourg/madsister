@@ -3,10 +3,10 @@ import { exists } from "@tauri-apps/plugin-fs";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { cancel, engineHasSections, fetchAudio, record, setupEngine, stop, transcribe, type EngineEvent } from "./engine";
+import { cancel, engineHas, fetchAudio, record, setupEngine, stop, transcribe, type EngineEvent } from "./engine";
 import { Importer } from "./Importer";
 
-vi.mock("./engine", () => ({ engineHasSections: vi.fn(), setupEngine: vi.fn(), transcribe: vi.fn(), fetchAudio: vi.fn(), record: vi.fn(), stop: vi.fn(), cancel: vi.fn() }));
+vi.mock("./engine", () => ({ FEATURES: ["sections", "separate"], engineHas: vi.fn(), setupEngine: vi.fn(), transcribe: vi.fn(), fetchAudio: vi.fn(), record: vi.fn(), stop: vi.fn(), cancel: vi.fn() }));
 vi.mock("@tauri-apps/api/path", () => ({ appDataDir: async () => "/data", join: async (...parts: string[]) => parts.join("/") }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ exists: vi.fn() }));
@@ -23,7 +23,7 @@ vi.mock("@tauri-apps/api/webview", () => ({
 const onResult = vi.fn();
 const dropFile = (path: string) => act(() => drop.handler({ payload: { type: "drop", paths: [path] } }));
 /** Sends an event to the engine callback of the last `transcribe` call (or of the given callback). */
-const emit = (event: EngineEvent, onEvent = () => vi.mocked(transcribe).mock.lastCall![4]) => act(() => onEvent()(event));
+const emit = (event: EngineEvent, onEvent = () => vi.mocked(transcribe).mock.lastCall![5]) => act(() => onEvent()(event));
 const fetchEvent = () => vi.mocked(fetchAudio).mock.lastCall![2];
 const recordEvent = () => vi.mocked(record).mock.lastCall![1];
 
@@ -31,7 +31,7 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(engineHasSections).mockResolvedValue(true);
+  vi.mocked(engineHas).mockResolvedValue(true);
   vi.mocked(setupEngine).mockResolvedValue(9);
   vi.mocked(transcribe).mockResolvedValue(42);
   vi.mocked(fetchAudio).mockResolvedValue(7);
@@ -44,9 +44,10 @@ test("Importer_whenDroppingAnAudioFile_waitsForRunThenShowsProgressAndReportsThe
   const user = userEvent.setup();
   render(<Importer onResult={onResult} />);
 
-  // Then "Detect sections" warns about its duration, and not about an install since sections are installed
-  const hintId = screen.getByRole("checkbox", { name: "Detect sections" }).getAttribute("aria-describedby")!;
-  expect(document.getElementById(hintId)!.textContent).toContain("Slower (~6 min for a 4-min song)");
+  // Then "Detect sections" and "Accurate" warn about their duration, and not about an install since both are installed
+  const hint = (name: string) => document.getElementById(screen.getByRole("checkbox", { name }).getAttribute("aria-describedby")!)!.textContent;
+  expect(hint("Detect sections")).toContain("Slower (~6 min for a 4-min song)");
+  expect(hint("Accurate (slower)")).toContain("Separates the instruments first (~+1 min for a 4-min song)");
   expect(screen.queryByText(/Installed on first use/)).toBeNull();
 
   // When dropping an mp3
@@ -62,7 +63,7 @@ test("Importer_whenDroppingAnAudioFile_waitsForRunThenShowsProgressAndReportsThe
   await user.click(screen.getByRole("button", { name: "Run" }));
 
   // Then the engine starts on it, writing next to it, with that meter and all-in-one
-  expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", "6/8", true, expect.any(Function));
+  expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", "6/8", true, "fast", expect.any(Function));
   expect(screen.getByRole("status").textContent).toBe("Starting…");
   expect(screen.getByRole("button", { name: "Import audio…" })).toHaveProperty("disabled", true);
 
@@ -77,29 +78,32 @@ test("Importer_whenDroppingAnAudioFile_waitsForRunThenShowsProgressAndReportsThe
   expect(screen.queryByRole("progressbar")).toBeNull();
 });
 
-test("Importer_whenSectionsAreNotInstalled_installsThemBeforeTranscribing", async () => {
-  // Given "Detect sections" checked while all-in-one isn't installed
+test("Importer_whenSectionsOrAccurateAreNotInstalled_installsThemBeforeTranscribing", async () => {
+  // Given "Detect sections" and "Accurate" checked while neither all-in-one nor Demucs is installed
   const user = userEvent.setup();
-  vi.mocked(engineHasSections).mockResolvedValue(false);
+  vi.mocked(engineHas).mockResolvedValue(false);
   render(<Importer onResult={onResult} />);
   await user.click(screen.getByRole("checkbox", { name: "Detect sections" }));
+  await user.click(screen.getByRole("checkbox", { name: "Accurate (slower)" }));
 
-  // Then the install requirement is announced
-  expect(await screen.findByText("Installed on first use, requires a network connection")).toBeDefined();
+  // Then the install requirement is announced for each
+  expect(await screen.findAllByText("Installed on first use, requires a network connection")).toHaveLength(2);
 
   // When dropping an mp3 then running
   await dropFile("/music/song.mp3");
   await user.click(screen.getByRole("button", { name: "Run" }));
 
-  // Then the install runs first and nothing is transcribed yet
-  expect(setupEngine).toHaveBeenCalledExactlyOnceWith(true, expect.any(Function));
+  // Then one install of both runs first and nothing is transcribed yet
+  expect(engineHas).toHaveBeenCalledWith("sections");
+  expect(engineHas).toHaveBeenCalledWith("separate");
+  expect(setupEngine).toHaveBeenCalledExactlyOnceWith(["sections", "separate"], expect.any(Function));
   expect(transcribe).not.toHaveBeenCalled();
 
-  // When the install ends, Then the transcription starts with all-in-one
-  vi.mocked(engineHasSections).mockResolvedValue(true);
+  // When the install ends, Then the transcription starts with all-in-one, in accurate mode
+  vi.mocked(engineHas).mockResolvedValue(true);
   await emit({ type: "result", path: "/models" }, () => vi.mocked(setupEngine).mock.lastCall![1]);
   expect(screen.queryByText(/Installed on first use/)).toBeNull();
-  expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", null, true, expect.any(Function));
+  expect(transcribe).toHaveBeenCalledWith("/music/song.mp3", "/music/song.madsister.json", null, true, "accurate", expect.any(Function));
 });
 
 test("Importer_whenCancelling_cancelsTheJob", async () => {
@@ -112,7 +116,7 @@ test("Importer_whenCancelling_cancelsTheJob", async () => {
   expect(screen.getByText("take.wav")).toBeDefined();
   expect(transcribe).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Run" }));
-  expect(transcribe).toHaveBeenCalledWith("/music/take.wav", "/music/take.madsister.json", null, false, expect.any(Function));
+  expect(transcribe).toHaveBeenCalledWith("/music/take.wav", "/music/take.madsister.json", null, false, "fast", expect.any(Function));
 
   // When clicking Cancel, then the engine reports it was cancelled
   await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -194,7 +198,7 @@ test("Importer_whenFetchingAUrl_downloadsThenTranscribesTheFile", async () => {
   // When the download ends, Then the downloaded file (any format) is transcribed next to it
   await emit({ type: "result", path: "/data/sources/My song.webm" }, fetchEvent);
   await vi.waitFor(() =>
-    expect(transcribe).toHaveBeenCalledWith("/data/sources/My song.webm", "/data/sources/My song.madsister.json", null, false, expect.any(Function)),
+    expect(transcribe).toHaveBeenCalledWith("/data/sources/My song.webm", "/data/sources/My song.madsister.json", null, false, "fast", expect.any(Function)),
   );
 
   // When the transcription ends, Then its result is handed over
@@ -262,7 +266,7 @@ test("Importer_whenRecording_showsTheElapsedTimeThenTranscribesOnStop", async ()
   expect(stop).toHaveBeenCalledWith(8);
   await emit({ type: "result", path: "/data/sources/Recording x.wav" }, recordEvent);
   await vi.waitFor(() =>
-    expect(transcribe).toHaveBeenCalledWith("/data/sources/Recording x.wav", "/data/sources/Recording x.madsister.json", null, false, expect.any(Function)),
+    expect(transcribe).toHaveBeenCalledWith("/data/sources/Recording x.wav", "/data/sources/Recording x.madsister.json", null, false, "fast", expect.any(Function)),
   );
   expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
 });

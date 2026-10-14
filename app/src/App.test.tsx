@@ -20,7 +20,7 @@ HTMLDialogElement.prototype.showModal = function () {
 HTMLDialogElement.prototype.close = function () {
   this.removeAttribute("open");
 };
-vi.mock("./ui/engine", () => ({ transcribe: vi.fn(), cancel: vi.fn(), engineNeedsSetup: async () => false, engineHasSections: async () => true }));
+vi.mock("./ui/engine", () => ({ FEATURES: ["sections", "separate"], transcribe: vi.fn(), cancel: vi.fn(), engineNeedsSetup: async () => false, engineHas: async () => true }));
 const drop = vi.hoisted(() => ({ handler: (_: { payload: unknown }) => {} }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({
@@ -210,8 +210,8 @@ test("App_whenImportingAudio_loadsTheResultAndReportsErrors", async () => {
   const user = userEvent.setup();
   render(<App />);
   files["/music/blues.madsister.json"] = serializeSong(song);
-  const engineSays = (event: Parameters<Parameters<typeof transcribe>[4]>[0]) =>
-    act(() => vi.mocked(transcribe).mock.lastCall![4](event));
+  const engineSays = (event: Parameters<Parameters<typeof transcribe>[5]>[0]) =>
+    act(() => vi.mocked(transcribe).mock.lastCall![5](event));
 
   // When dropping the mp3, running the import and the engine reports its result
   await act(() => drop.handler({ payload: { type: "drop", paths: ["/music/blues.mp3"] } }));
