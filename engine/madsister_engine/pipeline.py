@@ -12,7 +12,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from madsister_engine import add_heuristic, events
+from madsister_engine import add_heuristic, bass, events
 from madsister_engine.beats import BeatResult
 from madsister_engine.decode import decode
 from madsister_engine.quantize import ChordSegment, build_song
@@ -94,16 +94,26 @@ def to_song(
     has_sections: bool,
     chroma: tuple | None = None,
     add_tau: float | None = None,
+    bass_chroma: tuple | None = None,
+    bass_tau: float | None = None,
 ) -> Song:
-    """Quantization (§3.3 steps 4-6, with 5b when `add_tau` is set): model outputs -> Song. `chroma` = `add_heuristic.chroma`."""
+    """Quantization (§3.3 steps 4-6, with 5b when `add_tau` is set, then the bass detection when `bass_tau` is): model
+    outputs -> Song. `chroma` = `add_heuristic.chroma`, `bass_chroma` = `bass.chroma`."""
     if len(beat_result.beats) < 2:
         raise ValueError("could not find beats in this audio")
-    refine = None
-    if add_tau is not None:
-        features, times = chroma
-        refine = functools.partial(
-            add_heuristic.refine_add, chroma=features, chroma_times=times, beats=beat_result.beats, tau=add_tau
+    steps = [
+        functools.partial(step, chroma=features[0], chroma_times=features[1], beats=beat_result.beats, tau=tau)
+        for step, features, tau in (
+            (add_heuristic.refine_add, chroma, add_tau),
+            (bass.refine_bass, bass_chroma, bass_tau),  # after the add step: it skips slash chords
         )
+        if tau is not None
+    ]
+
+    def refine(bars):
+        for step in steps:
+            bars = step(bars)
+        return bars
     meter_beats, unit = METERS[meter] if meter else (beats_per_bar(beat_result.beats, beat_result.downbeats), 4)
     return build_song(
         title,
@@ -126,6 +136,7 @@ def transcribe(
     chords: str = "auto",
     separate: bool = False,
     add_tau: float | None = None,
+    bass_tau: float | None = None,
 ) -> None:
     tracker = _adapter("beat tracker", _BEATS, beats)
     recognizer = _adapter("chord model", _CHORDS, chords)
@@ -134,11 +145,11 @@ def transcribe(
     with tempfile.TemporaryDirectory() as tmp:
         events.progress("decode", 5)
         wav = decode(audio, tmp)
-        harmonic = wav
+        harmonic = low = wav
         if separator:
             events.progress("separate", 20)
             with _stdout_to_stderr():
-                harmonic = separator.harmonic_stem(wav, Path(tmp))
+                harmonic, low = separator.stems(wav, Path(tmp))
         events.progress("beats", 40)
         with _stdout_to_stderr():
             beat_result = tracker.track(wav, METERS[meter][0] if meter else None)
@@ -148,7 +159,8 @@ def transcribe(
 
         events.progress("quantize", 90)
         chroma = add_heuristic.chroma(harmonic) if add_tau is not None else None
-        song = to_song(Path(audio).stem, beat_result, segments, meter, has_sections, chroma, add_tau)
+        bass_chroma = bass.chroma(low) if bass_tau is not None else None
+        song = to_song(Path(audio).stem, beat_result, segments, meter, has_sections, chroma, add_tau, bass_chroma, bass_tau)
 
     with open(audio, "rb") as f:
         sha256 = hashlib.file_digest(f, "sha256").hexdigest()

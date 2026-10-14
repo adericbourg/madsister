@@ -1,4 +1,4 @@
-"""Harmonic stem (bass + other) via Demucs htdemucs (spec §2.1, §3.3 step 5b). Needs the `separate` dependency group."""
+"""Harmonic (bass + other) and bass stems via Demucs htdemucs (spec §2.1, §3.3 step 5b). Needs the `separate` dependency group."""
 
 import os
 import wave
@@ -18,18 +18,18 @@ def prepare() -> None:
     get_model("htdemucs")
 
 
-def harmonic_stem(wav_path: str | Path, out_dir: str | Path) -> Path:
-    """The mix without vocals and drums, as mono 44.1 kHz WAV `out_dir/harmonic.wav`. CPU unless CUDA is available."""
+def stems(wav_path: str | Path, out_dir: str | Path) -> tuple[Path, Path]:
+    """The harmonic stem (the mix without vocals and drums) and the bass stem, as mono 44.1 kHz WAVs `out_dir/harmonic.wav`
+    and `out_dir/bass.wav`, from one separation. CPU unless CUDA is available."""
     separator = Separator("htdemucs")
-    _, stems = separator.separate_audio_file(Path(wav_path))
-    mono = (stems["bass"] + stems["other"]).mean(0).numpy()
-
+    _, separated = separator.separate_audio_file(Path(wav_path))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    dst = out_dir / "harmonic.wav"
-    with wave.open(str(dst), "wb") as out:
-        out.setnchannels(1)
-        out.setsampwidth(2)
-        out.setframerate(separator.samplerate)  # htdemucs runs at 44.1 kHz
-        out.writeframes((np.clip(mono, -1, 1) * 32767).astype("<i2").tobytes())
-    return dst
+    harmonic, bass = out_dir / "harmonic.wav", out_dir / "bass.wav"
+    for dst, mix in ((harmonic, separated["bass"] + separated["other"]), (bass, separated["bass"])):
+        with wave.open(str(dst), "wb") as out:
+            out.setnchannels(1)
+            out.setsampwidth(2)
+            out.setframerate(separator.samplerate)  # htdemucs runs at 44.1 kHz
+            out.writeframes((np.clip(mix.mean(0).numpy(), -1, 1) * 32767).astype("<i2").tobytes())
+    return harmonic, bass

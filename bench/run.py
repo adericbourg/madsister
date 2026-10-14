@@ -157,7 +157,7 @@ def run_take(ref_id: str, combos: list[tuple], done: set) -> list[dict]:
         harmonic = wav["value"]
         if separate:
             separator = pipeline._adapter("source separation", pipeline._SEPARATE, "demucs")
-            stem = _cached(cache / "separate.json", lambda: str(separator.harmonic_stem(Path(wav["value"]), cache)))
+            stem = _cached(cache / "separate.json", lambda: str(separator.stems(Path(wav["value"]), cache)[0]))
             parts.append(stem)
             harmonic = stem["value"]
         tracker = pipeline._adapter("beat tracker", pipeline._BEATS, beats)

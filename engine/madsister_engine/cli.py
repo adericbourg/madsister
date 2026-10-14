@@ -11,7 +11,8 @@ def _transcribe(args: argparse.Namespace) -> int:
     if not Path(args.audio).is_file():
         raise FileNotFoundError(f"audio file not found: {args.audio}")
     pipeline.transcribe(
-        args.audio, args.out, args.meter, not args.no_sections, args.beats, args.chords, args.separate, args.add_tau
+        args.audio, args.out, args.meter, not args.no_sections, args.beats, args.chords, args.separate, args.add_tau,
+        args.bass_tau,
     )
     events.result(str(Path(args.out).resolve()))
     return 0
@@ -47,6 +48,7 @@ def _parser() -> argparse.ArgumentParser:
     transcribe.add_argument("--chords", choices=["auto", "btc", "cnnlstm"], default="auto", help=argparse.SUPPRESS)
     transcribe.add_argument("--separate", action="store_true", help=argparse.SUPPRESS)
     transcribe.add_argument("--add-tau", type=float, help=argparse.SUPPRESS)
+    transcribe.add_argument("--bass-tau", type=float, help=argparse.SUPPRESS)
     transcribe.set_defaults(func=_transcribe)
 
     fetch = sub.add_parser("fetch", help="download audio from a URL")

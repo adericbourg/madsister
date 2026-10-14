@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from fixtures.make_clip import PROGRESSION
-from madsister_engine import add_heuristic, cli, pipeline
+from madsister_engine import add_heuristic, bass, cli, pipeline
 from madsister_engine.beats import BeatResult
 from madsister_engine.quantize import ChordSegment
 
@@ -85,28 +85,42 @@ def test_main_of_transcribe_emits_stages_in_order_and_writes_song(fakes, make_wa
     assert {slot["beats"] for s in song["sections"] for bar in s["bars"] for slot in bar["chords"]} == {6}
 
 
-def test_main_of_transcribe_with_separate_and_add_tau_uses_harmonic_stem(fakes, make_wav, tmp_path, capfd, monkeypatch):
-    # Given a fake Demucs that copies its input, and chroma with a strong D everywhere (C → C:add2)
-    def harmonic_stem(wav, out_dir):
-        dst = out_dir / "harmonic.wav"
-        dst.write_bytes(wav.read_bytes())
-        return dst
+def test_main_of_transcribe_with_separate_add_tau_and_bass_tau_uses_the_stems(fakes, make_wav, tmp_path, capfd, monkeypatch):
+    # Given a fake Demucs that copies its input into both stems, chroma with a strong D everywhere (C → C:add2), and a low
+    # chroma with a strong E everywhere (C → C/3, and a bass on every other chord too)
+    def stems(wav, out_dir):
+        paths = out_dir / "harmonic.wav", out_dir / "bass.wav"
+        for dst in paths:
+            dst.write_bytes(wav.read_bytes())
+        return paths
 
-    monkeypatch.setitem(sys.modules, "madsister_engine.separate", types.SimpleNamespace(harmonic_stem=harmonic_stem))
+    monkeypatch.setitem(sys.modules, "madsister_engine.separate", types.SimpleNamespace(stems=stems))
     chroma = np.full((12, 400), 0.05)
     chroma[[0, 2, 4, 7]] = 1.0
     monkeypatch.setattr(add_heuristic, "chroma", lambda wav: (chroma, np.arange(400) * 0.05))
+    low = np.full((12, 400), 0.05)
+    low[4] = 1.0
+    bass_inputs = []
+    monkeypatch.setattr(bass, "chroma", lambda wav: (bass_inputs.append(wav), (low, np.arange(400) * 0.05))[1])
     out = tmp_path / "s.json"
 
     # When
-    code = cli.main(["transcribe", str(make_wav()), "--out", str(out), "--separate", "--add-tau", "0.5"])
+    code = cli.main(["transcribe", str(make_wav()), "--out", str(out), "--separate", "--add-tau", "0.5", "--bass-tau", "1.5"])
 
-    # Then the stem feeds the chord model and the C bars become add2
+    # Then the harmonic stem feeds the chord model, the bass stem the bass detection, and the C bars become add2 over E
     assert code == 0
     assert ("separate", 20) in _stages(_lines(capfd))
     assert fakes["recognize"].name == "harmonic.wav"
+    assert [p.name for p in bass_inputs] == ["bass.wav"]
     bars = [bar for s in json.loads(out.read_text())["sections"] for bar in s["bars"]]
-    assert bars[0]["chords"][0]["chord"] == "C:add2"
+    assert bars[0]["chords"][0]["chord"] == "C:add2/3"
+
+    # When separating isn't asked
+    code = cli.main(["transcribe", str(make_wav()), "--out", str(out), "--bass-tau", "1.5"])
+
+    # Then the bass detection reads the mix
+    assert code == 0
+    assert bass_inputs[-1].name == "decoded.wav"
 
 
 def test_main_when_adapter_fails_finds_no_beats_or_group_missing_emits_error_and_exits_1(fakes, make_wav, tmp_path, capfd, monkeypatch):

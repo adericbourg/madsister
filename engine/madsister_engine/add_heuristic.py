@@ -1,5 +1,6 @@
 """add2/add4 refinement from chroma (spec §3.3 step 5b, D6). Disabled (tau=None) until the bench validates it."""
 
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -45,6 +46,13 @@ def refine_add(
     """
     if tau is None:
         return bars
+    return map_slots(bars, chroma_times, beats, lambda slot, frames: _refine(slot, chroma, frames, tau, flag_threshold))
+
+
+def map_slots(
+    bars: list[Bar], chroma_times: np.ndarray, beats: list[float], fn: Callable[[ChordSlot, np.ndarray], ChordSlot]
+) -> list[Bar]:
+    """Rewrite each slot with `fn(slot, frames)`, `frames` being the mask of the chroma frames during the slot's beats."""
     result = []
     for bar in bars:
         i = min(range(len(beats)), key=lambda k: abs(beats[k] - bar.start_sec))
@@ -52,18 +60,19 @@ def refine_add(
         for slot in bar.chords:
             start = beats[i]
             end = beats[i + slot.beats] if i + slot.beats < len(beats) else np.inf
-            frames = (chroma_times >= start) & (chroma_times < end)
-            slots.append(_refine(slot, chroma, frames, tau, flag_threshold))
+            slots.append(fn(slot, (chroma_times >= start) & (chroma_times < end)))
             i += slot.beats
         result.append(replace(bar, chords=slots))
     return result
 
 
-def chroma(wav_path: str | Path) -> tuple[np.ndarray, np.ndarray]:
-    """CQT chroma (12, T) of the harmonic stem, hop 2048, with the frame times. Needs librosa (chords-* groups)."""
+def chroma(wav_path: str | Path, **register) -> tuple[np.ndarray, np.ndarray]:
+    """CQT chroma (12, T) of the harmonic stem, hop 2048, with the frame times. Needs librosa (chords-* groups).
+
+    `register`: `chroma_cqt`'s `fmin` and `n_octaves`, to keep a range only (`bass.chroma`)."""
     import librosa
 
     y, sr = librosa.load(str(wav_path), sr=None, mono=True)
     hop = 2048
-    features = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop)
+    features = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop, **register)
     return features, librosa.frames_to_time(np.arange(features.shape[1]), sr=sr, hop_length=hop)
