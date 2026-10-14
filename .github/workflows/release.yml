@@ -40,7 +40,7 @@ env:
 
 jobs:
   version:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-slim
     outputs:
       version: ${{ steps.version.outputs.version }}
       package: ${{ steps.version.outputs.package }}
@@ -294,7 +294,7 @@ jobs:
     needs: [version, linux, linux-clean-install, macos, macos-clean-install]
     # A platform left out of a manual run skips its jobs, which would skip this one too.
     if: ${{ !cancelled() && !failure() && needs.version.outputs.skip != 'true' }}
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-slim
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -387,7 +387,7 @@ jobs:
   homebrew:
     needs: [version, publish]
     if: ${{ !cancelled() && needs.publish.result == 'success' && inputs.platforms != 'linux' }} # no dmg to point the cask at; see `apt`
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-slim
     concurrency:
       group: homebrew
       cancel-in-progress: false # two runs in a row would otherwise race on the push
