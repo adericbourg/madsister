@@ -2,7 +2,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::io::{self, BufRead, BufReader, Read, Write};
-use std::os::unix::process::CommandExt; // ponytail: unix only (Linux, macOS), Windows is out of scope (D4)
 use std::path::{Path, PathBuf};
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -168,7 +167,11 @@ fn last_lines(reader: impl Read) -> VecDeque<String> {
     tail
 }
 
-/// The running jobs by pid (a job id is its child's pid, which is also its process group id), with their stdin when piped.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// The running jobs by pid (a job id is its child's pid, which is also its process group id on unix), with their stdin
+/// when piped.
 #[derive(Clone, Default)]
 pub struct Jobs(Arc<Mutex<HashMap<u32, Option<ChildStdin>>>>);
 
@@ -179,7 +182,8 @@ impl Jobs {
         has_stdin: bool,
         emit: impl Fn(EngineEvent) + Send + 'static,
     ) -> io::Result<u32> {
-        let mut child = Command::new(&argv[0])
+        let mut command = Command::new(&argv[0]);
+        command
             .args(&argv[1..])
             // A null stdin is an EOF, which stops `record` at once.
             .stdin(if has_stdin {
@@ -188,9 +192,14 @@ impl Jobs {
                 Stdio::null()
             })
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .process_group(0) // its own group, so cancel also reaches uv's child and ffmpeg/Demucs
-            .spawn()?;
+            .stderr(Stdio::piped());
+        // Its own group, so cancel also reaches uv's child and ffmpeg/Demucs.
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut command, 0);
+        // No console window popping up for each engine run (the app is a GUI program).
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(&mut command, CREATE_NO_WINDOW);
+        let mut child = command.spawn()?;
         let pid = child.id();
         self.0.lock().unwrap().insert(pid, child.stdin.take());
         let stdout = child.stdout.take().unwrap();
@@ -236,12 +245,22 @@ impl Jobs {
         }
     }
 
-    /// Kills the job's whole process group. No-op once the job has ended.
+    /// Kills the job's whole process group (process tree on Windows). No-op once the job has ended.
     pub fn cancel(&self, job_id: u32) {
         let mut live = self.0.lock().unwrap();
         if live.remove(&job_id).is_some() {
-            // SAFETY: plain syscall; the group exists since its leader isn't reaped while it's in the set.
-            unsafe { libc::killpg(job_id as libc::pid_t, libc::SIGKILL) };
+            // The pid isn't reused while it's in the set: its leader isn't reaped (its handle is open, on Windows).
+            #[cfg(unix)]
+            // SAFETY: plain syscall.
+            unsafe {
+                libc::killpg(job_id as libc::pid_t, libc::SIGKILL)
+            };
+            #[cfg(windows)]
+            let _ = std::os::windows::process::CommandExt::creation_flags(
+                Command::new("taskkill").args(["/T", "/F", "/PID", &job_id.to_string()]),
+                CREATE_NO_WINDOW,
+            )
+            .status();
         }
     }
 
@@ -362,6 +381,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)] // the fake uv is a shell script
     #[test]
     fn setup_command_installs_the_env_with_the_bundled_wheel_then_runs_setup() {
         // Given a fake uv that logs its calls and creates the engine, and a bundled madmom wheel
