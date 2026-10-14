@@ -13,11 +13,14 @@ fn spawn_fake_with_stdin(
     scenario: &str,
     has_stdin: bool,
 ) -> (u32, Receiver<EngineEvent>) {
-    let (tx, rx) = mpsc::channel();
     let script = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fake-engine.sh");
-    let argv = ["sh", script, scenario].map(String::from);
+    spawn_argv(jobs, &["sh", script, scenario].map(String::from), has_stdin)
+}
+
+fn spawn_argv(jobs: &Jobs, argv: &[String], has_stdin: bool) -> (u32, Receiver<EngineEvent>) {
+    let (tx, rx) = mpsc::channel();
     let job_id = jobs
-        .spawn(&argv, has_stdin, move |event| {
+        .spawn(argv, has_stdin, move |event| {
             let _ = tx.send(event);
         })
         .unwrap();
@@ -90,7 +93,7 @@ fn spawn_when_engine_fails_ends_with_its_error_and_output_tail() {
 fn cancel_kills_the_engine_and_its_children_then_ends_with_cancelled() {
     // Given an engine that hangs with a child process
     let jobs = Jobs::default();
-    let (job_id, rx) = spawn_fake(&jobs, "hang");
+    let (job_id, rx) = spawn_hang(&jobs);
     let child_pid = match rx.recv().unwrap() {
         EngineEvent::Progress { stage, .. } => stage,
         other => panic!("expected progress, got {other:?}"),
@@ -102,18 +105,38 @@ fn cancel_kills_the_engine_and_its_children_then_ends_with_cancelled() {
 
     // Then the job ends as cancelled at once (the child held stdout open), and the child is gone (reaped soon after)
     assert_eq!(event, Ok(EngineEvent::Cancelled));
-    let is_child_alive = || {
-        Command::new("kill")
-            .args(["-0", &child_pid])
-            .status()
-            .unwrap()
-            .success()
-    };
     let is_child_gone = (0..50).any(|_| {
         thread::sleep(Duration::from_millis(100));
-        !is_child_alive()
+        !is_alive(&child_pid)
     });
     assert!(is_child_gone, "child {child_pid} still alive");
+}
+
+#[cfg(unix)]
+fn spawn_hang(jobs: &Jobs) -> (u32, Receiver<EngineEvent>) {
+    spawn_fake(jobs, "hang")
+}
+
+/// Git Bash's `sh` children escape `taskkill /T` (its emulated fork loses the Windows parent link), so a native tree:
+/// PowerShell starts `ping` as the hanging child, like python starting ffmpeg.
+#[cfg(windows)]
+fn spawn_hang(jobs: &Jobs) -> (u32, Receiver<EngineEvent>) {
+    let script = r#"$p = Start-Process ping -ArgumentList '-n','60','127.0.0.1' -NoNewWindow -PassThru; Write-Output ('{"type":"progress","stage":"' + $p.Id + '","pct":0}'); Wait-Process -Id $p.Id"#;
+    spawn_argv(jobs, &["powershell", "-NoProfile", "-Command", script].map(String::from), false)
+}
+
+#[cfg(unix)]
+fn is_alive(pid: &str) -> bool {
+    Command::new("kill").args(["-0", pid]).status().unwrap().success()
+}
+
+#[cfg(windows)]
+fn is_alive(pid: &str) -> bool {
+    let out = Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&out.stdout).contains(pid)
 }
 
 #[test]

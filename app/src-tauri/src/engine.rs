@@ -372,7 +372,7 @@ mod tests {
         );
         assert_eq!(
             engine_command(Some(" ".into()), Some(&packaged)),
-            [venv_engine(Path::new("/data/env")).display().to_string()]
+            [venv_engine(&packaged.env).display().to_string()]
         );
         let dev = engine_command(None, None);
         assert_eq!(dev[..2], ["uv", "run"]);

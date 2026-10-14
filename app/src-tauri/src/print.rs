@@ -269,7 +269,10 @@ mod tests {
         assert_eq!(parse_args(&args("")), Err("no song to print".into()));
         assert_eq!(
             parse_args(&args("--out-dir pdf a/x.madsister.json b/x.json")),
-            Err("two songs would print to pdf/x.pdf".into())
+            Err(format!(
+                "two songs would print to {}",
+                Path::new("pdf").join("x.pdf").display()
+            ))
         );
         assert_eq!(
             parse_args(&args("a.json --font")),
