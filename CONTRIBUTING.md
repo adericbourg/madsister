@@ -73,7 +73,7 @@ pnpm tauri build --config src-tauri/tauri.bundle.conf.json      # Linux: --bundl
 ```
 
 On first launch (and after each update) the packaged app installs its engine into its data dir (`engine-env`) with
-`src-tauri/setup-engine.sh`, then downloads the models. Without the madmom wheel the release workflow bundles, that first
+`src-tauri/setup-engine.py` (run by the bundled uv's managed Python), then downloads the models. Without the madmom wheel the release workflow bundles, that first
 launch builds madmom from git: it needs git and a C compiler. The deb depends on ffmpeg, the GStreamer plugins and
 `libportaudio2`; the AppImage bundles GStreamer but needs ffmpeg and `libportaudio2` on the system.
 

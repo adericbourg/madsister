@@ -34,7 +34,7 @@ pub enum EngineEvent {
     Cancelled,
 }
 
-/// The engine installed by `setup-engine.sh` in a packaged app (`tauri build`): `uv` is a sidecar next to the app's
+/// The engine installed by `setup-engine.py` in a packaged app (`tauri build`): `uv` is a sidecar next to the app's
 /// binary, the `engine/` project a resource, the env lives in the app data dir.
 pub struct Packaged {
     pub uv: PathBuf,
@@ -43,9 +43,9 @@ pub struct Packaged {
     pub version: String,
 }
 
-const SETUP_SCRIPT: &str = include_str!("../setup-engine.sh");
+const SETUP_SCRIPT: &str = include_str!("../setup-engine.py");
 
-/// What `setup-engine.sh` installs on demand: `sections` (all-in-one), `separate` (Demucs, accurate mode).
+/// What `setup-engine.py` installs on demand: `sections` (all-in-one), `separate` (Demucs, accurate mode).
 pub const FEATURES: [&str; 2] = ["sections", "separate"];
 
 impl Packaged {
@@ -64,16 +64,19 @@ impl Packaged {
     /// Installs the env with the `requested` features plus the ones already installed for this version (a sync is exact).
     pub fn setup_command(&self, requested: &[String]) -> Vec<String> {
         let path = |p: &PathBuf| p.display().to_string();
-        let mut command = vec![
-            "sh".into(),
-            "-c".into(),
+        // uv's managed Python runs it: there's no Python before the env, nor sh on Windows.
+        let mut command = vec![path(&self.uv)];
+        command.extend(
+            ["run", "--no-project", "--managed-python", "--python", "3.11", "python", "-c"]
+                .map(String::from),
+        );
+        command.extend([
             SETUP_SCRIPT.into(),
-            "sh".into(),
             path(&self.uv),
             path(&self.project),
             path(&self.env),
             self.version.clone(),
-        ];
+        ]);
         command.extend(
             FEATURES
                 .into_iter()
@@ -365,7 +368,13 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("engine/wheels")).unwrap();
         std::fs::write(root.join("engine/wheels/madmom-0.17-cp311.whl"), "").unwrap();
+        // `run … python -c <script> …` runs the setup script with the system's python3.
         let fake_uv = r#"#!/bin/sh
+if [ "$1" = run ]; then
+  while [ "$1" != python ]; do shift; done
+  shift
+  exec python3 "$@"
+fi
 echo "$*" >> "$UV_PROJECT_ENVIRONMENT.log"
 echo "Resolved 110 packages"
 mkdir -p "$UV_PROJECT_ENVIRONMENT/bin"

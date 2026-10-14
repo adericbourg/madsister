@@ -88,7 +88,7 @@ fn engine_needs_setup(engine: State<Engine>) -> bool {
     engine.0.as_ref().is_some_and(Packaged::needs_setup)
 }
 
-/// Installs the packaged engine (`setup-engine.sh`): same events as the engine commands. `features`: some of
+/// Installs the packaged engine (`setup-engine.py`): same events as the engine commands. `features`: some of
 /// `engine::FEATURES` (large downloads), on top of the installed ones.
 #[tauri::command]
 fn setup_engine(
