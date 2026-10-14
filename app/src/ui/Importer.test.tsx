@@ -129,6 +129,30 @@ test("Importer_whenCancelling_cancelsTheJob", async () => {
   expect(onResult).not.toHaveBeenCalled();
 });
 
+test("Importer_whenUnmountedDuringAJob_cancelsIt", async () => {
+  // Given a recording running, and a second importer whose recording is still starting
+  const user = userEvent.setup();
+  const running = render(<Importer onResult={onResult} />);
+  await user.click(screen.getByRole("tab", { name: "Record" }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
+  running.unmount();
+
+  // Then closing its tab kills the running job
+  expect(cancel).toHaveBeenCalledExactlyOnceWith(8);
+
+  // When the second one is unmounted before its job id comes back
+  let started = (_: number) => {};
+  vi.mocked(record).mockReturnValueOnce(new Promise((resolve) => (started = resolve)));
+  const starting = render(<Importer onResult={onResult} />);
+  await user.click(screen.getByRole("tab", { name: "Record" }));
+  await user.click(screen.getByRole("button", { name: "Run" }));
+  starting.unmount();
+  await act(async () => started(11));
+
+  // Then the job is killed as soon as it has an id
+  expect(cancel).toHaveBeenLastCalledWith(11);
+});
+
 test("Importer_whenTheEngineFails_showsTheMessageAndStderr", async () => {
   // Given a running transcription
   const user = userEvent.setup();

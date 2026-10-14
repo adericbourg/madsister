@@ -27,6 +27,7 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
   const [audioPath, setAudioPath] = useState<string | null>(null);
   // A feature counts as installed until the engine says it isn't.
   const [installed, setInstalled] = useState<Record<Feature, boolean>>({ sections: true, separate: true });
+  const isUnmounted = useRef(false);
 
   /** Runs one engine job; its result goes to `onDone`. */
   const run = async (begin: (onEvent: (event: EngineEvent) => void) => Promise<number>, onDone: (path: string) => void) => {
@@ -43,6 +44,7 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
     setJob({ id: null, stage: "Starting…", pct: 0 });
     try {
       const id = await begin(onEvent);
+      if (isUnmounted.current) return void cancel(id); // the tab closed while the job was starting
       setJob((j) => j && { ...j, id });
     } catch (e) {
       setJob(null);
@@ -80,14 +82,20 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
   };
 
   // The drop listener and the engine callbacks outlive renders: they go through the latest props and state.
-  const latest = useRef({ onResult, selectFile, transcribeFile, isRunning: job !== null, isActive });
-  latest.current = { onResult, selectFile, transcribeFile, isRunning: job !== null, isActive };
+  const latest = useRef({ onResult, selectFile, transcribeFile, isRunning: job !== null, isActive, jobId: job?.id ?? null });
+  latest.current = { onResult, selectFile, transcribeFile, isRunning: job !== null, isActive, jobId: job?.id ?? null };
   useEffect(() => {
+    isUnmounted.current = false;
     for (const f of FEATURES) void engineHas(f).then((has) => setInstalled((current) => ({ ...current, [f]: has })));
     const unlisten = getCurrentWebview().onDragDropEvent(({ payload }) => {
       if (payload.type === "drop" && payload.paths.length > 0 && latest.current.isActive && !latest.current.isRunning) latest.current.selectFile(payload.paths[0]);
     });
-    return () => void unlisten.then((f) => f());
+    return () => {
+      void unlisten.then((f) => f());
+      // A closed tab's job would run on unseen (a recording, until the app quits).
+      isUnmounted.current = true;
+      if (latest.current.jobId !== null) void cancel(latest.current.jobId);
+    };
   }, []);
   useEffect(() => onRunningChange?.(job !== null), [job !== null]);
 
