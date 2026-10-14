@@ -29,6 +29,9 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
   const [installed, setInstalled] = useState<Record<Feature, boolean>>({ sections: true, separate: true });
   const isUnmounted = useRef(false);
 
+  // A failure before or between the engine jobs (a path out of the fs scope...) shows like the engine's.
+  const report = (e: unknown) => setFailure({ message: String(e), stderr: "" });
+
   /** Runs one engine job; its result goes to `onDone`. */
   const run = async (begin: (onEvent: (event: EngineEvent) => void) => Promise<number>, onDone: (path: string) => void) => {
     setFailure(null);
@@ -48,7 +51,7 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
       setJob((j) => j && { ...j, id });
     } catch (e) {
       setJob(null);
-      setFailure({ message: String(e), stderr: "" });
+      report(e);
     }
   };
 
@@ -60,7 +63,7 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
     if (missing.length > 0) {
       await run((onEvent) => setupEngine(missing, onEvent), () => {
         setInstalled((current) => ({ ...current, ...Object.fromEntries(missing.map((f) => [f, true])) }));
-        void latest.current.transcribeFile(audioPath); // one-time install, then back here
+        void latest.current.transcribeFile(audioPath).catch(report); // one-time install, then back here
       });
       return;
     }
@@ -106,7 +109,7 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
 
   // Downloads and recordings go to the app data dir; the engine keeps a download's format (e.g. webm), which it decodes.
   const sourcesDir = async () => join(await appDataDir(), "sources");
-  const thenTranscribe = (path: string) => void latest.current.transcribeFile(path);
+  const thenTranscribe = (path: string) => void latest.current.transcribeFile(path).catch(report);
 
   const fetchUrl = async () => {
     if (!/^https?:\/\//i.test(url)) {
@@ -137,7 +140,7 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void runSelected();
+          void runSelected().catch(report);
         }}
       >
         <div role="tablist" aria-label="Audio source">

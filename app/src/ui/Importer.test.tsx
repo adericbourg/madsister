@@ -178,6 +178,21 @@ test("Importer_whenTheEngineFails_showsTheMessageAndStderr", async () => {
   expect(screen.queryByRole("progressbar")).toBeNull();
 });
 
+test("Importer_whenTheSongFileCantBeChecked_showsWhy", async () => {
+  // Given an mp3 whose song file is out of the fs scope
+  const user = userEvent.setup();
+  vi.mocked(exists).mockRejectedValueOnce("forbidden path: /media/usb/song.madsister.json");
+  render(<Importer onResult={onResult} />);
+  await dropFile("/media/usb/song.mp3");
+
+  // When running
+  await user.click(screen.getByRole("button", { name: "Run" }));
+
+  // Then the reason is shown and nothing started
+  await vi.waitFor(() => expect(screen.getByRole("alert").textContent).toContain("forbidden path"));
+  expect(transcribe).not.toHaveBeenCalled();
+});
+
 test("Importer_ofUnsupportedOrDeclinedFiles_doesNotStart", async () => {
   // Given the importer
   const user = userEvent.setup();
