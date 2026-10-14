@@ -320,6 +320,8 @@ Measured on 72 GuitarSet solo-guitar takes, not on the user's songs; the user's 
   user on 2026-10-14: `accurate` = the default + Demucs, opt-in (D7).
 - **D6:** undecided — needs the user's bench with ≥ 3 add2/add4 songs (GuitarSet: precision ≤ 1.1 % at every τ in 0.3–0.7).
 - all-in-one is in no preset (6–7 min per 4-min song, lower downbeat F); only section detection (F-ST-1) still depends on it.
+- **Bass detection (slash chords):** no gain on GuitarSet at any threshold (precision ≤ 12 %); off, hidden `--bass-tau`, to be
+  measured on band mixes.
 
 ## 9. Testing
 - Engine: pytest. Unit tests on quantization (§3.3 steps 4–6) with synthetic frame labels. One end-to-end test

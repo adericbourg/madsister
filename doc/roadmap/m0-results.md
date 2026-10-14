@@ -109,14 +109,46 @@ in the decoder or a different model, to be tried on the user's own songs.
   vs 0.576), and it crashed on one take. Its only remaining value is section detection (F-ST-1, nice to have), which the default
   no longer gives (single section). Dropping it would unblock the torch upgrade (`BLOCKERS.md`, Dependabot): NATTEN 0.17.4 is
   what forces `torch==2.5.1`. The chord adapters call `torch.load(..., weights_only=False)` on pickled checkpoints, which would
-  need checking with torch ≥ 2.6.
+  need checking with torch ≥ 2.6. *(Outdated: `beats/neighborhood_attention.py` has since replaced NATTEN, and torch is pinned
+  to 2.11.)*
+
+## Bass detection (slash chords), 2026-10-14
+Step after quantization (and after the add2/add4 step), off by default, hidden `--bass-tau`: for each slot, the low-register
+chroma (E1 to ~E3, `bass.py`) over its beats; the strongest of the root, 3rd, 5th and 7th (6th for 6 chords) becomes the bass
+when it is ≥ τ × the root's, and a root in the bass removes the model's slash. The source is the Demucs bass stem with
+`--separate`, the mix otherwise. Same 72 takes, `--combos madmom+cnnlstm,madmom+cnnlstm+demucs --bass-tau 1.0,1.25,1.5,2.0,3.0`.
+Raw rows and tables: [`bench/results/2026-10-14-guitarset-bass-chord-tones.*`](../../bench/results/2026-10-14-guitarset-bass-chord-tones.md)
+(and the first version, where any low pitch class could be the bass: `2026-10-14-guitarset-bass.*`).
+
+| combo | edits /100 | edits, bass ignored | slash predicted (wrong) | slash P | slash R |
+|---|---|---|---|---|---|
+| madmom+cnnlstm (no bass step) | **65.7** | 58.0 | 26 (25) | 0.04 | 0.00 |
+| + bass τ 1.0 | 75.2 | 58.0 | 574 (507) | 0.12 | 0.22 |
+| + bass τ 1.5 | 71.5 | 58.0 | 350 (312) | 0.11 | 0.11 |
+| + bass τ 3.0 | 67.9 | 58.0 | 154 (135) | 0.12 | 0.04 |
+| madmom+cnnlstm+demucs (no bass step) | 65.6 | 57.9 | 27 (26) | 0.04 | 0.00 |
+| + bass τ 1.5 (bass stem) | 75.1 | 57.9 | 440 (411) | 0.07 | 0.07 |
+| + bass τ 3.0 (bass stem) | 68.1 | 57.9 | 141 (129) | 0.09 | 0.02 |
+
+- **No gain at any τ.** A wrong slash costs an edit and a right one saves one, so precision must pass ~50 %; it stays ≤ 12 %.
+  The "bass ignored" column doesn't move: only basses change.
+- The first version (any low pitch class) was worse still (precision ~7 %, 72.0 at τ 1.5) and wrote non-chord-tone basses
+  (`C:maj/2`) that mir_eval counts as wrong chords (majmin 0.927 → 0.844). Restricting to chord tones restored majmin.
+- CNN-LSTM's own slashes are wrong too (25/26).
+- GuitarSet can't settle it: no bass instrument, and alternating-bass and fingerpicking patterns spread the low notes over the
+  root and the 5th within a slot. The Demucs bass stem doesn't help here. **Decision (user, 2026-10-14):** keep it off,
+  measure it on band mixes with a bass line.
 
 ## Open questions for the user
 1. Confirm the default on your own songs (band mixes, vocals): does Demucs start to pay off there (→ an `accurate` mode)?
+   **Answer (2026-10-14):** an opt-in `accurate` mode (the default + Demucs) ships anyway (D7, M4b), to be measured on band mixes.
 2. all-in-one: keep it for section detection only (slow, opt-in), replace section detection by something cheaper (M5-4), or drop
-   it and unpin torch?
+   it and unpin torch? **Answer (2026-10-14):** section detection is a must-have; opt-in is enough, so all-in-one stays.
 3. D6: the heuristic only relabels `maj` slots. Minor add chords (e.g. `Am(add9)`) have no quality in the §4 format. Add
-   `madd2`/`madd4`-style qualities, or leave minor adds to manual entry?
+   `madd2`/`madd4`-style qualities, or leave minor adds to manual entry? **Answer (2026-10-14):** the format already had
+   `minadd2`/`minadd4`; the heuristic now relabels `min` slots too. Still off and unmeasured: GuitarSet has no minor add.
 4. Inversions: 8 edits/100 come from basses. Is it acceptable for the default grid to rarely show slash chords (CNN-LSTM can emit
-   `/3 /5 /b7 /2` but did on 1.6 % of its segments here)?
-5. ChordFormer has no license: ask the author, or ignore it?
+   `/3 /5 /b7 /2` but did on 1.6 % of its segments here)? **Answer (2026-10-14):** no, basses should be found as often as they
+   are played. A bass detector was benchmarked (section above): no gain on GuitarSet, kept off.
+5. ChordFormer has no license: ask the author, or ignore it? **Answer (2026-10-14):** postponed (a rewrite would also need
+   training it: its weights are unlicensed too).
