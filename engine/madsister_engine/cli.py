@@ -10,9 +10,9 @@ from madsister_engine.models import models_dir
 def _transcribe(args: argparse.Namespace) -> int:
     if not Path(args.audio).is_file():
         raise FileNotFoundError(f"audio file not found: {args.audio}")
+    separate = args.separate or args.mode == "accurate"  # D7: accurate = the default models on the Demucs harmonic stem
     pipeline.transcribe(
-        args.audio, args.out, args.meter, not args.no_sections, args.beats, args.chords, args.separate, args.add_tau,
-        args.bass_tau,
+        args.audio, args.out, args.meter, not args.no_sections, args.beats, args.chords, separate, args.add_tau, args.bass_tau
     )
     events.result(str(Path(args.out).resolve()))
     return 0
@@ -24,7 +24,7 @@ def _fetch(args: argparse.Namespace) -> int:
 
 
 def _setup(args: argparse.Namespace) -> int:
-    pipeline.setup(args.sections, args.all)
+    pipeline.setup(args.sections, args.separate, args.all)
     events.result(str(models_dir()))
     return 0
 
@@ -43,6 +43,9 @@ def _parser() -> argparse.ArgumentParser:
     transcribe.add_argument("--out", required=True)
     transcribe.add_argument("--meter", choices=pipeline.METERS)
     transcribe.add_argument("--no-sections", action="store_true")
+    transcribe.add_argument(
+        "--mode", choices=["fast", "accurate"], default="fast", help="accurate: separates the sources first (slower)"
+    )
     # Hidden: the bench combinations (M0-13), and `--beats allinone`, which the app passes for section detection.
     transcribe.add_argument("--beats", choices=["auto", "allinone", "madmom"], default="auto", help=argparse.SUPPRESS)
     transcribe.add_argument("--chords", choices=["auto", "btc", "cnnlstm"], default="auto", help=argparse.SUPPRESS)
@@ -58,6 +61,7 @@ def _parser() -> argparse.ArgumentParser:
 
     setup = sub.add_parser("setup", help="download the model weights once, for offline transcription")
     setup.add_argument("--sections", action="store_true", help="also all-in-one (section detection)")
+    setup.add_argument("--separate", action="store_true", help="also Demucs (accurate mode)")
     setup.add_argument("--all", action="store_true", help="every model, bench-only ones included")
     setup.set_defaults(func=_setup)
 

@@ -122,6 +122,13 @@ def test_main_of_transcribe_with_separate_add_tau_and_bass_tau_uses_the_stems(fa
     assert code == 0
     assert bass_inputs[-1].name == "decoded.wav"
 
+    # When the accurate mode is asked instead of --separate
+    code = cli.main(["transcribe", str(make_wav()), "--out", str(out), "--mode", "accurate"])
+
+    # Then it separates too
+    assert code == 0
+    assert ("separate", 20) in _stages(_lines(capfd))
+
 
 def test_main_when_adapter_fails_finds_no_beats_or_group_missing_emits_error_and_exits_1(fakes, make_wav, tmp_path, capfd, monkeypatch):
     # Given a tracker that finds a single beat (all-in-one on one GuitarSet take, m0-results)

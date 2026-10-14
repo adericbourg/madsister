@@ -226,7 +226,7 @@ def test_main_of_setup_when_run_twice_downloads_default_models_once(monkeypatch,
     assert _lines(capfd) == expected * 2
 
 
-def test_main_of_setup_with_sections_or_all_prepares_more_models_with_progress_per_model(monkeypatch, capfd, tmp_path):
+def test_main_of_setup_with_sections_separate_or_all_prepares_more_models_with_progress_per_model(monkeypatch, capfd, tmp_path):
     # Given every model adapter installed
     prepared = []
     for module in ("chords.cnnlstm", "beats.allinone_tracker", "chords.btc", "separate"):
@@ -238,10 +238,13 @@ def test_main_of_setup_with_sections_or_all_prepares_more_models_with_progress_p
     # When
     sections = cli.main(["setup", "--sections"])
     sections_prepared, prepared[:] = list(prepared), []
+    separate = cli.main(["setup", "--separate"])
+    separate_prepared, prepared[:] = list(prepared), []
     everything = cli.main(["setup", "--all"])
 
-    # Then --sections adds all-in-one to the default models, --all adds the bench-only ones
-    assert sections == everything == 0
+    # Then --sections adds all-in-one to the default models, --separate Demucs (accurate mode), --all the bench-only ones too
+    assert sections == separate == everything == 0
     assert sections_prepared == ["chords.cnnlstm", "beats.allinone_tracker"]
+    assert separate_prepared == ["chords.cnnlstm", "separate"]
     assert prepared == ["chords.cnnlstm", "beats.allinone_tracker", "chords.btc", "separate"]
-    assert [line.get("pct") for line in _lines(capfd)] == [50, 100, None, 25, 50, 75, 100, None]
+    assert [line.get("pct") for line in _lines(capfd)] == [50, 100, None, 50, 100, None, 25, 50, 75, 100, None]

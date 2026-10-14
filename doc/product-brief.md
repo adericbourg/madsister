@@ -108,6 +108,8 @@ Decisions:
   `fast` = no source separation, fastest acceptable model combo. `accurate` = the best-scoring combo from M0
   (e.g. Demucs + best chord model + add2/add4 heuristic), whatever its cost. The preset contents are defined from the M0
   results table. If M0 shows that no slower combo is measurably better, only one mode ships.
+  **User decision (2026-10-14):** `accurate` ships anyway, as an opt-in: the default combo on the Demucs harmonic stem. It
+  showed no gain on GuitarSet (solo guitar); band mixes are where it is expected to help.
   Before M4b, the engine runs a single default pipeline.
 
 ### 3.1 Repository layout
@@ -304,7 +306,7 @@ Each milestone is usable on its own.
 | **M2** Transcription | Engine CLI integrated: F-IN-1, F-IN-4, F-IN-5, F-ED-8, F-ED-11. | Drop an mp3 → an editable grid in < 2 min. |
 | **M3** Verification | F-PB-*. | Cursor follows the bars. Phase and tempo fixes work on a bench song with a known error. |
 | **M4** Exports | F-EX-2, F-EX-3, then F-EX-4. | Exported files open in ChordPro CLI and MuseScore. |
-| **M4b** Modes | D7, F-IN-7: `--mode` in the engine and a mode picker in the UI. | Both modes run on `bench/`. `accurate` scores measurably better than `fast` in "edits needed", or it is dropped. |
+| **M4b** Modes | D7, F-IN-7: `--mode` in the engine and a mode picker in the UI. | Both modes run on `bench/`. `accurate` scores measurably better than `fast` in "edits needed", or it is dropped (2026-10-14: kept on the user's decision, D7). |
 | **M5** Sources | F-IN-2 (yt-dlp), F-IN-3 (mic). F-ST-1 if not done in M2. | URL and recording both yield a grid. |
 | **M6** Packaging | Linux AppImage/deb with engine setup. Then macOS. | Installs on a clean machine with one command/package. |
 | **M7** Application shell | F-UI-*: theme and dark mode, preferences, sidebar, native menu and ribbon, tabs, session restore. | Two songs open in tabs, driven from the native menu, in light and dark mode. |
@@ -314,7 +316,8 @@ Measured on 72 GuitarSet solo-guitar takes, not on the user's songs; the user's 
 - **Default pipeline:** madmom (beats) + Chord-CNN-LSTM (chords), no Demucs, add2/add4 heuristic off. Fewest edits
   (65.7 per 100 slots) among the combos meeting NF-2: 19 s measured for a 4-min file.
 - **D7 candidates:** `fast` = the default. No `accurate` candidate: the best combo regardless of time (+ Demucs) is 0.1 edit/100
-  better, which is not measurable → single mode unless the user's band-mix songs show a Demucs gain.
+  better, which is not measurable → single mode unless the user's band-mix songs show a Demucs gain. Overridden by the
+  user on 2026-10-14: `accurate` = the default + Demucs, opt-in (D7).
 - **D6:** undecided — needs the user's bench with ≥ 3 add2/add4 songs (GuitarSet: precision ≤ 1.1 % at every τ in 0.3–0.7).
 - all-in-one is in no preset (6–7 min per 4-min song, lower downbeat F); only section detection (F-ST-1) still depends on it.
 

@@ -64,14 +64,17 @@ def _stdout_to_stderr():
         os.close(saved)
 
 
-def setup(has_sections: bool, is_all: bool) -> None:
-    """Download what the default models need (+ all-in-one with `has_sections`, + the bench-only ones with `is_all`)
-    into `models_dir()`, so transcription then runs offline (D5). Each adapter's `prepare()` is idempotent."""
+def setup(has_sections: bool, has_separate: bool, is_all: bool) -> None:
+    """Download what the default models need (+ all-in-one with `has_sections`, + Demucs with `has_separate`, + the
+    bench-only ones with `is_all`) into `models_dir()`, so transcription then runs offline (D5). Each adapter's `prepare()`
+    is idempotent."""
     items = [("chord model", _CHORDS, "cnnlstm")]  # madmom ships its weights in the package
     if has_sections or is_all:
         items.append(("beat tracker", _BEATS, "allinone"))
     if is_all:
-        items += [("chord model", _CHORDS, "btc"), ("source separation", _SEPARATE, "demucs")]
+        items.append(("chord model", _CHORDS, "btc"))
+    if has_separate or is_all:
+        items.append(("source separation", _SEPARATE, "demucs"))
     for done, item in enumerate(items, 1):
         with _stdout_to_stderr():
             _adapter(*item).prepare()

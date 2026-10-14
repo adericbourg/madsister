@@ -95,7 +95,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 | M4-1 | [m4-step1-chordpro-grid](m4-step1-chordpro-grid.md) | done | 07bc88f |
 | M4-2 | [m4-step2-musicxml](m4-step2-musicxml.md) | done | 66778ac |
 | M4-3 | [m4-step3-midi](m4-step3-midi.md) | done | this |
-| M4b-1 | [m4b-step1-engine-mode-presets](m4b-step1-engine-mode-presets.md) | skipped (D7, user 2026-10-01) | |
+| M4b-1 | [m4b-step1-engine-mode-presets](m4b-step1-engine-mode-presets.md) | done (`--mode`, no duration estimate: user 2026-10-14) | this |
 | M4b-2 | [m4b-step2-bench-modes](m4b-step2-bench-modes.md) | skipped (D7, user 2026-10-01) | |
 | M4b-3 | [m4b-step3-mode-picker-ui](m4b-step3-mode-picker-ui.md) | skipped (D7, user 2026-10-01) | |
 | M5-1 | [m5-step1-engine-fetch](m5-step1-engine-fetch.md) | done | 2f0cc01 |
