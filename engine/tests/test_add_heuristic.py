@@ -6,7 +6,7 @@ from madsister_engine.song import Bar, ChordSlot
 
 BEATS = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5]  # two 4/4 bars at 120 BPM
 TIMES = np.arange(0, 4, 0.05)
-C, D, E, F, G, A = 0, 2, 4, 5, 7, 9
+C, D, E, F, G, A, B = 0, 2, 4, 5, 7, 9, 11
 
 
 def _chroma(*extra: int, first_bar_only: bool = False) -> np.ndarray:
@@ -39,18 +39,20 @@ def test_refine_add_of_major_slot_relabels_by_strong_second_or_fourth_and_caps_c
     assert with_neither == bars
 
 
-def test_refine_add_skips_sus_minor_inversions_and_one_beat_slots():
+def test_refine_add_relabels_minor_slots_and_skips_sus_inversions_and_one_beat_slots():
     # Given strong D and F everywhere (sus4 of A has D; C:maj/3 and a 1-beat C would otherwise qualify)
     bars = [
-        Bar([ChordSlot("A:sus4", 2), ChordSlot("A:min", 2)], start_sec=0.0),
+        Bar([ChordSlot("A:sus4", 2), ChordSlot("A:min", 2, 0.9)], start_sec=0.0),
         Bar([ChordSlot("C:maj/3", 3), ChordSlot("C:maj", 1)], start_sec=2.0),
     ]
 
-    # When
-    result = refine_add(bars, _chroma(D, F), TIMES, BEATS, tau=0.1)
+    # When D (the 4th of A) is strong, then also B (its 2nd)
+    with_d = refine_add(bars, _chroma(D, F), TIMES, BEATS, tau=0.1)
+    with_b = refine_add(bars, _chroma(D, F, B), TIMES, BEATS, tau=0.1)
 
-    # Then nothing changes
-    assert result == bars
+    # Then only A minor is relabelled, as a minor add with a capped confidence; the 2nd wins over the 4th
+    assert _labels(with_d) == [[("A:sus4", None), ("A:minadd4", 0.49)], [("C:maj/3", None), ("C:maj", None)]]
+    assert _labels(with_b)[0][1] == ("A:minadd2", 0.49)
 
 
 def test_refine_add_when_tau_is_none_is_a_no_op():

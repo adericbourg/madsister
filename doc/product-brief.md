@@ -147,8 +147,8 @@ Exit code 0 on success, non-zero on error (with an `error` line emitted first).
 5. Simplification: absorb a slot < 1 beat or that is `N` into its neighbour (conservative, configurable later only if needed).
 5b. **add2/add4 refinement (D6):** for each slot labelled `maj`/`min` lasting ≥ 2 beats, compute the mean chroma over the slot
    on the harmonic signal (Demucs, vocals + drums removed). If the energy of the 2nd (resp. 4th) degree relative to the
-   triad tones is above a threshold τ (tuned in M0), relabel as `add2` (resp. `add4`) and cap confidence below the F-ED-8
-   flag threshold so the user reviews it. Never apply to `sus*` (no 3rd = already sus).
+   triad tones is above a threshold τ (tuned in M0), relabel as `add2` (resp. `add4`; `minadd2`/`minadd4` for a `min` slot)
+   and cap confidence below the F-ED-8 flag threshold so the user reviews it. Never apply to `sus*` (no 3rd = already sus).
 6. Sections → map segment boundaries to the nearest downbeat. Labels from all-in-one. Without it, one section "Song".
 7. Key estimate (MAY, for display/transposition) — madmom key or skip.
 8. Write `Song` JSON (§4).

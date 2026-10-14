@@ -1,4 +1,4 @@
-"""add2/add4 refinement from chroma (spec §3.3 step 5b, D6). Disabled (tau=None) until the bench validates it."""
+"""add2/add4 (and minor add2/add4) refinement from chroma (spec §3.3 step 5b, D6). Disabled (tau=None) until the bench validates it."""
 
 from collections.abc import Callable
 from dataclasses import replace
@@ -17,17 +17,19 @@ def _pitch_class(root: str) -> int:
 
 def _refine(slot: ChordSlot, chroma: np.ndarray, frames: np.ndarray, tau: float, flag_threshold: float) -> ChordSlot:
     root, _, quality = slot.chord.partition(":")
-    # ponytail: major only. The format has no minor add quality (Q6 `add2` = major triad + 2nd), and inversions
-    # (`C:maj/3`) are skipped because `add2/3` isn't worth the ambiguity; extend if the bench shows real cases.
-    if quality != "maj" or slot.beats < 2 or not frames.any():
+    # ponytail: inversions (`C:maj/3`) are skipped because `add2/3` isn't worth the ambiguity, and a minor 9th voicing
+    # (no b7 check) reads as `minadd2`; extend if the bench shows real cases.
+    third = {"maj": 4, "min": 3}.get(quality)
+    if third is None or slot.beats < 2 or not frames.any():
         return slot
     mean = chroma[:, frames].mean(axis=1)
     pc = _pitch_class(root)
-    triad = mean[[pc, (pc + 4) % 12, (pc + 7) % 12]].mean()
+    triad = mean[[pc, (pc + third) % 12, (pc + 7) % 12]].mean()
     for degree, label in ((2, "add2"), (5, "add4")):  # the 2nd wins when both pass
         if mean[(pc + degree) % 12] >= tau * triad:
             confidence = min(c for c in (slot.confidence, flag_threshold - 0.01) if c is not None)
-            return replace(slot, chord=f"{root}:{label}", confidence=confidence)
+            prefix = "min" if quality == "min" else ""
+            return replace(slot, chord=f"{root}:{prefix}{label}", confidence=confidence)
     return slot
 
 
@@ -39,7 +41,8 @@ def refine_add(
     tau: float | None,
     flag_threshold: float = 0.5,
 ) -> list[Bar]:
-    """Relabel `maj` slots of ≥ 2 beats as `add2`/`add4` when that degree's mean chroma ≥ tau × the triad tones' mean.
+    """Relabel `maj` (`min`) slots of ≥ 2 beats as `add2`/`add4` (`minadd2`/`minadd4`) when that degree's mean chroma
+    ≥ tau × the triad tones' mean.
 
     `chroma` is (12, T) with C at row 0, `chroma_times` the T frame times. Relabelled slots get a confidence below
     `flag_threshold` so the user reviews them. `tau=None` returns `bars` unchanged.
