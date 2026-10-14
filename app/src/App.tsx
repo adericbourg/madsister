@@ -90,7 +90,6 @@ function App() {
   };
 
   useEffect(() => {
-    readConfigJson(SETTINGS).then((json) => setSettings(parseSettings(json)));
     readConfigJson(RECENT).then((json) => Array.isArray(json) && setRecent(json.filter((p) => typeof p === "string")));
   }, []);
 
@@ -98,8 +97,9 @@ function App() {
   useEffect(() => {
     void Promise.all([readConfigJson(SETTINGS), readConfigJson(SESSION)]).then(async ([settingsJson, json]) => {
       const raw = (typeof json === "object" && json !== null ? json : {}) as { paths?: unknown; active?: unknown };
-      const isEnabled = parseSettings(settingsJson).reopenTabs;
-      const paths = isEnabled && Array.isArray(raw.paths) ? raw.paths.filter((p): p is string => typeof p === "string") : [];
+      const saved = parseSettings(settingsJson);
+      setSettings(saved);
+      const paths = saved.reopenTabs && Array.isArray(raw.paths) ? raw.paths.filter((p): p is string => typeof p === "string") : [];
       const opened = (await Promise.all(paths.map((path) => readSong(path).then((song) => ({ song, path }), () => null)))).filter((t) => t !== null);
       if (opened.length > 0) {
         const restored = opened.map((initial) => ({ id: nextId.current++, initial }));
