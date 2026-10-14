@@ -188,7 +188,7 @@ jobs:
           cd
           env=\$HOME/.local/share/dev.dericbourg.$PACKAGE/engine-env
           start=\$(date +%s)
-          /usr/bin/$PACKAGE-uv run --no-project --managed-python --python 3.11 python /tmp/setup-engine.py /usr/bin/$PACKAGE-uv $project "\$env" $VERSION
+          /usr/bin/$PACKAGE-uv run --no-project --managed-python --python 3.11 python -I /tmp/setup-engine.py /usr/bin/$PACKAGE-uv $project "\$env" $VERSION
           echo "setup: \$((\$(date +%s) - start)) s, env: \$(du -sh "\$env" | cut -f1)"
           ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
           start=\$(date +%s)
@@ -282,7 +282,7 @@ jobs:
           app="$RUNNER_TEMP/dmg/$PACKAGE.app"
           env=$RUNNER_TEMP/engine-env
           start=$(date +%s)
-          "$app/Contents/MacOS/$PACKAGE-uv" run --no-project --managed-python --python 3.11 python app/src-tauri/setup-engine.py "$app/Contents/MacOS/$PACKAGE-uv" "$app/Contents/Resources/engine" "$env" "$VERSION"
+          "$app/Contents/MacOS/$PACKAGE-uv" run --no-project --managed-python --python 3.11 python -I app/src-tauri/setup-engine.py "$app/Contents/MacOS/$PACKAGE-uv" "$app/Contents/Resources/engine" "$env" "$VERSION"
           echo "setup: $(($(date +%s) - start)) s, env: $(du -sh "$env" | cut -f1)"
           ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
           start=$(date +%s)

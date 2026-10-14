@@ -63,10 +63,11 @@ impl Packaged {
     /// Installs the env with the `requested` features plus the ones already installed for this version (a sync is exact).
     pub fn setup_command(&self, requested: &[String]) -> Vec<String> {
         let path = |p: &PathBuf| p.display().to_string();
-        // uv's managed Python runs it: there's no Python before the env, nor sh on Windows.
+        // uv's managed Python runs it: there's no Python before the env, nor sh on Windows. -I: no module from the
+        // current directory (whatever the app was launched from) nor PYTHON* variable gets in.
         let mut command = vec![path(&self.uv)];
         command.extend(
-            ["run", "--no-project", "--managed-python", "--python", "3.11", "python", "-c"]
+            ["run", "--no-project", "--managed-python", "--python", "3.11", "python", "-I", "-c"]
                 .map(String::from),
         );
         command.extend([

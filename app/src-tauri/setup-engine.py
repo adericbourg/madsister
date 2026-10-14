@@ -1,5 +1,5 @@
 # Installs the packaged engine (M6-2), run by the app with the bundled uv's managed Python (and by the release workflow's
-# clean-install check): `uv run --no-project --managed-python --python 3.11 python setup-engine.py <args>`.
+# clean-install check): `uv run --no-project --managed-python --python 3.11 python -I setup-engine.py <args>`.
 # Usage: setup-engine.py <uv> <engine project dir> <env dir> <app version> [sections] [separate]
 # Features installed on demand (large downloads): `sections` adds all-in-one (section detection, slow), `separate` adds
 # Demucs (accurate mode). A sync is exact: the caller passes the features already installed too.
