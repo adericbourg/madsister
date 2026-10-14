@@ -200,6 +200,14 @@ impl Jobs {
         // No console window popping up for each engine run (the app is a GUI program).
         #[cfg(windows)]
         std::os::windows::process::CommandExt::creation_flags(&mut command, CREATE_NO_WINDOW);
+        // The Windows build ships ffmpeg next to the app (no package manager brings it): the engine looks it up on PATH.
+        #[cfg(windows)]
+        if let (Ok(exe), Some(path)) = (std::env::current_exe(), std::env::var_os("PATH")) {
+            let dirs = exe.parent().map(Path::to_path_buf).into_iter();
+            if let Ok(path) = std::env::join_paths(dirs.chain(std::env::split_paths(&path))) {
+                command.env("PATH", path);
+            }
+        }
         let mut child = command.spawn()?;
         let pid = child.id();
         self.0.lock().unwrap().insert(pid, child.stdin.take());
