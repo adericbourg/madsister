@@ -20,6 +20,9 @@ fn start(
 ) -> Result<u32, String> {
     let mut argv =
         engine::engine_command(std::env::var("MADSISTER_ENGINE").ok(), engine.0.as_ref());
+    if let Some(hint) = engine::missing_dev_engine(&argv) {
+        return Err(hint);
+    }
     argv.extend(args);
     spawn(jobs, argv, has_stdin, on_event)
 }
