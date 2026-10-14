@@ -67,6 +67,11 @@ def _slots(labels: list[tuple[str, float | None]]) -> list[ChordSlot]:
     return slots
 
 
+def downbeat_starts(beats: list[float], downbeats: list[float]) -> list[int]:
+    """The sorted, distinct indices of the beats nearest to each downbeat."""
+    return sorted({min(range(len(beats)), key=lambda i: abs(beats[i] - d)) for d in downbeats})
+
+
 def bars_from_beats(
     labels: list[tuple[str, float | None]], beats: list[float], downbeats: list[float], meter_beats: int
 ) -> list[Bar]:
@@ -74,7 +79,7 @@ def bars_from_beats(
 
     A bar whose beat count differs from the meter keeps it through a meter override (song edges, tracker errors).
     """
-    starts = sorted({min(range(len(beats)), key=lambda i: abs(beats[i] - d)) for d in downbeats})
+    starts = downbeat_starts(beats, downbeats)
     # ponytail: a 1-beat pickup is dropped (usually a tracker artefact); 2+ beats become a short bar.
     if starts and starts[0] >= 2:
         starts.insert(0, 0)

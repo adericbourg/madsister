@@ -15,7 +15,7 @@ from pathlib import Path
 from madsister_engine import add_heuristic, bass, events
 from madsister_engine.beats import BeatResult
 from madsister_engine.decode import decode
-from madsister_engine.quantize import ChordSegment, build_song
+from madsister_engine.quantize import ChordSegment, build_song, downbeat_starts
 from madsister_engine.song import Audio, Song, write
 
 # option -> (dependency group, module that only that group installs, adapter module). `auto` = first installed, in order:
@@ -83,7 +83,7 @@ def setup(has_sections: bool, has_separate: bool, is_all: bool) -> None:
 
 def beats_per_bar(beats: list[float], downbeats: list[float]) -> int:
     """Median number of beats between consecutive downbeats; 4 with fewer than two downbeats."""
-    starts = sorted({min(range(len(beats)), key=lambda i: abs(beats[i] - d)) for d in downbeats})
+    starts = downbeat_starts(beats, downbeats)
     if len(starts) < 2:
         return 4
     return round(statistics.median(b - a for a, b in zip(starts, starts[1:])))
