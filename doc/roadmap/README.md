@@ -38,7 +38,7 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 - Minimal code (no speculative abstractions). Mark a deliberate shortcut with a `ponytail:` comment naming its ceiling.
 - CI = GitHub Actions, one workflow per project: `.github/workflows/engine.yml` (M0-1), `.github/workflows/app.yml` (M1-1).
   CI runs fast tests only (no model weights), except `.github/workflows/engine-models.yml` (model groups + slow tests,
-  Linux and macOS): engine dependency PRs (Renovate) must have `engine-models` green before merge.
+  Linux, plus macOS and Windows weekly): engine dependency PRs (Renovate) must have `engine-models` green before merge.
   Every step keeps CI green: if it adds a system dependency or a new test command,
   it updates the workflow in the same commit. Lint workflows with `uvx --from actionlint-py actionlint`. Pin actions to tags that exist
   (e.g. `astral-sh/setup-uv` has no floating major tag: use the exact version).
