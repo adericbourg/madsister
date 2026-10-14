@@ -49,7 +49,7 @@ madsister print --compact --font kalam --bars-per-row 8 --out-dir ~/pdf song.mad
 - Options left out use the app's preferences: `--style fr|intl|latin`, `--font kalam|patrick-hand|petaluma-script|petaluma-text|serif`,
   `--bars-per-row 2|4|8`, `--compact` or `--no-compact`.
 - It exits with 1 if a chart failed, after printing the others.
-- Linux and macOS. It opens a hidden window, so it needs a desktop session. On macOS, the command is inside the app:
+- Linux and macOS (not Windows yet). It opens a hidden window, so it needs a desktop session. On macOS, the command is inside the app:
   `/Applications/madsister.app/Contents/MacOS/madsister print …`.
 
 ## Install (Debian, Ubuntu)
@@ -91,9 +91,22 @@ brew install --cask madsister
 - Same first launch as on Linux (the engine and the models download once); ffmpeg comes with the cask.
 - Uninstall: `brew uninstall --cask madsister` (`--zap` also removes the engine and the data).
 
+## Install (Windows)
+
+Download `madsister_<version>_x64-setup.exe` from the [releases page](https://github.com/adericbourg/madsister/releases)
+and run it.
+
+- Windows x64. It installs for your user only, no admin rights needed, with ffmpeg included.
+- The installer isn't signed: on SmartScreen's warning, click **More info**, then **Run anyway**.
+- `madsister-snapshot` follows `main`, rebuilt nightly (the latest pre-release on the releases page), and installs next
+  to `madsister`.
+- Same first launch as on Linux (the engine and the models download once).
+- Uninstall: **Settings › Apps › Installed apps › madsister › Uninstall**; tick *Delete the application data* to also
+  remove the engine and the data. The models stay in `%USERPROFILE%\.cache\madsister`: delete that folder by hand.
+
 ## Limits
 
-- Linux (amd64) and macOS (Apple silicon) only.
+- Linux (amd64), macOS (Apple silicon) and Windows (x64) only.
 - Recognition targets pop, rock, chanson and folk harmony; jazz extensions (9, 11, 13, alterations) can be typed but
   aren't detected.
 - Section detection is slow (about 6 minutes for a 4-minute song) and downloads its models on first use. So does the
