@@ -1,4 +1,4 @@
-from run import add_counts, edits_needed, timed_slots
+from run import edits_needed, is_add, is_slash, label_counts, timed_slots
 
 BEATS = [i * 0.5 for i in range(8)]  # 2 bars of 4/4 at 120 BPM
 
@@ -48,13 +48,16 @@ def test_edits_needed_counts_wrong_and_differently_split_reference_slots():
     assert (identical, enharmonic, one_wrong, split, missed, missed_bass_ignored, no_grid) == (0, 0, 1, 2, 1, 0, 3)
 
 
-def test_add_counts_of_prediction_counts_add_slots_and_exact_matches():
-    # Given a reference with one C:add2, and a prediction with that C:add2 plus a false G:add4
-    ref = timed_slots(_song([("C:add2", 4)], [("G:maj", 4)]), BEATS)
-    est = timed_slots(_song([("C:add2", 4)], [("G:add4", 4)]), BEATS)
+def test_label_counts_of_prediction_counts_add_or_slash_slots_and_exact_matches():
+    # Given a reference with C:add2 then A:minadd2 over E, and a prediction with that C:add2, a false G:add4 and A:min over E
+    ref = timed_slots(_song([("C:add2", 4)], [("G:maj", 2), ("A:minadd2/5", 2)]), BEATS)
+    est = timed_slots(_song([("C:add2", 4)], [("G:add4", 2), ("A:min/5", 2)]), BEATS)
 
-    # When
-    counts = add_counts(ref, est)
+    # When counting the add slots (minor adds included), then the slash chords
+    adds = label_counts(ref, est, is_add)
+    slashes = label_counts(ref, est, is_slash)
 
-    # Then (predicted add slots, of which right, reference add slots, of which found)
-    assert counts == (2, 1, 1, 1)
+    # Then (predicted slots, of which right, reference slots, of which found): the slash chord is predicted with the wrong
+    # quality, so it counts as neither right nor found
+    assert adds == (2, 1, 2, 1)
+    assert slashes == (1, 0, 1, 0)

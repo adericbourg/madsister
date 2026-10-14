@@ -1,9 +1,9 @@
 """Benchmark runner (spec §7, §8 M0): every installed pipeline combination on the reference set -> CSV + Markdown table.
 
-Run from the repo root: `uv run --project engine python bench/run.py [--limit N] [--combos madmom+btc,...] [--add-tau 0.3,0.5]`.
+Run from the repo root: `uv run --project engine python bench/run.py [--limit N] [--combos madmom+btc,...] [--add-tau 0.3,0.5] [--bass-tau 1.5,2]`.
 
 Each expensive output is computed once per take and reused by every combination, cached as JSON under
-`bench/data/cache/<dataset>/<id>/` so an interrupted run resumes: decoded audio, Demucs stem, beats per tracker (always on
+`bench/data/cache/<dataset>/<id>/` so an interrupted run resumes: decoded audio, Demucs stems, beats per tracker (always on
 the full mix, as in `transcribe`), chords per (model, mix|stem). A combination's time is the sum of its components, i.e.
 what one `transcribe` call costs. Quantization goes through `pipeline.to_song`, the code path of `transcribe`.
 """
@@ -21,7 +21,7 @@ import sys
 import time
 from pathlib import Path
 
-from madsister_engine import add_heuristic, pipeline
+from madsister_engine import add_heuristic, bass, pipeline
 from madsister_engine.beats import BeatResult
 from madsister_engine.decode import decode
 from madsister_engine.quantize import NO_CHORD, ChordSegment
@@ -31,7 +31,7 @@ BENCH = Path(__file__).parent
 DATASET = "guitarset"  # ponytail: the only reference set so far; add a --dataset option with the user's songs
 REFS, AUDIO = BENCH / "data" / DATASET / "refs", BENCH / "data" / DATASET / "audio"
 FIELDS = ["file", "combo", "edits", "edits_no_bass", "ref_slots", "majmin", "sevenths", "tetrads", "downbeat_f", "sec"]
-FIELDS += ["add_pred", "add_pred_ok", "add_ref", "add_ref_found"]
+FIELDS += ["add_pred", "add_pred_ok", "add_ref", "add_ref_found", "bass_pred", "bass_pred_ok", "bass_ref", "bass_ref_found"]
 Slot = tuple[float, float, str]  # start, end, Harte chord
 
 
@@ -81,18 +81,26 @@ def edits_needed(ref: list[Slot], est: list[Slot], ref_beats: list[float], ignor
     return edits
 
 
-def add_counts(ref: list[Slot], est: list[Slot]) -> tuple[int, int, int, int]:
-    """add2/add4 at slot level (D6): (predicted add slots, of which the reference has the same label at their middle,
-    reference add slots, of which the prediction has the same label at their middle)."""
+def is_add(chord: str) -> bool:
+    return chord.split(":")[-1].split("/")[0] in ("add2", "add4", "minadd2", "minadd4")
+
+
+def is_slash(chord: str) -> bool:
+    return "/" in chord
+
+
+def label_counts(ref: list[Slot], est: list[Slot], is_target) -> tuple[int, int, int, int]:
+    """Slots whose chord `is_target` (adds, D6; slash chords), at slot level: (predicted ones, of which the reference has the
+    same chord at their middle, reference ones, of which the prediction has the same chord at their middle)."""
 
     def matches(slots, other):
         found = [(i := _at(other, (s + e) / 2)) is not None and _same(other[i][2], chord) for s, e, chord in slots]
         return len(found), sum(found)
 
-    def adds(slots):
-        return [s for s in slots if s[2].split(":")[-1].split("/")[0] in ("add2", "add4")]
+    def targets(slots):
+        return [s for s in slots if is_target(s[2])]
 
-    return *matches(adds(est), ref), *matches(adds(ref), est)
+    return *matches(targets(est), ref), *matches(targets(ref), est)
 
 
 # The app's extra qualities in plain Harte, which mir_eval parses.
@@ -129,7 +137,8 @@ def evaluate(ref_id: str, song: dict | None, beat_result: BeatResult) -> dict:
         "ref_slots": len(ref),
         **{key: round(scores[key], 4) for key in ("majmin", "sevenths", "tetrads")},
         "downbeat_f": round(downbeat_f, 4),
-        **dict(zip(FIELDS[-4:], add_counts(ref, est))),
+        **dict(zip(FIELDS[-8:-4], label_counts(ref, est, is_add))),
+        **dict(zip(FIELDS[-4:], label_counts(ref, est, is_slash))),
     }
 
 
@@ -147,19 +156,21 @@ def run_take(ref_id: str, combos: list[tuple], done: set) -> list[dict]:
     cache = BENCH / "data" / "cache" / DATASET / ref_id
     cache.mkdir(parents=True, exist_ok=True)
     wav = _cached(cache / "decode.json", lambda: str(decode(AUDIO / f"{ref_id}_mic.wav", cache)))
-    chromas = {}  # mix|stem -> (chroma, sec): cheap enough not to cache on disk
+    chromas = {}  # (add|bass, input) -> (chroma, sec): cheap enough not to cache on disk
     rows = []
-    for beats, chords, separate, tau in combos:
-        name = "+".join([beats, chords] + ["demucs"] * separate + [f"tau{tau}"] * (tau is not None))
+    for beats, chords, separate, tau, bass_tau in combos:
+        name = "+".join(
+            [beats, chords] + ["demucs"] * separate + [f"tau{tau}"] * (tau is not None) + [f"bass{bass_tau}"] * (bass_tau is not None)
+        )
         if (ref_id, name) in done:
             continue
         parts = [wav]
-        harmonic = wav["value"]
+        harmonic = low = wav["value"]
         if separate:
             separator = pipeline._adapter("source separation", pipeline._SEPARATE, "demucs")
-            stem = _cached(cache / "separate.json", lambda: str(separator.stems(Path(wav["value"]), cache)[0]))
-            parts.append(stem)
-            harmonic = stem["value"]
+            stems = _cached(cache / "stems.json", lambda: [str(p) for p in separator.stems(Path(wav["value"]), cache)])
+            parts.append(stems)
+            harmonic, low = stems["value"]
         tracker = pipeline._adapter("beat tracker", pipeline._BEATS, beats)
         beat_part = _cached(cache / f"beats-{beats}.json", lambda: dataclasses.asdict(tracker.track(wav["value"], None)))
         recognizer = pipeline._adapter("chord model", pipeline._CHORDS, chords)
@@ -169,29 +180,38 @@ def run_take(ref_id: str, combos: list[tuple], done: set) -> list[dict]:
             lambda: [dataclasses.astuple(s) for s in recognizer.recognize(harmonic)],
         )
         parts += [beat_part, chord_part]
-        chroma = None
-        if tau is not None:
-            if input_name not in chromas:
+
+        def chroma_of(kind, compute, path):
+            if (kind, input_name) not in chromas:
                 start = time.perf_counter()
-                chromas[input_name] = (add_heuristic.chroma(harmonic), time.perf_counter() - start)
-            chroma, sec = chromas[input_name]
+                chromas[kind, input_name] = (compute(path), time.perf_counter() - start)
+            value, sec = chromas[kind, input_name]
             parts.append({"sec": sec})
+            return value
+
+        chroma = chroma_of("add", add_heuristic.chroma, harmonic) if tau is not None else None
+        bass_chroma = chroma_of("bass", bass.chroma, low) if bass_tau is not None else None
 
         start = time.perf_counter()
         beat_result = BeatResult(**beat_part["value"])
         segments = [ChordSegment(*s) for s in chord_part["value"]]
         # < 2 beats (all-in-one on one take): no grid, scored as every slot to re-enter
-        song = to_json(pipeline.to_song(ref_id, beat_result, segments, None, False, chroma, tau)) if len(beat_result.beats) > 1 else None
+        song = (
+            to_json(pipeline.to_song(ref_id, beat_result, segments, None, False, chroma, tau, bass_chroma, bass_tau))
+            if len(beat_result.beats) > 1
+            else None
+        )
         sec = sum(p["sec"] for p in parts) + time.perf_counter() - start
         rows.append({"file": ref_id, "combo": name, **evaluate(ref_id, song, beat_result), "sec": round(sec, 2)})
     return rows
 
 
 def table(rows: list[dict]) -> str:
-    """Mean per combination. Edits per 100 reference slots and add precision/recall are pooled over files."""
+    """Mean per combination. Edits per 100 reference slots and add/bass precision/recall are pooled over files."""
     lines = [
-        "| combo | files | edits /100 slots | edits, bass ignored | majmin | sevenths | tetrads | downbeat F | time (s) | add pred (FP) | add P | add R |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| combo | files | edits /100 slots | edits, bass ignored | majmin | sevenths | tetrads | downbeat F | time (s) "
+        "| add pred (FP) | add P | add R | bass pred (FP) | bass P | bass R |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for combo, group in itertools.groupby(sorted(rows, key=lambda r: r["combo"]), key=lambda r: r["combo"]):
         group = list(group)
@@ -205,12 +225,15 @@ def table(rows: list[dict]) -> str:
         def ratio(num, den):
             return f"{total(num) / total(den):.2f}" if total(den) else "–"
 
-        pred, fp = int(total("add_pred")), int(total("add_pred") - total("add_pred_ok"))
+        def counts(kind):
+            pred, fp = int(total(f"{kind}_pred")), int(total(f"{kind}_pred") - total(f"{kind}_pred_ok"))
+            return f"| {pred} ({fp}) | {ratio(f'{kind}_pred_ok', f'{kind}_pred')} | {ratio(f'{kind}_ref_found', f'{kind}_ref')} "
+
         lines.append(
             f"| {combo} | {len(group)} | {100 * total('edits') / total('ref_slots'):.1f} "
             f"| {100 * total('edits_no_bass') / total('ref_slots'):.1f} | {mean('majmin')} "
             f"| {mean('sevenths')} | {mean('tetrads')} | {mean('downbeat_f')} | {total('sec') / len(group):.1f} "
-            f"| {pred} ({fp}) | {ratio('add_pred_ok', 'add_pred')} | {ratio('add_ref_found', 'add_ref')} |"
+            f"{counts('add')}{counts('bass')}|"
         )
     return "\n".join(lines) + "\n"
 
@@ -220,6 +243,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, help="first N takes only")
     parser.add_argument("--combos", help="comma-separated, e.g. madmom+btc,allinone+cnnlstm+demucs (default: all installed)")
     parser.add_argument("--add-tau", default="", help="comma-separated τ values: each combination is also run with them")
+    parser.add_argument("--bass-tau", default="", help="comma-separated bass τ values, crossed with --add-tau the same way")
     parser.add_argument("--out", type=Path, help=f"CSV path (default: bench/results/<date>-{DATASET}.csv)")
     args = parser.parse_args()
 
@@ -231,7 +255,8 @@ def main() -> None:
         wanted = set(args.combos.split(","))
         combos = [c for c in combos if "+".join([c[0], c[1]] + ["demucs"] * c[2]) in wanted]
     taus = [None] + [float(t) for t in args.add_tau.split(",") if t]
-    combos = [(*c, tau) for c in combos for tau in taus]
+    bass_taus = [None] + [float(t) for t in args.bass_tau.split(",") if t]
+    combos = [(*c, tau, bass_tau) for c in combos for tau in taus for bass_tau in bass_taus]
 
     out = args.out or BENCH / "results" / f"{datetime.date.today()}-{DATASET}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)

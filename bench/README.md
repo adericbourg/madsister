@@ -40,20 +40,22 @@ add chords (14 add2/add4 segments), no sections, 4/4 only, short excerpts (22–
 uv run --project engine python bench/run.py --add-tau 0.3,0.4,0.5,0.6,0.7
 ```
 
-Every installed combination (beat tracker × chord model × Demucs no/yes, each also with every `--add-tau` value) runs on
-every take. Quick runs: `--limit 2` (first takes), `--combos madmom+btc,allinone+cnnlstm+demucs`. It needs every model
+Every installed combination (beat tracker × chord model × Demucs no/yes, each also with every `--add-tau` value and every
+`--bass-tau` value) runs on every take. `--bass-tau 1.5,2` also runs the bass (slash chord) detection, on the Demucs bass
+stem when separating, on the mix otherwise. Quick runs: `--limit 2` (first takes), `--combos madmom+btc,allinone+cnnlstm+demucs`. It needs every model
 group installed (`uv sync` with all the `--group`s: a single `--group` removes the others) and `mir_eval` (`chords-btc`).
 
 - Output: `bench/results/<date>-guitarset.csv` (one row per take × combination) and `.md` (the table: mean per
   combination, also printed). `--out` sets the CSV path. Rows already in the CSV are skipped: rerun to resume.
 - Cache: `bench/data/cache/guitarset/<id>/` holds each expensive output once per take (`decode.json` + `decoded.wav`,
-  `separate.json` + `harmonic.wav`, `beats-<tracker>.json`, `chords-<model>-<mix|stem>.json`), each with its wall time.
+  `stems.json` + `harmonic.wav` and `bass.wav`, `beats-<tracker>.json`, `chords-<model>-<mix|stem>.json`), each with its wall time.
   Combinations reuse them, and a combination's time is the sum of its components (what one `transcribe` call costs,
   model loading included, Python imports excluded). Delete the folder after changing an adapter.
 - Metrics: **edits needed** per 100 reference slots (primary; definition in `edits_needed`), the same with the bass ignored
   (root + quality only; GuitarSet annotates many inversions), mir_eval chord WCSR
-  (`majmin`, `sevenths`, `tetrads`) of the quantized grid against the `.lab`, downbeat F-measure, and `add*` counts at
-  slot level for the τ sweep (predicted, false positives, precision, recall). A tracker that finds < 2 beats yields no grid:
+  (`majmin`, `sevenths`, `tetrads`) of the quantized grid against the `.lab`, downbeat F-measure, and the `add*` (add2/add4,
+  minor ones included) and `bass*` (slash chords) counts at slot level for the τ sweeps (predicted, false positives,
+  precision, recall). A tracker that finds < 2 beats yields no grid:
   scored as every slot to re-enter.
 - The full GuitarSet run takes about 1.5 h on an M-series Mac (all-in-one: ~1 s per second of audio).
 
