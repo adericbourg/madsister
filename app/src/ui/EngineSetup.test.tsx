@@ -73,4 +73,24 @@ test("EngineSetup_whenTheSetupFails_showsTheErrorAndRetries", async () => {
   expect(setupEngine).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.getByRole("progressbar")).toBeDefined();
+  await engineSays({ type: "result", path: "/models" }); // the next test starts with no setup running
+});
+
+test("EngineSetup_inASecondTab_followsTheRunningSetupInsteadOfStartingAnother", async () => {
+  // Given a first launch whose setup runs in one tab
+  vi.mocked(engineNeedsSetup).mockResolvedValue(true);
+  render(<EngineSetup>first</EngineSetup>);
+  await screen.findByRole("progressbar");
+
+  // When a second tab opens during the setup
+  render(<EngineSetup>second</EngineSetup>);
+  await vi.waitFor(() => expect(screen.getAllByRole("progressbar")).toHaveLength(2));
+
+  // Then it runs no setup of its own, and both tabs follow the one running to its end
+  expect(setupEngine).toHaveBeenCalledOnce();
+  await engineSays({ type: "progress", stage: "setup", pct: 50 });
+  expect(screen.getAllByRole("progressbar").map((p) => p.getAttribute("value"))).toEqual(["50", "50"]);
+  await engineSays({ type: "result", path: "/models" });
+  expect(screen.getByText("first")).toBeDefined();
+  expect(screen.getByText("second")).toBeDefined();
 });
