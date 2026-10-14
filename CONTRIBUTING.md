@@ -44,8 +44,8 @@ command line (split on whitespace) to override it.
 |---|---|---|
 | `uv run --no-sync pytest -m "not slow"` | `engine/` | `engine` (Linux) |
 | `uv run --no-sync pytest -m slow` | `engine/` | `engine-models` (Linux + macOS), weekly too |
-| `pnpm test` then `pnpm build` (type check) | `app/` | `app` |
-| `cargo test` then `cargo clippy -- -D warnings` | `app/src-tauri/` | `app` |
+| `pnpm test` then `pnpm build` (type check) | `app/` | `app` (Linux) |
+| `cargo test` then `cargo clippy -- -D warnings` | `app/src-tauri/` | `app` (Linux; Windows nightly) |
 
 The slow tests need every model group (`engine/README.md` has the sync line) and download weights on the first run.
 The model benchmark is described in [bench/README.md](bench/README.md).

@@ -6,9 +6,13 @@ on:
     paths: ["app/**", ".github/workflows/app.yml"]
   pull_request:
     paths: ["app/**", ".github/workflows/app.yml"]
+  schedule:
+    - cron: "0 2 * * *"  # Windows runners bill 2x Linux: the Windows check runs nightly, not per push
+  workflow_dispatch:
 
 jobs:
   test:
+    if: github.event_name != 'schedule' # the push or PR already ran it
     runs-on: ubuntu-26.04
     timeout-minutes: 20  # apt mirrors occasionally hang
     defaults:
@@ -44,8 +48,26 @@ jobs:
       - run: cargo test --locked
         working-directory: app/src-tauri
 
+  changed:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-slim
+    outputs:
+      app: ${{ steps.changed.outputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the history the path filter looks at
+      - id: changed
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || [ -n "$(git log --since='25 hours ago' -1 --format=%H -- app .github/workflows/app.yml)" ]; then
+            echo app=true >> "$GITHUB_OUTPUT"
+          fi
+
   # The Windows-only code (process tree, console window, PATH): compiled and linted on Windows, the unix tests skipped.
+  # Nightly, and only if app/ changed in the last 25 hours; run the workflow by hand to check a risky PR.
   windows:
+    needs: changed
+    if: needs.changed.outputs.app == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
