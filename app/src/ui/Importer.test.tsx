@@ -7,7 +7,7 @@ import { cancel, engineHas, fetchAudio, record, setupEngine, stop, transcribe, t
 import { Importer } from "./Importer";
 
 vi.mock("./engine", () => ({ FEATURES: ["sections", "separate"], engineHas: vi.fn(), setupEngine: vi.fn(), transcribe: vi.fn(), fetchAudio: vi.fn(), record: vi.fn(), stop: vi.fn(), cancel: vi.fn() }));
-vi.mock("@tauri-apps/api/path", () => ({ appDataDir: async () => "/data", join: async (...parts: string[]) => parts.join("/") }));
+vi.mock("@tauri-apps/api/path", () => ({ appLocalDataDir: async () => "/data", join: async (...parts: string[]) => parts.join("/") }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), confirm: vi.fn() }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ exists: vi.fn() }));
 const drop = vi.hoisted(() => ({ handler: (_: { payload: unknown }) => {} }));

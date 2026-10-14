@@ -1,5 +1,5 @@
 // Audio import (spec F-IN-1..4, NF-4): pick a file (dialog or drag & drop), a URL or the microphone, set the options, then Run → engine jobs with progress and cancel.
-import { appDataDir, join } from "@tauri-apps/api/path";
+import { appLocalDataDir, join } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useId, useRef, useState } from "react";
 import { cancel, engineHas, FEATURES, fetchAudio, record, setupEngine, stop, transcribe, type EngineEvent, type Feature, type ForcedMeter } from "./engine";
@@ -107,8 +107,8 @@ export const Importer = ({ isActive = true, onRunningChange, onResult }: Props) 
     if (path !== null) selectFile(path);
   };
 
-  // Downloads and recordings go to the app data dir; the engine keeps a download's format (e.g. webm), which it decodes.
-  const sourcesDir = async () => join(await appDataDir(), "sources");
+  // Downloads and recordings go to the local app data dir (not Windows' roaming profile); the engine keeps a download's format (e.g. webm), which it decodes.
+  const sourcesDir = async () => join(await appLocalDataDir(), "sources");
   const thenTranscribe = (path: string) => void latest.current.transcribeFile(path).catch(report);
 
   const fetchUrl = async () => {

@@ -125,7 +125,7 @@ fn packaged_engine(app: &tauri::App) -> Option<Packaged> {
     Some(Packaged {
         uv,
         project: app.path().resource_dir().ok()?.join("engine"),
-        env: app.path().app_data_dir().ok()?.join("engine-env"),
+        env: app.path().app_local_data_dir().ok()?.join("engine-env"),
         version: app.package_info().version.to_string(),
     })
 }
