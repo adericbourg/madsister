@@ -19,8 +19,8 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | PyYAML | BTC's config loading | MIT | — | https://github.com/yaml/pyyaml |
 | yt-dlp | Downloads a URL's audio (`fetch` group), the only network access after setup | Unlicense | — | https://github.com/yt-dlp/yt-dlp |
 | python-sounddevice | Microphone recording (`record` group) | MIT | — | https://github.com/spatialaudio/python-sounddevice |
-| PortAudio | Audio I/O under sounddevice (bundled in its macOS wheels; `libportaudio2` on Linux) | MIT | — | https://www.portaudio.com |
-| FFmpeg | Decoding (called as an external program on `PATH`, not bundled) | LGPL-2.1+ (GPL-2+ for some builds) | — | https://ffmpeg.org |
+| PortAudio | Audio I/O under sounddevice (bundled in its macOS and Windows wheels; `libportaudio2` on Linux) | MIT | — | https://www.portaudio.com |
+| FFmpeg | Decoding (called as an external program on `PATH`; bundled in the Windows installer only: BtbN's GPL `ffmpeg.exe` build, pinned by `FFMPEG_BUILD` in `.github/workflows/release.yml`, source: FFmpeg commit `330caae0c1` and https://github.com/BtbN/FFmpeg-Builds) | LGPL-2.1+ (GPL-2+ for some builds, the bundled one included) | — | https://ffmpeg.org |
 | uv (Astral) | Bundled in the release packages (`madsister-uv`, `madsister-snapshot-uv`): installs Python and the engine on first launch | MIT OR Apache-2.0 | — | https://github.com/astral-sh/uv |
 | GStreamer (base, good, libav plugins), WebKitGTK and their libraries | Bundled in the Linux AppImage only (the deb depends on the distribution's packages) | LGPL-2.1+ (libav plugin: LGPL, FFmpeg inside) | — | https://gstreamer.freedesktop.org, https://webkitgtk.org |
 | Patrick Hand (Patrick Wagesreiter) | Chart font, via `@fontsource/patrick-hand` | — | SIL OFL 1.1 | https://github.com/google/fonts/tree/main/ofl/patrickhand |

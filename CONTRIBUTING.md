@@ -77,6 +77,17 @@ On first launch (and after each update) the packaged app installs its engine int
 launch builds madmom from git: it needs git and a C compiler. The deb depends on ffmpeg, the GStreamer plugins and
 `libportaudio2`; the AppImage bundles GStreamer but needs ffmpeg and `libportaudio2` on the system.
 
+On Windows (Git Bash), the sidecars end in `.exe` and ffmpeg is one of them, since nothing else installs it (a static build, e.g.
+BtbN's `win64-gpl`: a shared one needs its DLLs):
+
+```sh
+triple=$(rustc -vV | sed -n 's/^host: //p')
+cp "$(which uv)" "src-tauri/binaries/madsister-uv-$triple.exe"
+cp "$(which ffmpeg)" "src-tauri/binaries/ffmpeg-$triple.exe"
+pnpm tauri build --bundles nsis --config src-tauri/tauri.bundle.conf.json \
+  --config '{"bundle":{"externalBin":["binaries/madsister-uv","binaries/ffmpeg"]}}'
+```
+
 ## Releases
 
 `.github/workflows/release.yml` builds the Linux deb and AppImage (on Ubuntu 22.04, with the madmom wheel and the `uv`

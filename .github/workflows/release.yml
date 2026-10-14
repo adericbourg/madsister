@@ -7,8 +7,9 @@ name: release
 # check below gates the publication, and the next nightly snapshot replaces a bad one.
 # A release is the package `madsister`, a snapshot the package `madsister-snapshot` (own binary, files and data dir: both
 # can be installed together). The `apt` job then republishes the signed apt repository on GitHub Pages: its only suite
-# holds the latest of each, and the `homebrew` job commits the matching macOS cask to adericbourg/homebrew-tap.
-# A manual run can be limited to one platform: the release then only holds its files, and the other platform's apt
+# holds the latest of each, and the `homebrew` job commits the matching macOS cask to adericbourg/homebrew-tap. Windows
+# gets an installer on the release page only.
+# A manual run can be limited to one platform: the release then only holds its files, and the other platforms' apt
 # repository or cask keeps pointing at its previous release.
 on:
   schedule:
@@ -25,8 +26,8 @@ on:
         description: Platforms to build and publish
         required: true
         type: choice
-        options: [both, linux, macos]
-        default: both
+        options: [all, linux, macos, windows]
+        default: all
 
 permissions:
   contents: write
@@ -37,6 +38,8 @@ concurrency:
 
 env:
   UV_VERSION: 0.12.21 # the uv bundled as the app's sidecar, also used to build the madmom wheel
+  FFMPEG_BUILD: autobuild-2026-10-04-20-51/ffmpeg-n8.1.3-14-g330caae0c1-win64-gpl-8.1.zip # bundled in the Windows installer
+  FFMPEG_SHA256: e0152c72dbc560bcf5bf8bb8ce6cb5b7ff2240379dc706240c65d5c1157dd037
 
 jobs:
   version:
@@ -86,10 +89,10 @@ jobs:
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
 
-  # One job per platform, each uploading its artifact (`linux`, `macos`) to `publish`.
+  # One job per platform, each uploading its artifact (`linux`, `macos`, `windows`) to `publish`.
   linux:
     needs: version
-    if: needs.version.outputs.skip != 'true' && inputs.platforms != 'macos' # the jobs that need this one are skipped with it
+    if: needs.version.outputs.skip != 'true' && inputs.platforms != 'macos' && inputs.platforms != 'windows' # the jobs that need this one are skipped with it
     runs-on: ubuntu-26.04 # the oldest glibc the deb and the AppImage then run on
     timeout-minutes: 60
     steps:
@@ -200,7 +203,7 @@ jobs:
   # macOS arm64: an unsigned .dmg (ad-hoc signature only); the `homebrew` job below installs it through a cask that clears the quarantine flag.
   macos:
     needs: version
-    if: needs.version.outputs.skip != 'true' && inputs.platforms != 'linux'
+    if: needs.version.outputs.skip != 'true' && inputs.platforms != 'linux' && inputs.platforms != 'windows'
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -290,8 +293,112 @@ jobs:
           echo "transcribe: $(($(date +%s) - start)) s"
           grep -q '"chord": "C:maj"' c.madsister.json
 
+  # Windows x64: an unsigned per-user NSIS installer (SmartScreen warns once), with ffmpeg as a second sidecar since no
+  # package manager brings it; the app puts its own folder first on the engine's PATH.
+  windows:
+    needs: version
+    if: needs.version.outputs.skip != 'true' && inputs.platforms != 'linux' && inputs.platforms != 'macos'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag upstream
+        with:
+          version: ${{ env.UV_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - id: madmom
+        run: echo "rev=$(sed -n 's/^madmom = .*rev = "\([0-9a-f]*\)".*/\1/p' engine/pyproject.toml)" >> "$GITHUB_OUTPUT"
+      - id: madmom-wheel
+        uses: actions/cache@v6
+        with:
+          path: engine/wheels
+          key: madmom-wheel-${{ runner.os }}-${{ runner.arch }}-py3.11-${{ steps.madmom.outputs.rev }}
+      - name: Build the madmom wheel (first launch then needs no git nor C compiler)
+        if: steps.madmom-wheel.outputs.cache-hit != 'true'
+        env:
+          rev: ${{ steps.madmom.outputs.rev }}
+        run: |
+          git clone --quiet https://github.com/CPJKU/madmom "$RUNNER_TEMP/madmom"
+          git -C "$RUNNER_TEMP/madmom" checkout --quiet "$rev"
+          git -C "$RUNNER_TEMP/madmom" submodule update --init --quiet # the model weights
+          uv build --wheel --python 3.11 --out-dir engine/wheels "$RUNNER_TEMP/madmom"
+      - name: Download the uv and ffmpeg sidecars
+        env:
+          PACKAGE: ${{ needs.version.outputs.package }}
+        # ffmpeg ships to users inside the installer: a dated BtbN build, checked against the sha256 recorded here.
+        run: |
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          mkdir -p app/src-tauri/binaries
+          curl -fsSLo "$RUNNER_TEMP/uv.zip" "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.zip"
+          unzip -p "$RUNNER_TEMP/uv.zip" uv.exe > "app/src-tauri/binaries/$PACKAGE-uv-$triple.exe"
+          curl -fsSLo "$RUNNER_TEMP/ffmpeg.zip" "https://github.com/BtbN/FFmpeg-Builds/releases/download/$FFMPEG_BUILD"
+          echo "$FFMPEG_SHA256  $RUNNER_TEMP/ffmpeg.zip" | sha256sum -c -
+          unzip -p "$RUNNER_TEMP/ffmpeg.zip" '*/bin/ffmpeg.exe' > "app/src-tauri/binaries/ffmpeg-$triple.exe"
+      - run: pnpm install --frozen-lockfile
+        working-directory: app
+      - name: Build the installer
+        working-directory: app
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          PACKAGE: ${{ needs.version.outputs.package }}
+        # Same overrides as on Linux, plus the ffmpeg sidecar.
+        run: >-
+          pnpm tauri build --bundles nsis --config src-tauri/tauri.bundle.conf.json
+          --config "{\"productName\":\"$PACKAGE\",\"mainBinaryName\":\"$PACKAGE\",\"identifier\":\"dev.dericbourg.$PACKAGE\",\"version\":\"$VERSION\",\"bundle\":{\"externalBin\":[\"binaries/$PACKAGE-uv\",\"binaries/ffmpeg\"],\"resources\":{\"../../engine/wheels/\":\"engine/wheels/\"}}}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          if-no-files-found: error
+          path: app/src-tauri/target/release/bundle/nsis/*.exe
+
+  # The Windows twin of linux-clean-install: the installer's engine sets up and transcribes with the bundled ffmpeg only.
+  windows-clean-install:
+    needs: [version, windows]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7 # setup-engine.py, the script the app runs on first launch
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows
+      - name: Install, set up the engine, then transcribe a synthetic C major clip
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          PACKAGE: ${{ needs.version.outputs.package }}
+        run: |
+          ./*-setup.exe //S # silent, per user: into %LOCALAPPDATA%\<product>
+          app=$LOCALAPPDATA/$PACKAGE
+          ls "$app"
+          export PATH="$(cygpath -u "$app"):$PATH" # as the app does for the engine: the bundled ffmpeg (cygpath: C: would split PATH)
+          env=$LOCALAPPDATA/dev.dericbourg.$PACKAGE/engine-env
+          start=$(date +%s)
+          "$app/$PACKAGE-uv.exe" run --no-project --managed-python --python 3.11 python -I app/src-tauri/setup-engine.py "$app/$PACKAGE-uv.exe" "$app/engine" "$env" "$VERSION"
+          echo "setup: $(($(date +%s) - start)) s, env: $(du -sh "$env" | cut -f1)"
+          ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
+          start=$(date +%s)
+          "$env/Scripts/madsister-engine.exe" transcribe c.wav --out c.madsister.json
+          echo "transcribe: $(($(date +%s) - start)) s"
+          grep -q '"chord": "C:maj"' c.madsister.json
+
   publish:
-    needs: [version, linux, linux-clean-install, macos, macos-clean-install]
+    needs: [version, linux, linux-clean-install, macos, macos-clean-install, windows, windows-clean-install]
     # A platform left out of a manual run skips its jobs, which would skip this one too.
     if: ${{ !cancelled() && !failure() && needs.version.outputs.skip != 'true' }}
     runs-on: ubuntu-slim
@@ -311,7 +418,7 @@ jobs:
         run: |
           shopt -s nullglob # a platform left out has no files
           notes="For non-commercial use only: the engine includes madmom's CC BY-NC-SA 4.0 model weights (see THIRD_PARTY.md)."
-          if [ "$PLATFORMS" != macos ]; then
+          if [ "$PLATFORMS" != macos ] && [ "$PLATFORMS" != windows ]; then
             notes="$notes
           Linux: \`sudo apt install ./${PACKAGE}_${VERSION}_amd64.deb\`, or the AppImage (it needs ffmpeg and libportaudio2).
           To get updates through apt (the package \`madsister\` follows the releases, \`madsister-snapshot\` the snapshots; they can be installed together):
@@ -321,18 +428,22 @@ jobs:
           sudo apt update && sudo apt install $PACKAGE
           \`\`\`"
           fi
-          if [ "$PLATFORMS" != linux ]; then
+          if [ "$PLATFORMS" != linux ] && [ "$PLATFORMS" != windows ]; then
             notes="$notes
           macOS (Apple silicon): \`brew install --cask adericbourg/tap/$PACKAGE\` (it installs ffmpeg), or the dmg: the app is unsigned, run \`xattr -dr com.apple.quarantine /Applications/$PACKAGE.app\` once after copying it (it needs ffmpeg)."
+          fi
+          if [ "$PLATFORMS" != linux ] && [ "$PLATFORMS" != macos ]; then
+            notes="$notes
+          Windows (x64): run \`${PACKAGE}_${VERSION}_x64-setup.exe\` (no admin rights needed; ffmpeg included). It's unsigned: on SmartScreen's warning, click *More info*, then *Run anyway*."
           fi
           notes="$notes
           The first launch downloads the engine (Python, its libraries and the models), once."
           if [ "$RELEASE" = true ]; then
             # Creates the tag on this commit (a tag pushed with the workflow's token wouldn't trigger anything anyway).
-            gh release create "v$VERSION" dist/*/* dist/*.dmg --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
+            gh release create "v$VERSION" dist/*/* dist/*.dmg dist/*.exe --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
           else
             tag=v$VERSION
-            gh release create "$tag" dist/*/* dist/*.dmg --prerelease --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
+            gh release create "$tag" dist/*/* dist/*.dmg dist/*.exe --prerelease --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
             # Only the latest snapshot is kept: the previous ones go once this one is published.
             gh release list --limit 100 --json tagName --jq '.[].tagName | select(contains("-snapshot."))' |
               while read -r old; do
@@ -386,7 +497,7 @@ jobs:
   # GITHUB_TOKEN can't write to another repository: HOMEBREW_TAP_TOKEN is a fine-grained PAT with contents:write on the tap only.
   homebrew:
     needs: [version, publish]
-    if: ${{ !cancelled() && needs.publish.result == 'success' && inputs.platforms != 'linux' }} # no dmg to point the cask at; see `apt`
+    if: ${{ !cancelled() && needs.publish.result == 'success' && inputs.platforms != 'linux' && inputs.platforms != 'windows' }} # no dmg to point the cask at; see `apt`
     runs-on: ubuntu-slim
     concurrency:
       group: homebrew
