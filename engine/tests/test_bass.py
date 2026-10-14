@@ -6,7 +6,7 @@ from madsister_engine.song import Bar, ChordSlot
 
 BEATS = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5]  # two 4/4 bars at 120 BPM
 TIMES = np.arange(0, 4, 0.05)
-C, E, G = 0, 4, 7
+C, D, E, G = 0, 2, 4, 7
 
 
 def _chroma(strong: int, root_level: float = 0.5) -> np.ndarray:
@@ -35,17 +35,20 @@ def test_refine_bass_of_slot_with_strong_low_note_sets_or_removes_the_bass():
     assert _chords(with_c) == [["C:maj"], ["C:maj"]]
 
 
-def test_refine_bass_skips_weak_low_notes_no_chord_and_silence():
+def test_refine_bass_skips_weak_or_non_chord_tone_low_notes_no_chord_and_silence():
     # Given C major, then N
     bars = [Bar([ChordSlot("C:maj", 4)], start_sec=0.0), Bar([ChordSlot("N", 4)], start_sec=2.0)]
 
-    # When G is only 1.25× the root over the first bar (under τ), or E is strong over N, or the chroma is silent
+    # When G is only 1.25× the root over the first bar (under τ), or D (not a tone of C major) is strong there, or E is
+    # strong over N, or the chroma is silent
     weak = refine_bass(bars, _chroma(G, root_level=0.8), TIMES, BEATS, tau=1.5)
+    passing = refine_bass(bars, _chroma(D), TIMES, BEATS, tau=1.5)
     over_n = refine_bass(bars, _chroma(E)[:, ::-1], TIMES, BEATS, tau=1.5)
     silent = refine_bass(bars, np.zeros((12, len(TIMES))), TIMES, BEATS, tau=1.5)
 
     # Then nothing changes
     assert weak == bars
+    assert passing == bars
     assert over_n == bars
     assert silent == bars
 
