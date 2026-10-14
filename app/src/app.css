@@ -87,7 +87,7 @@ button.danger:enabled:hover {
   border-color: var(--danger);
 }
 
-button.primary {
+button.primary:enabled {
   font-weight: 600;
   color: var(--accent-text);
   background: var(--accent);
@@ -97,12 +97,6 @@ button.primary {
 button.primary:enabled:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-}
-
-button.primary:disabled {
-  color: var(--text-muted);
-  background: var(--surface);
-  border-color: var(--border);
 }
 
 input:not([type="checkbox"], [type="radio"]) {
