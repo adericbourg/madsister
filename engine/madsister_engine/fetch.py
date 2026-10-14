@@ -17,7 +17,8 @@ def fetch(url: str, out_dir: str | Path) -> Path:
         total = status.get("total_bytes") or status.get("total_bytes_estimate")
         if not total:
             return
-        pct = min(100, int(100 * status["downloaded_bytes"] / total))
+        # an already-downloaded file reports only its size
+        pct = min(100, int(100 * status.get("downloaded_bytes", total) / total))
         if pct != last_pct:
             last_pct = pct
             events.progress("download", pct)

@@ -117,6 +117,22 @@ def test_main_of_fetch_emits_download_progress_and_audio_path(youtube_dl, capfd,
     ]
 
 
+def test_main_of_fetch_when_file_is_already_downloaded_emits_100_pct(youtube_dl, capfd, tmp_path):
+    # Given yt-dlp finding the file already in out-dir, which reports its size but no downloaded bytes
+    youtube_dl["hooks"] = [{"status": "finished", "filename": "Song.webm", "total_bytes": 400}]
+    youtube_dl["filepath"] = tmp_path / "Song.webm"
+
+    # When
+    code = cli.main(["fetch", "https://example.com/watch?v=x", "--out-dir", str(tmp_path)])
+
+    # Then
+    assert code == 0
+    assert _lines(capfd) == [
+        {"type": "progress", "stage": "download", "pct": 100},
+        {"type": "result", "path": str(tmp_path / "Song.webm")},
+    ]
+
+
 def test_main_of_fetch_when_url_is_not_http_emits_error_without_downloading(youtube_dl, capfd, tmp_path):
     # When
     code = cli.main(["fetch", "file:///etc/passwd", "--out-dir", str(tmp_path)])
