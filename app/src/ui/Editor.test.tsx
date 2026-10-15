@@ -591,8 +591,8 @@ test("Editor_rightClickOnAChord_offersSplitAndBarInsertionAndRemoval", async () 
 
   // When right-clicking the 4-beat chord, Then the chord can be split, bars added and the bar removed
   fireEvent.contextMenu(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }), { clientX: 50 });
-  await vi.waitFor(() => expect(menuItems.length).toBe(4));
-  expect(texts()).toEqual(["Split", "Add empty bar before", "Add empty bar after", "Remove bar"]);
+  await vi.waitFor(() => expect(menuItems.length).toBe(6));
+  expect(texts()).toEqual(["Split", "Add empty bar before", "Add empty bar after", "Remove bar", "Split section before this bar (off)", "Split section after this bar"]);
 
   // When running "Add empty bar after", Then the section has one more bar
   menuItems[2].action();
@@ -618,6 +618,22 @@ test("Editor_rightClickOnABarLine_offersToSplitTheSectionOrAddABar", async () =>
   fireEvent.contextMenu(second, { clientX: 102 });
   await vi.waitFor(() => expect(texts()).toEqual(["Split section here", "Add empty bar here"]));
   menuItems[0].action();
+  await vi.waitFor(() => expect(labels()).toEqual(["Verse:1", "Verse (2):1", "Chorus:1"]));
+});
+
+test("Editor_rightClickOnABar_splitsTheSectionBeforeOrAfterIt", async () => {
+  // Given
+  render(<Harness mode="edit" from={menuFixture} />);
+  document.querySelectorAll<HTMLElement>(".bar").forEach((b) => (b.getBoundingClientRect = () => ({ left: 0, right: 100 }) as DOMRect));
+
+  // When right-clicking the lone Chorus bar, Then neither split is offered
+  fireEvent.contextMenu(screen.getByRole("gridcell", { name: "Chorus, bar 1, beat 1: A minor" }), { clientX: 50 });
+  await vi.waitFor(() => expect(texts().slice(4)).toEqual(["Split section before this bar (off)", "Split section after this bar (off)"]));
+
+  // When splitting before the second Verse bar, Then it starts a new section
+  fireEvent.contextMenu(screen.getByRole("gridcell", { name: "Verse, bar 2, beat 1: G" }), { clientX: 50 });
+  await vi.waitFor(() => expect(texts().slice(4)).toEqual(["Split section before this bar", "Split section after this bar (off)"]));
+  menuItems[4].action();
   await vi.waitFor(() => expect(labels()).toEqual(["Verse:1", "Verse (2):1", "Chorus:1"]));
 });
 

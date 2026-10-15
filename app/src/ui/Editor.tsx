@@ -210,11 +210,14 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
     let items;
     if (target.kind === "slot") {
       const { ref } = target;
+      const count = song.sections[ref.section].bars.length;
       items = [
         item("Split", run((s) => splitSlot(s, ref), { ...ref, slot: ref.slot + 1 }), song.sections[ref.section].bars[ref.bar].chords[ref.slot].beats > 1),
         item("Add empty bar before", run((s) => insertBar(s, ref, "before"), { ...ref, slot: 0 })),
         item("Add empty bar after", run((s) => insertBar(s, ref, "after"), { ...ref, bar: ref.bar + 1, slot: 0 })),
         item("Remove bar", run((s) => deleteBar(s, ref), clampCursor(deleteBar(song, ref), { ...ref, slot: 0 }))),
+        item("Split section before this bar", run((s) => splitSection(s, ref), { section: ref.section + 1, bar: 0, slot: ref.slot }), ref.bar > 0),
+        item("Split section after this bar", run((s) => splitSection(s, { ...ref, bar: ref.bar + 1 }), ref), ref.bar < count - 1),
       ];
       setCursor(ref);
     } else if (target.kind === "separator") {
