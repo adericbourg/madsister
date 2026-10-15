@@ -403,9 +403,9 @@ test("Editor_whenShiftingThePhase_movesTheBarLinesInOneUndoableStep", async () =
   await user.click(screen.getByRole("button", { name: "From this bar: 1 beat earlier" }));
   expect(chords()).toEqual(["A:min:1 C:maj:3", "C:maj:1 G:maj:2", "G:maj:4", "G:maj:1"]);
 
-  // When a bar inside the range has its own meter, Then the shift is refused and says why
+  // When moving the whole song's bar lines one beat later across the 3-beat bar, Then that bar keeps its length
   await user.click(screen.getByRole("button", { name: "Bars start 1 beat later" }));
-  expect(screen.getByRole("status").textContent).toBe("the phase can't be shifted across a bar with its own meter");
+  expect(chords()).toEqual(["A:min:1", "C:maj:4", "G:maj:3", "G:maj:4"]);
 });
 
 test("Editor_whenFixingTheTempo_mergesOrSplitsBarsInOneUndoableStep", async () => {

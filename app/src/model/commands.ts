@@ -240,24 +240,25 @@ const replaceFrom = (song: Song, from: BarRef, bars: readonly { section: number;
 
 /**
  * Moves every bar line from bar `from` (default: the first bar) to the end of the song by `delta` beats (spec F-PB-3):
- * +1 = the downbeats come one beat later. Beats are slot beats (eighths in 6/8). The range is re-cut into bars of the song
- * meter: a short first bar (pickup) and a short last bar get a meter override. A short first bar sets the current phase,
- * so shifting twice from the bar after a missed break makes it a 2-beat bar. Beat times are interpolated between bar
- * starts (the last timed period carries on); a bar starting on an untimed beat has no `startSec`. Each section starts at
- * the bar line its first bar line moved to.
+ * +1 = the downbeats come one beat later. Beats are slot beats (eighths in 6/8). Every bar line in the range moves, so
+ * inner bars keep their length (a 2/4 break stays 2/4). A short first bar is a pickup, not a bar line, and what follows
+ * the last bar line is re-cut into bars of the song meter: a short first and last bar get a meter override. So shifting
+ * twice from the bar after a missed break makes it a 2-beat bar. Beat times are interpolated between bar starts (the last timed period carries on); a bar starting on an
+ * untimed beat has no `startSec`. Each section starts at the bar line its first bar line moved to.
  */
 export const shiftPhase = (song: Song, delta: 1 | -1, from: BarRef = { section: 0, bar: 0 }): Song => {
   const size = song.meta.meter.beats;
   const range = barsFrom(song, from);
-  const lengths = range.map(({ bar }) => (bar.meter ?? song.meta.meter).beats);
-  // ponytail: a bar with its own meter inside the range is refused rather than kept; handle it if break bars get detected.
-  if (lengths.some((n, i) => n > size || (n < size && i > 0 && i < lengths.length - 1)))
-    throw new Error("the phase can't be shifted across a bar with its own meter");
-
   const beats = range.flatMap((t) => t.beats);
-  const phase = (((lengths[0] < size ? lengths[0] : 0) + delta) % size + size) % size;
-  const starts = phase > 0 ? [0] : [];
-  for (let q = phase; q < beats.length; q += size) starts.push(q);
+  // A short first bar is a pickup: its start is the range start, not a bar line.
+  const lines: number[] = [];
+  let at = 0;
+  range.forEach((t, i) => {
+    if (i > 0 || t.beats.length >= size) lines.push(at + delta);
+    at += t.beats.length;
+  });
+  const starts = [0, ...lines.filter((q) => q > 0 && q < beats.length)];
+  for (let q = starts[starts.length - 1] + size; q < beats.length; q += size) starts.push(q);
   const bars = starts.map((q, i) => ({
     section: beats[Math.min(Math.max(q - delta, 0), beats.length - 1)].section,
     bar: toBar(song, beats.slice(q, starts[i + 1] ?? beats.length)),

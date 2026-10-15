@@ -547,7 +547,7 @@ describe("shiftPhase", () => {
     expect(twice.sections[0].bars[1].meter).toEqual({ beats: 2, unit: 4 });
   });
 
-  test("shiftPhase_acrossABarWithItsOwnMeter_throws", () => {
+  test("shiftPhase_acrossABarWithItsOwnMeter_keepsItsLengthAndMovesIt", () => {
     // Given a 4/4 song with a 2/4 bar in the middle
     const song = frozen([
       {
@@ -555,15 +555,20 @@ describe("shiftPhase", () => {
         label: "Verse",
         bars: [
           { chords: [{ chord: "C:maj", beats: 4 }] },
-          { meter: { beats: 2, unit: 4 }, chords: [{ chord: "C:maj", beats: 2 }] },
-          { chords: [{ chord: "C:maj", beats: 4 }] },
+          { meter: { beats: 2, unit: 4 }, chords: [{ chord: "D:min", beats: 2 }] },
+          { chords: [{ chord: "G:maj", beats: 4 }] },
         ],
       },
     ]);
 
-    // When / Then shifting across it is refused, shifting after it isn't
-    expect(() => shiftPhase(song, 1)).toThrow(/own meter/);
-    expect(() => shiftPhase(song, 1, { section: 0, bar: 2 })).not.toThrow();
+    // When shifting the whole song by +1 beat
+    const shifted = valid(shiftPhase(song, 1));
+
+    // Then the 2/4 bar moves one beat later and stays 2/4
+    expect(shape(shifted)).toEqual([["-|C:maj:1", "-|C:maj:3 D:min:1", "-|D:min:1 G:maj:1", "-|G:maj:3"]]);
+    expect(shifted.sections[0].bars[2].meter).toEqual({ beats: 2, unit: 4 });
+    // And -1 undoes it
+    expect(shiftPhase(shifted, -1)).toEqual(song);
   });
 
   test("shiftPhase_ofAGuitarSetReferenceShiftedByOneBeat_restoresIt", () => {

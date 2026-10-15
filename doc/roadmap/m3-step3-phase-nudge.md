@@ -14,14 +14,14 @@ M3-1.
 - Pure `shiftPhase(song, delta: 1 | -1, from?: BarRef)` in `commands.ts`. `+1` = the downbeats come one beat later. A beat is a
   slot beat (an eighth in 6/8). The range runs from `from` (default: the first bar) to the end of the song; earlier bars are
   the same objects.
-- The range is cut into a beat sequence and re-cut into bars of the song meter. **Edges:** a leading partial bar becomes a
-  pickup and a trailing one a short last bar, both with a `meter` override (nothing is padded or dropped). The pickup's
+- The range is cut into a beat sequence and every bar line in it moves by the delta; what follows the last bar line is
+  re-cut into bars of the song meter. **Edges:** a leading partial bar becomes a pickup (its start is not a bar line) and a
+  trailing one a short last bar, both with a `meter` override (nothing is padded or dropped). The pickup's
   length is the current phase, so −1 then +1 (and +1 then −1) gives the original song back, and **pressing +1 (or −1)
   twice from the bar after a missed 2-beat break turns it into the 2-beat break bar** (4/4). No separate "insert a 2-beat
   bar" command: this already does it.
-- **Meter overrides:** refused (`the phase can't be shifted across a bar with its own meter`) when a bar inside the range
-  other than the first (pickup) and the last is not in the song meter, or when the first/last is longer. `ponytail:` comment.
-  Shift from the bar after the override instead.
+- **Meter overrides:** a bar inside the range with its own meter keeps its length and moves with the others (a 2/4 break
+  stays 2/4).
 - **Slots:** consecutive beats of the same chord make one slot; merged slots keep the lowest confidence.
 - **Times:** beat times are interpolated from each bar's `startSec` to the next bar's; when the next bar has no time (or for
   the last bar), the last known period carries on. A bar whose first beat has no time (inside a bar without `startSec`)
