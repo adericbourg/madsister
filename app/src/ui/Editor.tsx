@@ -78,6 +78,22 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
     if (!isActive && player.isPlaying) player.toggle();
   }, [isActive]);
 
+  const openHelp = () => {
+    helpOpener.current = document.activeElement as HTMLElement | null;
+    setIsHelpOpen(true);
+  };
+  // The grid handles ? itself; this catches it when focus is elsewhere (header, panels, transport), except in a text field.
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "?" || e.defaultPrevented || (e.target as Element).matches?.("input, textarea, select")) return;
+      e.preventDefault();
+      openHelp();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isActive]);
+
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const command = keyToCommand(e, { song, cursor, anchor, clipboard, barsPerRow, lowConfidenceThreshold });
     if (command === null) return;
@@ -120,8 +136,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
         break;
       }
       case "help":
-        helpOpener.current = document.activeElement as HTMLElement | null;
-        setIsHelpOpen(true);
+        openHelp();
         break;
     }
   };

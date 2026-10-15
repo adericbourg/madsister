@@ -127,6 +127,24 @@ test("Editor_whenTypingAChartByKeyboard_buildsTheSong", async () => {
   expect(screen.getByRole("status").textContent).toBe("");
 });
 
+test("Editor_whenPressingQuestionMarkOutsideTheGrid_opensTheHelpUnlessTyping", async () => {
+  // Given a song whose chord input is open
+  const user = userEvent.setup();
+  render(<Harness />);
+  await user.keyboard("C{Enter}");
+  await user.click(screen.getByRole("gridcell", { name: "Verse, bar 1, beat 1: C" }));
+
+  // When typing ? in it, Then it is typed, not the help
+  await user.keyboard("?");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  await user.keyboard("{Escape}");
+
+  // When pressing ? with a sidebar button focused, Then the help opens
+  screen.getByRole("button", { name: "Bars start 1 beat later" }).focus();
+  await user.keyboard("?");
+  expect(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeDefined();
+});
+
 test("Editor_whenClickingASlot_editsItInPlaceUntilEnterBlurOrEscape", async () => {
   // Given a song starting with C then G
   const user = userEvent.setup();
