@@ -363,17 +363,18 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
           </Panel>
           <Panel id="bar-lines">
             <button type="button" onClick={() => shift(-1)}>
-              Whole song −1 beat
+              Bars start 1 beat earlier
             </button>
             <button type="button" onClick={() => shift(1)}>
-              Whole song +1 beat
+              Bars start 1 beat later
             </button>
             <button type="button" disabled={cursorBar === undefined} onClick={() => shift(-1, cursor)}>
-              From this bar −1 beat
+              From this bar: 1 beat earlier
             </button>
             <button type="button" disabled={cursorBar === undefined} onClick={() => shift(1, cursor)}>
-              From this bar +1 beat
+              From this bar: 1 beat later
             </button>
+            <p>Missed a 2-beat bar? Click "From this bar: 1 beat later" twice on it.</p>
           </Panel>
           <Panel id="tempo">
             <button type="button" onClick={() => history.apply((s) => halveTempo(s))}>
