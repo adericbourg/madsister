@@ -452,6 +452,9 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
           {player.error}
         </p>
       )}
+      <p role="status" className="editor-notice">
+        {notice}
+      </p>
       <Grid
         song={song}
         barsPerRow={barsPerRow}
@@ -488,9 +491,6 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
           setDraft({ kind: "chord", text: show(chord), select: "all" });
         }}
       />
-      <p role="status" className="visually-hidden">
-        {notice}
-      </p>
       {isHelpOpen && (
         <div role="dialog" aria-modal="true" aria-labelledby={`${id}-help-title`} className="help" onKeyDown={(e) => e.key === "Escape" && closeHelp()}>
           <h2 id={`${id}-help-title`}>Keyboard shortcuts</h2>

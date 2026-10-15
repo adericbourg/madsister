@@ -294,6 +294,11 @@ dialog.preferences input:not([type="checkbox"]) {
   padding: 0.5rem 0.75rem;
 }
 
+/* Always rendered so screen readers keep the live region; takes no room until it says something. */
+.editor-notice:empty {
+  padding: 0;
+}
+
 .workspace {
   display: flex;
   flex: 1;
@@ -628,7 +633,8 @@ aside button {
   nav,
   .tabbar,
   aside,
-  .audio-notice {
+  .audio-notice,
+  .editor-notice {
     display: none;
   }
 
