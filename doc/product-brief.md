@@ -79,11 +79,11 @@ not a new model.
 ## 3. Architecture
 
 ```
-┌──────────────────────── Tauri app ────────────────────────┐
-│  UI (TypeScript, React)          Rust shell (thin)         │
-│  - grid editor                   - file dialogs, fs        │
-│  - audio player + cursor         - spawns engine process   │
-│  - print / export                                          │
+┌───────────────────── app (Rust, Slint) ───────────────────┐
+│  UI (Slint)                      Rust                      │
+│  - grid editor                   - song model, commands    │
+│  - audio player + cursor         - file dialogs, fs        │
+│  - print / export                - spawns engine process   │
 └──────────────┬────────────────────────────────────────────┘
                │ spawn: `madsister-engine <cmd> ...`
                │ stdout: JSON Lines (progress events + final result)
@@ -95,10 +95,14 @@ not a new model.
 ```
 
 Decisions:
-- **D1 Tauri + TS UI + Python engine.** Models are Python-only. Tauri keeps the shell light and is good on Linux.
+- **D1 Rust + Slint UI + Python engine.** Models are Python-only. The app is native Rust with a Slint UI; it replaced
+  a Tauri + TypeScript/React app (2026-10) for the robustness of native layout on resize and compiler checks end to
+  end, from the song model to the UI bindings.
 - **D2 Engine is a CLI invoked per job**, not a server. No port or lifecycle management, and it can be tested standalone.
   Model load per job (a few seconds) is acceptable. Revisit only if measured as a problem.
-- **D3 Recording happens in the engine** (`sounddevice`), not via `getUserMedia`: WebKitGTK (Tauri on Linux) has unreliable media capture.
+- **D3 Recording happens in the engine** (`sounddevice`), not in the app: one
+  capture path for every platform (first decided because WebKitGTK, the Tauri app's webview on Linux, had unreliable
+  media capture).
 - **D4 Platform priority:** Linux (dev + v1) → macOS (nice to have) → Windows. Engine environment via `uv`.
   Packaging a bundled Python + PyTorch (~1–2 GB) is deferred to M6.
 - **D5 Offline:** no network call except yt-dlp when the user pastes a URL. Model weights are downloaded once at setup.
@@ -115,7 +119,7 @@ Decisions:
 ### 3.1 Repository layout
 ```
 madsister/
-  app/            # Tauri project (src-tauri/ + src/ TS UI)
+  app/            # Rust crate: Slint UI (ui/), app and `madsister print` (src/)
   engine/         # Python package, pyproject.toml (uv)
     madsister_engine/
     tests/
@@ -244,7 +248,7 @@ Rules:
 
 ### 5.5 Print & export
 - **F-EX-1** Print / export PDF: A4, one page when possible, sections + bars grid, title/artist/key/tempo header.
-  The frontend spells the chart (`toSheet`); Rust lays it out and writes the PDF with krilla, for the app and `madsister print`
+  The app spells the chart (`to_sheet`), lays it out and writes the PDF with krilla, for the app and `madsister print`
   alike. The app saves the PDF; printing it is the PDF viewer's job.
 - **F-EX-2** Export **ChordPro** (`.cho`) using `{start_of_grid}` / `{end_of_grid}` sections (ChordPro 6 grid syntax),
   compatible with OSS apps (ChordPro reference implementation, OnSong-style readers). VERIFY grid support in target apps.
@@ -339,7 +343,7 @@ Measured on 72 GuitarSet solo-guitar takes, not on the user's songs; the user's 
 | Wrong downbeat phase / double tempo | One-click fixes F-PB-3/4. Meter override F-IN-5. |
 | PyTorch environment size and packaging | Deferred to M6. uv env in dev. |
 | yt-dlp breakage / ToS | Isolated, optional feature. Update via uv. |
-| WebKitGTK media quirks on Linux | Recording in the engine (D3). Playback via `<audio>` (GStreamer) — VERIFY in M1. |
+| Audio quirks on Linux | Recording in the engine (D3). Playback decoded by ffmpeg and played with cpal (ALSA, served by PipeWire and PulseAudio too). |
 
 ## 11. Resolved decisions (formerly open questions)
 1. **Repeats:** a `x2` repeat count on sections in M1. Classic repeat signs `|: :|` (and voltas) come later (F-EX-6).
