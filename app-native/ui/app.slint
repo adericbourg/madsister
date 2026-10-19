@@ -1,20 +1,36 @@
-import { ScrollView, Palette } from "std-widgets.slint";
-import { Sheet, ChartView, Size } from "sheet.slint";
-export { ChartFont } from "sheet.slint";
+import { ScrollView, Palette, Button } from "std-widgets.slint";
+import { Sheet, ChartView, Size, Grid } from "sheet.slint";
 
-export { ChartView, SectionView, RowView, BarView, SlotView } from "sheet.slint";
+export { ChartView, SectionView, RowView, BarView, SlotView, ChartFont, Grid } from "sheet.slint";
+
+export struct Shortcut {
+    keys: string,
+    what: string,
+}
 
 export component AppWindow inherits Window {
     title: chart.title == "" ? "madsister" : chart.title + " — madsister";
     preferred-width: 1280px;
     preferred-height: 800px;
     background: Palette.color-scheme == ColorScheme.dark ? #1c1c1f : #f4f4f6;
+    forward-focus: grid-scope;
 
     in property <[string]> recent;
     in property <ChartView> chart;
     in property <bool> has-song;
+    /// The editor's last notice ("Not possible here"), announced politely.
+    in property <string> notice;
+    in property <bool> is-help-open;
+    in property <[Shortcut]> shortcuts;
     callback open-recent(string);
     callback clear-recent();
+    /// A key on the grid; true when the editor took it.
+    callback grid-key(KeyEvent) -> bool;
+    callback close-help();
+
+    public function focus-grid() {
+        grid-scope.focus();
+    }
 
     MenuBar {
         Menu {
@@ -39,23 +55,113 @@ export component AppWindow inherits Window {
         color: Palette.foreground;
     }
 
-    if has-song: ScrollView {
-        content-width: self.visible-width;
-        content-height: page.preferred-height;
-        page := VerticalLayout {
-            width: parent.visible-width;
-            padding: Size.rem;
-            alignment: start;
-            HorizontalLayout {
-                alignment: center;
-                Sheet {
-                    // grid.css: max-width 60rem plus its 1.5rem side padding.
-                    preferred-width: 63 * Size.rem;
-                    max-width: 63 * Size.rem;
-                    min-width: 0;
-                    chart: chart;
+    VerticalLayout {
+        visible: has-song;
+        Text {
+            text: notice;
+            color: Palette.foreground;
+            horizontal-alignment: center;
+            accessible-role: text;
+            height: notice == "" ? 0 : self.preferred-height + 0.5 * Size.rem;
+            vertical-alignment: center;
+        }
+        grid-scope := FocusScope {
+            key-pressed(event) => { root.grid-key(event) ? EventResult.accept : EventResult.reject }
+            changed has-focus => { Grid.has-focus = self.has-focus; }
+            scroll := ScrollView {
+                content-width: self.visible-width;
+                content-height: page.preferred-height;
+                page := VerticalLayout {
+                    width: parent.visible-width;
+                    padding: Size.rem;
+                    alignment: start;
+                    HorizontalLayout {
+                        alignment: center;
+                        Sheet {
+                            // grid.css: max-width 60rem plus its 1.5rem side padding.
+                            preferred-width: 63 * Size.rem;
+                            max-width: 63 * Size.rem;
+                            min-width: 0;
+                            chart: chart;
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    if is-help-open: Rectangle {
+        background: #00000040;
+        TouchArea { }
+        help := FocusScope {
+            init => { self.focus(); }
+            key-pressed(event) => {
+                if (event.text == Key.Escape) {
+                    root.close-help();
+                    return accept;
+                }
+                reject
+            }
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: min(parent.width - 2 * Size.rem, 48 * Size.rem);
+                height: min(parent.height - 2 * Size.rem, card.preferred-height);
+                background: Palette.background;
+                border-radius: 8px;
+                drop-shadow-blur: 16px;
+                drop-shadow-color: #00000040;
+                accessible-role: groupbox;
+                accessible-label: @tr("Keyboard shortcuts");
+                card := VerticalLayout {
+                    padding: Size.rem;
+                    spacing: 0.75 * Size.rem;
+                    Text {
+                        text: @tr("Keyboard shortcuts");
+                        font-size: 1.25 * Size.rem;
+                        font-weight: 600;
+                        color: Palette.foreground;
+                    }
+                    ScrollView {
+                        content-height: list.preferred-height;
+                        list := VerticalLayout {
+                            width: parent.visible-width;
+                            spacing: 0.25 * Size.rem;
+                            for shortcut in shortcuts: HorizontalLayout {
+                                spacing: Size.rem;
+                                Text {
+                                    text: shortcut.keys;
+                                    width: 16 * Size.rem;
+                                    font-family: "monospace";
+                                    color: Palette.foreground;
+                                }
+                                Text {
+                                    text: shortcut.what;
+                                    wrap: word-wrap;
+                                    color: Palette.foreground;
+                                }
+                            }
+                        }
+                    }
+                    HorizontalLayout {
+                        alignment: end;
+                        Button {
+                            text: @tr("Close");
+                            clicked => { root.close-help(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Keeps the cursor slot in view (Grid.reveal, wired in Rust): y is its position in the window.
+    public function reveal(y: length, height: length) {
+        let top = y - scroll.absolute-position.y;
+        if (top < 0) {
+            scroll.content-y = min(0, scroll.content-y - top);
+        } else if (top + height > scroll.visible-height) {
+            scroll.content-y = max(scroll.visible-height - scroll.content-height, scroll.content-y - (top + height - scroll.visible-height));
         }
     }
 }
