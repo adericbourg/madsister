@@ -54,6 +54,7 @@ pub fn chart_view(song: &Song, settings: &Settings) -> ChartView {
             let rows = bars.chunks(settings.bars_per_row).map(|row| RowView { bars: model(row.to_vec()) }).collect();
             SectionView {
                 label: section.label.as_str().into(),
+                bar_count: section.bars.len() as i32,
                 repeat: section.repeat.unwrap_or(1) as i32,
                 rows: model(rows),
             }

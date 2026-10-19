@@ -252,3 +252,83 @@ fn typing_in_a_nashville_song_reads_degrees_of_the_key() {
     ed.click(at(0, 0, 0), &settings());
     assert_eq!(ed.draft.as_ref().map(|d| d.text.as_str()), Some("4"));
 }
+
+mod menu {
+    use super::*;
+
+    /// Verse: C | G D (1 beat each); Chorus: Am.
+    fn menu_editor() -> Editor {
+        Editor::new(
+            parse_song(
+                r#"{ "version": 1, "meta": { "title": "t", "meter": { "beats": 2, "unit": 4 } }, "sections": [
+                    { "id": "v", "label": "Verse", "bars": [
+                        { "chords": [{ "chord": "C:maj", "beats": 2 }] },
+                        { "chords": [{ "chord": "G:maj", "beats": 1 }, { "chord": "D:maj", "beats": 1 }] }
+                    ] },
+                    { "id": "c", "label": "Chorus", "bars": [{ "chords": [{ "chord": "A:min", "beats": 2 }] }] }
+                ] }"#,
+            )
+            .unwrap(),
+        )
+    }
+
+    fn labels(ed: &Editor) -> Vec<String> {
+        ed.song().sections.iter().map(|s| format!("{}:{}", s.label, s.bars.len())).collect()
+    }
+
+    const fn bar_at(section: usize, bar: usize) -> BarRef {
+        BarRef { section, bar }
+    }
+
+    #[test]
+    fn bar_items_add_and_remove_bars_and_place_the_cursor() {
+        // Given
+        let mut ed = menu_editor();
+
+        // When adding an empty bar after the first one, Then the section has one more bar, the cursor on it
+        ed.run(MenuAction::AddBarAfter(bar_at(0, 0)));
+        assert_eq!((labels(&ed), ed.cursor()), (vec!["Verse:3".into(), "Chorus:1".into()], at(0, 1, 0)));
+
+        // When removing it, Then the section is back to two bars
+        ed.run(MenuAction::RemoveBar(bar_at(0, 1)));
+        assert_eq!(labels(&ed), ["Verse:2", "Chorus:1"]);
+
+        // When splitting a 2-beat chord, Then the cursor is on its second half
+        ed.run(MenuAction::Split(at(0, 0, 0)));
+        assert_eq!((bar(&ed, 0, 0).len(), ed.cursor()), (2, at(0, 0, 1)));
+    }
+
+    #[test]
+    fn line_and_bar_items_split_the_section() {
+        // Given / When splitting on the line between the two Verse bars
+        let mut ed = menu_editor();
+        ed.run(MenuAction::SplitSectionAt(bar_at(0, 1)));
+
+        // Then
+        assert_eq!(labels(&ed), ["Verse:1", "Verse (2):1", "Chorus:1"]);
+        assert_eq!(ed.cursor(), at(1, 0, 0));
+
+        // When splitting before/after a bar and adding a bar at the closing line
+        let mut ed = menu_editor();
+        ed.run(MenuAction::SplitSectionAfter(bar_at(0, 0)));
+        assert_eq!(labels(&ed), ["Verse:1", "Verse (2):1", "Chorus:1"]);
+        let mut ed = menu_editor();
+        ed.run(MenuAction::AddBarAt(bar_at(0, 2)));
+        assert_eq!(labels(&ed), ["Verse:3", "Chorus:1"]);
+    }
+
+    #[test]
+    fn merge_with_previous_joins_the_sections_and_a_refused_item_is_announced() {
+        // Given / When merging the Chorus into the Verse
+        let mut ed = menu_editor();
+        ed.run(MenuAction::MergeWithPrevious(1));
+
+        // Then the cursor is on the first merged bar
+        assert_eq!((labels(&ed), ed.cursor()), (vec!["Verse:3".into()], at(0, 2, 0)));
+
+        // When merging the first section, Then nothing changes and the reason is shown
+        ed.run(MenuAction::MergeWithPrevious(0));
+        assert_eq!(labels(&ed), ["Verse:3"]);
+        assert!(!ed.notice.is_empty());
+    }
+}
