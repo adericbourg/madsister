@@ -41,10 +41,12 @@ struct State {
     last_tab_id: u32,
     /// Saves the songs that have a file 2 s after the last edit; restarted by every refresh while one has changes.
     autosave: slint::Timer,
-    /// Where recent.json is kept; None in tests.
+    /// Where recent.json and session.json are kept; None in tests.
     config: Option<PathBuf>,
     /// The recent song files, most recent first.
     recent: Vec<String>,
+    /// session.json as last written: the tabs that have a file, and the active one among them (F-UI-8).
+    session: String,
 }
 
 impl State {
@@ -60,6 +62,7 @@ impl State {
             autosave: slint::Timer::default(),
             config: None,
             recent: Vec::new(),
+            session: String::new(),
         }
     }
 
@@ -209,6 +212,7 @@ fn refresh(app: &AppWindow, state: &mut State) {
         .collect();
     app.set_tabs(Rc::new(VecModel::from(tabs)).into());
     app.set_active_tab(state.active as i32);
+    save_session(state);
     let tab = &state.tabs[state.active];
     app.set_error(tab.error.as_str().into());
     app.set_has_song(tab.editor.is_some());
@@ -653,6 +657,40 @@ fn write_config(state: &State, name: &str, json: &str) -> std::io::Result<()> {
     let Some(dir) = &state.config else { return Ok(()) };
     std::fs::create_dir_all(dir)?;
     write_atomic(&dir.join(name), json)
+}
+
+/// Writes session.json when the tabs that have a file, or the active one, changed.
+fn save_session(state: &mut State) {
+    let paths: Vec<String> = state.tabs.iter().filter_map(|tab| tab.path.as_ref()).map(|p| p.to_string_lossy().into_owned()).collect();
+    let active = state.tab().path.as_ref().and_then(|p| paths.iter().position(|q| *q == p.to_string_lossy())).unwrap_or(0);
+    let session = serde_json::json!({ "paths": paths, "active": active }).to_string();
+    if session == state.session {
+        return;
+    }
+    if let Err(e) = write_config(state, "session.json", &session) {
+        state.tab_mut().error = format!("Can't save the open tabs: {e}");
+    }
+    state.session = session;
+}
+
+/// Reopens the tabs of the previous session that have a file still readable, unless the reopenTabs setting is off.
+fn restore_session(state: &mut State) {
+    let Some(json) = read_config(state, "session.json").filter(|_| state.settings.reopen_tabs) else { return };
+    let paths = parse_paths(&json["paths"]);
+    let active = json["active"].as_u64().and_then(|i| paths.get(i as usize)).map(PathBuf::from);
+    let opened: Vec<_> = paths.iter().filter_map(|p| read_song(Path::new(p)).ok().map(|song| (PathBuf::from(p), song))).collect();
+    if opened.is_empty() {
+        return;
+    }
+    state.tabs.clear();
+    for (path, song) in opened {
+        let index = state.push_tab();
+        let tab = &mut state.tabs[index];
+        tab.saved = Some(song.clone());
+        tab.editor = Some(viewer(song));
+        tab.path = Some(path);
+    }
+    state.active = state.tabs.iter().position(|tab| tab.path == active).unwrap_or(0);
 }
 
 /// Asks for a song file to open.
@@ -1185,6 +1223,7 @@ fn main() -> Result<(), slint::PlatformError> {
     state.config = madsister::settings::config_dir();
     state.recent = read_config(&state, "recent.json").map_or_else(Vec::new, |json| parse_paths(&json));
     show_recent(&app, &state);
+    restore_session(&mut state);
     let state = Rc::new(RefCell::new(state));
     {
         let settings = &state.borrow().settings;
@@ -1199,7 +1238,7 @@ fn main() -> Result<(), slint::PlatformError> {
     app.set_shortcuts(Rc::new(VecModel::from(shortcuts)).into());
     match args.first() {
         Some(path) => _ = open(&app, &mut state.borrow_mut(), Path::new(path)),
-        None => refresh(&app, &mut state.borrow_mut()),
+        None => show_tab(&app, &mut state.borrow_mut()),
     }
 
     wire(&app, &state);
