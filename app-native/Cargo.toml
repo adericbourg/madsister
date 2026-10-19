@@ -4,6 +4,40 @@ version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-only"
 
+description = "Turns a song into an editable, printable chord grid"
+homepage = "https://github.com/adericbourg/madsister"
+
+# `cargo packager --release` (README, Packaging). The release workflow overrides the names for the snapshot package and
+# adds the madmom wheel; whatever is named after the binary must stay so (`Packaged::beside`).
+[package.metadata.packager]
+product-name = "madsister"
+identifier = "dev.dericbourg.madsister"
+before-packaging-command = "cargo build --release"
+authors = ["Alban Dericbourg"] # the deb's Maintainer
+icons = ["icons/32x32.png", "icons/128x128.png", "icons/icon.png", "icons/icon.icns", "icons/icon.ico"]
+category = "Music"
+external-binaries = ["binaries/madsister-uv"]
+resources = [
+  { src = "../engine/pyproject.toml", target = "engine/pyproject.toml" },
+  { src = "../engine/uv.lock", target = "engine/uv.lock" },
+  { src = "../engine/.python-version", target = "engine/.python-version" },
+  { src = "../engine/madsister_engine", target = "engine/madsister_engine" },
+]
+
+[package.metadata.packager.macos]
+signing-identity = "-" # ad hoc, which Apple silicon requires to run the app: it isn't signed nor notarized
+info-plist-path = "Info.plist" # merged into the generated one: the microphone prompt's text (recording)
+
+[package.metadata.packager.deb]
+# ffmpeg: the engine's and the player's decoder; libportaudio2: the engine's recording (sounddevice); libasound2: cpal's
+# ALSA output (PipeWire and PulseAudio serve it too); libfontconfig1: linked. The others are loaded at run time: winit's
+# X11 and Wayland, Slint's OpenGL renderer, and the file dialogs' D-Bus (rfd's xdg-desktop-portal backend).
+depends = [
+  "ca-certificates", "ffmpeg", "libportaudio2", "libasound2t64 | libasound2", "libfontconfig1",
+  "libx11-xcb1", "libxcursor1", "libxi6", "libxrender1", "libxkbcommon-x11-0", "libwayland-client0", "libwayland-egl1",
+  "libegl1", "libgl1", "libdbus-1-3",
+]
+
 [dependencies]
 cpal = "0.18"
 dirs = "6"
