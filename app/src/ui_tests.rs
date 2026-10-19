@@ -241,6 +241,7 @@ fn the_importer_refuses_a_url_that_isnt_http() {
 }
 
 /// Reads the engine's events until `is_done`, for 10 s at most.
+#[cfg(unix)] // only the unix-only setup test waits
 fn wait_for(app: &AppWindow, state: &Rc<RefCell<State>>, is_done: impl Fn(&State) -> bool) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     while !is_done(&state.borrow()) {
