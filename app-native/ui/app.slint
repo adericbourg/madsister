@@ -23,8 +23,8 @@ export struct TabView {
     is-dirty: bool,
 }
 
-/// What a File menu item asks for.
-export enum FileAction { new-tab, open, clear-recent, close-tab, save, save-as }
+/// What a menu item asks for.
+export enum AppAction { new-tab, open, clear-recent, close-tab, save, save-as, quit, undo, redo, edit-mode, minimize, zoom }
 
 /// What File ▸ Export writes (F-EX-1..4).
 export enum ExportFormat { chord-pro, music-xml, midi, pdf }
@@ -103,7 +103,11 @@ export component AppWindow inherits Window {
     in property <int> active-tab;
     callback tab-selected(int);
     callback tab-closed(int);
-    callback file-action(FileAction);
+    callback app-action(AppAction);
+    /// The menus follow macOS conventions.
+    in property <bool> is-mac;
+    /// The active tab's song is in edit mode; the Edit mode menu item checks it.
+    in-out property <bool> is-editing;
     callback export(ExportFormat);
     /// A Nashville song without a key has no notes to export.
     in property <bool> is-export-locked;
@@ -162,12 +166,12 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("New tab");
                 shortcut: @keys(Control + N);
-                activated => { root.file-action(FileAction.new-tab); }
+                activated => { root.app-action(AppAction.new-tab); }
             }
             MenuItem {
                 title: @tr("Open…");
                 shortcut: @keys(Control + O);
-                activated => { root.file-action(FileAction.open); }
+                activated => { root.app-action(AppAction.open); }
             }
             Menu {
                 title: @tr("Open recent");
@@ -179,7 +183,7 @@ export component AppWindow inherits Window {
                 MenuSeparator { }
                 MenuItem {
                     title: @tr("Clear recent");
-                    activated => { root.file-action(FileAction.clear-recent); }
+                    activated => { root.app-action(AppAction.clear-recent); }
                 }
             }
             MenuSeparator { }
@@ -187,19 +191,19 @@ export component AppWindow inherits Window {
                 title: @tr("Close tab");
                 shortcut: @keys(Control + W);
                 enabled: has-song;
-                activated => { root.file-action(FileAction.close-tab); }
+                activated => { root.app-action(AppAction.close-tab); }
             }
             MenuItem {
                 title: @tr("Save");
                 shortcut: @keys(Control + S);
                 enabled: has-song;
-                activated => { root.file-action(FileAction.save); }
+                activated => { root.app-action(AppAction.save); }
             }
             MenuItem {
                 title: @tr("Save as…");
                 shortcut: @keys(Control + Shift + S);
                 enabled: has-song;
-                activated => { root.file-action(FileAction.save-as); }
+                activated => { root.app-action(AppAction.save-as); }
             }
             MenuSeparator { }
             Menu {
@@ -223,6 +227,51 @@ export component AppWindow inherits Window {
                 shortcut: @keys(Control + P);
                 enabled: has-song;
                 activated => { root.export(ExportFormat.pdf); }
+            }
+            // macOS has Quit in the app menu.
+            if !is-mac: MenuSeparator { }
+            if !is-mac: MenuItem {
+                title: @tr("Quit madsister");
+                shortcut: @keys(Control + Q);
+                activated => { root.app-action(AppAction.quit); }
+            }
+        }
+        Menu {
+            title: @tr("Edit");
+            // No shortcut: a menu shortcut would take Ctrl+Z from the text fields' own undo; the grid has its own.
+            MenuItem {
+                title: @tr("Undo");
+                enabled: has-song && is-editing;
+                activated => { root.app-action(AppAction.undo); }
+            }
+            MenuItem {
+                title: @tr("Redo");
+                enabled: has-song && is-editing;
+                activated => { root.app-action(AppAction.redo); }
+            }
+        }
+        Menu {
+            title: @tr("View");
+            MenuItem {
+                title: @tr("Edit mode");
+                shortcut: @keys(Control + E);
+                enabled: has-song;
+                checkable: true;
+                // Activating it toggles is-editing at once; Rust sets it back to the editor's mode.
+                checked <=> root.is-editing;
+                activated => { root.app-action(AppAction.edit-mode); }
+            }
+        }
+        if is-mac: Menu {
+            title: @tr("Window");
+            MenuItem {
+                title: @tr("Minimize");
+                shortcut: @keys(Control + M);
+                activated => { root.app-action(AppAction.minimize); }
+            }
+            MenuItem {
+                title: @tr("Zoom");
+                activated => { root.app-action(AppAction.zoom); }
             }
         }
     }

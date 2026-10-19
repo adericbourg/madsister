@@ -222,6 +222,7 @@ fn refresh(app: &AppWindow, state: &mut State) {
     let tab = &state.tabs[state.active];
     app.set_error(tab.error.as_str().into());
     app.set_has_song(tab.editor.is_some());
+    app.set_is_editing(tab.editor.as_ref().is_some_and(|e| e.is_editable));
     // The exports write real notes, which a key-less Nashville song (chords relative to C) doesn't have: same lock as transposing.
     app.set_is_export_locked(tab.editor.as_ref().is_some_and(Editor::is_transpose_locked));
     // shortcut: a new song without a file isn't autosaved (no recovery file); add one if users lose work.
@@ -959,8 +960,7 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
             }
             Some(Pending::CloseWindow) if is_yes => {
                 drop(state);
-                _ = app.hide();
-                _ = slint::quit_event_loop();
+                close_window(&app);
                 return;
             }
             _ => {}
@@ -1066,27 +1066,28 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
         }
     });
     let (weak, st) = (app.as_weak(), state.clone());
-    app.on_file_action(move |action| {
+    app.on_app_action(move |action| {
         let (weak, st) = (weak.clone(), st.clone());
         // Deferred: macOS native menus break if their structure changes while an item's activation is being handled.
         slint::Timer::single_shot(std::time::Duration::ZERO, move || {
             let Some(app) = weak.upgrade() else { return };
             let mut state = st.borrow_mut();
-            // The menu's shortcuts still fire under the confirmation dialog.
+            // The menu's shortcuts still fire under the confirmation dialog; refreshing unchecks what the menu toggled.
             if state.pending.is_some() {
+                refresh(&app, &mut state);
                 return;
             }
             match action {
-                FileAction::NewTab => {
+                AppAction::NewTab => {
                     let index = state.push_tab();
                     activate(&mut state, index);
                     show_tab(&app, &mut state);
                 }
-                FileAction::CloseTab => {
+                AppAction::CloseTab => {
                     let active = state.active;
                     close_tab(&app, &mut state, active);
                 }
-                FileAction::Save => match state.tab().path.clone() {
+                AppAction::Save => match state.tab().path.clone() {
                     Some(path) => {
                         save_to(state.tab_mut(), path);
                         refresh(&app, &mut state);
@@ -1096,15 +1097,43 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
                         save_as(&app, &st);
                     }
                 },
-                FileAction::SaveAs => {
+                AppAction::SaveAs => {
                     drop(state);
                     save_as(&app, &st);
                 }
-                FileAction::Open => {
+                AppAction::Open => {
                     drop(state);
                     pick_song(&app, &st);
                 }
-                FileAction::ClearRecent => set_recent(&app, &mut state, Vec::new()),
+                AppAction::ClearRecent => set_recent(&app, &mut state, Vec::new()),
+                AppAction::Quit => {
+                    if !asks_before_closing(&app, &mut state) {
+                        drop(state);
+                        close_window(&app);
+                    }
+                }
+                AppAction::Undo | AppAction::Redo => {
+                    // Read-only in view mode, like the grid.
+                    if let Some(editor) = state.tab_mut().editor.as_mut().filter(|e| e.is_editable) {
+                        if action == AppAction::Undo {
+                            editor.history.undo();
+                        } else {
+                            editor.history.redo();
+                        }
+                    }
+                    refresh(&app, &mut state);
+                }
+                AppAction::EditMode => {
+                    if let Some(editor) = state.tab_mut().editor.as_mut() {
+                        editor.is_editable = !editor.is_editable;
+                        editor.draft = None;
+                        editor.notice.clear();
+                    }
+                    refresh(&app, &mut state);
+                    focus_grid_when_idle(&app, &state);
+                }
+                AppAction::Minimize => app.window().set_minimized(true),
+                AppAction::Zoom => app.window().set_maximized(!app.window().is_maximized()),
             }
         });
     });
@@ -1149,14 +1178,27 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, st) = (app.as_weak(), state.clone());
     app.window().on_close_requested(move || {
         let Some(app) = weak.upgrade() else { return slint::CloseRequestResponse::HideWindow };
-        let mut state = st.borrow_mut();
-        if !state.tabs.iter().any(Tab::is_dirty) {
-            return slint::CloseRequestResponse::HideWindow;
+        if asks_before_closing(&app, &mut st.borrow_mut()) {
+            slint::CloseRequestResponse::KeepWindowShown
+        } else {
+            slint::CloseRequestResponse::HideWindow
         }
-        state.pending = Some(Pending::CloseWindow);
-        show_question(&app, &state);
-        slint::CloseRequestResponse::KeepWindowShown
     });
+}
+
+/// Closing the window (or Quit) with unsaved songs asks first: true when it asked.
+fn asks_before_closing(app: &AppWindow, state: &mut State) -> bool {
+    if !state.tabs.iter().any(Tab::is_dirty) {
+        return false;
+    }
+    state.pending = Some(Pending::CloseWindow);
+    show_question(app, state);
+    true
+}
+
+fn close_window(app: &AppWindow) {
+    _ = app.hide();
+    _ = slint::quit_event_loop();
 }
 
 /// Connects the window's callbacks to the editor.
@@ -1183,12 +1225,6 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
                     editor.set_draft_text(&text);
                     return Outcome::Handled;
                 }
-            }
-            if (e.ctrl || e.meta) && e.key.eq_ignore_ascii_case("e") {
-                editor.is_editable = !editor.is_editable;
-                editor.draft = None;
-                editor.notice.clear();
-                return Outcome::Handled;
             }
             editor.key(e, settings)
         });
@@ -1308,6 +1344,7 @@ fn main() -> Result<(), slint::PlatformError> {
     selector.select()?;
 
     let app = AppWindow::new()?;
+    app.set_is_mac(cfg!(target_os = "macos"));
     let mut state = State::new(Settings::load());
     state.config = madsister::settings::config_dir();
     state.recent = read_config(&state, "recent.json").map_or_else(Vec::new, |json| parse_paths(&json));
