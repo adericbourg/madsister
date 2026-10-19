@@ -555,3 +555,61 @@ fn opening_an_invalid_song_file_says_why_and_keeps_the_open_song() {
     assert_eq!(tab_labels(&app), ["Untitled"]);
     assert!(app.get_has_song());
 }
+
+/// The start screen with the given config folder, its previous session restored.
+fn relaunch(config: &Path, reopen_tabs: bool) -> (AppWindow, Rc<RefCell<State>>) {
+    let (app, state) = start_screen();
+    let mut state_mut = state.borrow_mut();
+    state_mut.config = Some(config.to_path_buf());
+    state_mut.settings.reopen_tabs = reopen_tabs;
+    restore_session(&mut state_mut);
+    show_tab(&app, &mut state_mut);
+    drop(state_mut);
+    (app, state)
+}
+
+#[test]
+fn at_launch_the_tabs_of_the_previous_session_that_still_have_their_file_come_back() {
+    // Given a session of three files, the second one active, and the third gone
+    let dir = temp_dir("session");
+    let (blues, waltz) = (song_file(&dir, "Blues"), song_file(&dir, "Waltz"));
+    let gone = dir.join("gone.madsister.json");
+    let path = |p: &Path| p.display().to_string();
+    std::fs::write(dir.join("session.json"), serde_json::json!({ "paths": [path(&blues), path(&waltz), path(&gone)], "active": 1 }).to_string())
+        .unwrap();
+
+    // When the app starts
+    let (app, state) = relaunch(&dir, true);
+
+    // Then the two remaining songs are back in their tabs, the second in front, without any error
+    assert_eq!((tab_labels(&app), app.get_active_tab()), (vec!["Blues".to_string(), "Waltz".to_string()], 1));
+    assert!(app.get_has_song() && app.get_error().is_empty());
+
+    // When adding a new grid, then coming back to the first song
+    with_ctrl(&app, "n");
+    run_deferred();
+    click(&app, &find(&app, "Create grid").unwrap());
+    click(&app, &find(&app, "Blues").unwrap());
+
+    // Then the session keeps the songs that have a file, the first one active
+    let session: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("session.json")).unwrap()).unwrap();
+    drop(state);
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(session, serde_json::json!({ "paths": [path(&blues), path(&waltz)], "active": 0 }));
+}
+
+#[test]
+fn at_launch_with_reopen_tabs_off_the_start_screen_shows_without_tabs() {
+    // Given a previous session, and the setting turned off
+    let dir = temp_dir("session-off");
+    let blues = song_file(&dir, "Blues");
+    std::fs::write(dir.join("session.json"), serde_json::json!({ "paths": [blues.display().to_string()], "active": 0 }).to_string()).unwrap();
+
+    // When the app starts
+    let (app, _state) = relaunch(&dir, false);
+
+    // Then
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(tab_labels(&app), ["New tab"]);
+    assert!(!app.get_has_song());
+}
