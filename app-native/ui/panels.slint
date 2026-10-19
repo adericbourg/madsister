@@ -1,0 +1,322 @@
+// The per-song panels (F-UI-4): Song and Transpose, plus Section, Bar, Bar lines and Tempo in edit mode.
+
+import { GroupBox, LineEdit, ComboBox, SpinBox, Button, Palette, ScrollView } from "std-widgets.slint";
+
+/// The panels' values, from the editor (main.rs `refresh`).
+export struct PanelsView {
+    title: string,
+    artist: string,
+    key: string,
+    tempo: string,
+    is-nashville: bool,
+    transpose-locked: bool,
+    /// Net semitones since the song was opened.
+    transposition: int,
+    /// Each section's name, with its repeat count.
+    sections: [string],
+    section-index: int,
+    section-name: string,
+    repeat: int,
+    is-first-section: bool,
+    is-last-section: bool,
+    /// The cursor is on a bar (not on an empty section).
+    has-bar: bool,
+    bar-beats: int,
+    bar-unit: int,
+}
+
+/// A Song panel field (editor.rs `MetaField`).
+export enum MetaChoice { title, artist, key, tempo }
+
+/// A field committed on Enter or when it loses the focus, with its error under it.
+component Field inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <string> error;
+    callback committed(string);
+    public function focus-input() {
+        input.focus();
+        input.select-all();
+    }
+    spacing: 2px;
+    Text {
+        text: label;
+        color: Palette.foreground;
+    }
+    input := LineEdit {
+        text: value;
+        accessible-label: label;
+        accepted(text) => { root.committed(text); }
+        changed has-focus => {
+            if (!self.has-focus && self.text != value) {
+                root.committed(self.text);
+            }
+        }
+    }
+    // Undo, redo and the grid change the value under it.
+    changed value => { input.text = value; }
+    if error != "": Text {
+        text: error;
+        color: Palette.color-scheme == ColorScheme.dark ? #f97066 : #b42318;
+        wrap: word-wrap;
+        accessible-role: text;
+    }
+}
+
+export component Panels inherits ScrollView {
+    in property <PanelsView> view;
+    in property <bool> is-editable;
+    in property <string> title-error;
+    in property <string> key-error;
+    in property <string> tempo-error;
+    in property <string> section-error;
+    callback meta-committed(MetaChoice, string);
+    callback notation-picked(bool);
+    callback transpose(int, bool);
+    callback section-picked(int);
+    callback section-renamed(string);
+    callback repeat-set(int);
+    callback section-moved(int);
+    callback section-added();
+    callback section-deleted();
+    callback bar-beats-set(int);
+    /// Bar lines one beat later (or earlier), from the cursor bar (or the whole song).
+    callback shifted(bool, bool);
+    /// Half (or double) tempo, from the cursor bar (or the whole song).
+    callback tempo-fixed(bool, bool);
+
+    /// Focuses a Song field: a click on the chart header reaches it here.
+    public function focus-meta(field: MetaChoice) {
+        if (field == MetaChoice.title) { title.focus-input(); }
+        if (field == MetaChoice.artist) { artist.focus-input(); }
+        if (field == MetaChoice.key) { key.focus-input(); }
+        if (field == MetaChoice.tempo) { tempo.focus-input(); }
+    }
+
+    /// Focuses the bar's beats: a click on a bar's time signature reaches it here.
+    public function focus-bar-beats() {
+        beats-focus-requests += 1;
+    }
+
+    property <bool> is-flat;
+    // The Bar panel only exists in edit mode, so it's reached by a counter it watches.
+    property <int> beats-focus-requests;
+
+    content-height: panels.preferred-height;
+    panels := VerticalLayout {
+        width: parent.visible-width;
+        padding: 8px;
+        spacing: 8px;
+        GroupBox {
+            title: @tr("Song");
+            VerticalLayout {
+                spacing: 6px;
+                title := Field {
+                    label: @tr("Title");
+                    value: view.title;
+                    error: title-error;
+                    committed(text) => { root.meta-committed(MetaChoice.title, text); }
+                }
+                artist := Field {
+                    label: @tr("Artist");
+                    value: view.artist;
+                    committed(text) => { root.meta-committed(MetaChoice.artist, text); }
+                }
+                key := Field {
+                    label: @tr("Key");
+                    value: view.key;
+                    error: key-error;
+                    committed(text) => { root.meta-committed(MetaChoice.key, text); }
+                }
+                Text {
+                    text: @tr("Notation");
+                    color: Palette.foreground;
+                }
+                ComboBox {
+                    model: [@tr("Chords"), @tr("Nashville numbers")];
+                    current-index: view.is-nashville ? 1 : 0;
+                    enabled: view.key != "";
+                    accessible-label: @tr("Notation");
+                    selected => { root.notation-picked(self.current-index == 1); }
+                }
+                if view.key == "": Text {
+                    text: view.is-nashville ? @tr("Set a key to see the chords") : @tr("Set a key to switch to Nashville numbers");
+                    color: Palette.foreground;
+                    wrap: word-wrap;
+                }
+                tempo := Field {
+                    label: @tr("Tempo (BPM)");
+                    value: view.tempo;
+                    error: tempo-error;
+                    committed(text) => { root.meta-committed(MetaChoice.tempo, text); }
+                }
+            }
+        }
+        GroupBox {
+            title: @tr("Transpose");
+            enabled: !view.transpose-locked;
+            VerticalLayout {
+                spacing: 6px;
+                ComboBox {
+                    model: [@tr("Sharps (♯)"), @tr("Flats (♭)")];
+                    current-index: is-flat ? 1 : 0;
+                    accessible-label: @tr("Spelling");
+                    selected => { is-flat = self.current-index == 1; }
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    Button {
+                        text: @tr("−1 semitone");
+                        clicked => { root.transpose(-1, is-flat); }
+                    }
+                    Text {
+                        text: view.transposition > 0 ? "+" + view.transposition : view.transposition;
+                        color: Palette.foreground;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                        min-width: 2rem;
+                        accessible-role: text;
+                    }
+                    Button {
+                        text: @tr("+1 semitone");
+                        clicked => { root.transpose(1, is-flat); }
+                    }
+                }
+                Button {
+                    text: @tr("Reset");
+                    enabled: Math.mod(view.transposition, 12) != 0;
+                    clicked => { root.transpose(-view.transposition, is-flat); }
+                }
+            }
+        }
+        if is-editable: GroupBox {
+            title: @tr("Section");
+            VerticalLayout {
+                spacing: 6px;
+                ComboBox {
+                    model: view.sections;
+                    current-index: view.section-index;
+                    accessible-label: @tr("Section");
+                    selected => { root.section-picked(self.current-index); }
+                }
+                Field {
+                    label: @tr("Name");
+                    value: view.section-name;
+                    error: section-error;
+                    committed(text) => { root.section-renamed(text); }
+                }
+                Text {
+                    text: @tr("Repeat");
+                    color: Palette.foreground;
+                }
+                SpinBox {
+                    value: view.repeat;
+                    minimum: 1;
+                    maximum: 99;
+                    accessible-label: @tr("Repeat");
+                    edited(n) => { root.repeat-set(n); }
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    Button {
+                        text: @tr("Move up");
+                        enabled: !view.is-first-section;
+                        clicked => { root.section-moved(-1); }
+                    }
+                    Button {
+                        text: @tr("Move down");
+                        enabled: !view.is-last-section;
+                        clicked => { root.section-moved(1); }
+                    }
+                }
+                Button {
+                    text: @tr("Add section");
+                    clicked => { root.section-added(); }
+                }
+                Button {
+                    text: @tr("Delete section");
+                    clicked => { root.section-deleted(); }
+                }
+            }
+        }
+        if is-editable: GroupBox {
+            title: @tr("Bar");
+            enabled: view.has-bar;
+            HorizontalLayout {
+                spacing: 6px;
+                Text {
+                    text: @tr("Beats in this bar");
+                    color: Palette.foreground;
+                    vertical-alignment: center;
+                }
+                SpinBox {
+                    property <int> requests: beats-focus-requests;
+                    changed requests => { self.focus(); }
+                    value: view.bar-beats;
+                    minimum: 1;
+                    maximum: 32;
+                    accessible-label: @tr("Beats in this bar");
+                    edited(n) => { root.bar-beats-set(n); }
+                }
+                Text {
+                    text: "/" + view.bar-unit;
+                    color: Palette.foreground;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        if is-editable: GroupBox {
+            title: @tr("Bar lines");
+            VerticalLayout {
+                spacing: 6px;
+                Button {
+                    text: @tr("Bars start 1 beat earlier");
+                    clicked => { root.shifted(false, false); }
+                }
+                Button {
+                    text: @tr("Bars start 1 beat later");
+                    clicked => { root.shifted(true, false); }
+                }
+                Button {
+                    text: @tr("From this bar: 1 beat earlier");
+                    enabled: view.has-bar;
+                    clicked => { root.shifted(false, true); }
+                }
+                Button {
+                    text: @tr("From this bar: 1 beat later");
+                    enabled: view.has-bar;
+                    clicked => { root.shifted(true, true); }
+                }
+                Text {
+                    text: @tr("Missed a 2-beat bar? Click \"From this bar: 1 beat later\" twice on it.");
+                    color: Palette.foreground;
+                    wrap: word-wrap;
+                }
+            }
+        }
+        if is-editable: GroupBox {
+            title: @tr("Tempo");
+            VerticalLayout {
+                spacing: 6px;
+                Button {
+                    text: @tr("Whole song half tempo");
+                    clicked => { root.tempo-fixed(true, false); }
+                }
+                Button {
+                    text: @tr("Whole song double tempo");
+                    clicked => { root.tempo-fixed(false, false); }
+                }
+                Button {
+                    text: @tr("From this bar half tempo");
+                    enabled: view.has-bar;
+                    clicked => { root.tempo-fixed(true, true); }
+                }
+                Button {
+                    text: @tr("From this bar double tempo");
+                    enabled: view.has-bar;
+                    clicked => { root.tempo-fixed(false, true); }
+                }
+            }
+        }
+    }
+}

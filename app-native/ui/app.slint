@@ -1,5 +1,8 @@
 import { ScrollView, Palette, Button } from "std-widgets.slint";
 import { Sheet, ChartView, Size, Grid } from "sheet.slint";
+import { Panels, PanelsView, MetaChoice } from "panels.slint";
+
+export { PanelsView, MetaChoice } from "panels.slint";
 
 export { ChartView, SectionView, RowView, BarView, SlotView, ChartFont, Grid, MenuChoice } from "sheet.slint";
 
@@ -27,6 +30,34 @@ export component AppWindow inherits Window {
     /// A key on the grid; true when the editor took it.
     callback grid-key(KeyEvent) -> bool;
     callback close-help();
+    in property <PanelsView> panels;
+    in property <string> title-error;
+    in property <string> key-error;
+    in property <string> tempo-error;
+    in property <string> section-error;
+    /// A question that blocks until answered (deleting a section with chords...).
+    in property <string> confirm-text;
+    callback confirm-answered(bool);
+    callback meta-committed <=> sidebar.meta-committed;
+    callback notation-picked <=> sidebar.notation-picked;
+    callback transpose <=> sidebar.transpose;
+    callback section-picked <=> sidebar.section-picked;
+    callback section-renamed <=> sidebar.section-renamed;
+    callback repeat-set <=> sidebar.repeat-set;
+    callback section-moved <=> sidebar.section-moved;
+    callback section-added <=> sidebar.section-added;
+    callback section-deleted <=> sidebar.section-deleted;
+    callback bar-beats-set <=> sidebar.bar-beats-set;
+    callback shifted <=> sidebar.shifted;
+    callback tempo-fixed <=> sidebar.tempo-fixed;
+
+    public function focus-meta(field: MetaChoice) {
+        sidebar.focus-meta(field);
+    }
+
+    public function focus-bar-beats() {
+        sidebar.focus-bar-beats();
+    }
 
     public function focus-grid() {
         grid-scope.focus();
@@ -55,8 +86,9 @@ export component AppWindow inherits Window {
         color: Palette.foreground;
     }
 
-    VerticalLayout {
+    HorizontalLayout {
         visible: has-song;
+    VerticalLayout {
         Text {
             text: notice;
             color: Palette.foreground;
@@ -83,6 +115,65 @@ export component AppWindow inherits Window {
                             max-width: 63 * Size.rem;
                             min-width: 0;
                             chart: chart;
+                        }
+                    }
+                }
+            }
+        }
+    }
+        sidebar := Panels {
+            width: 20rem;
+            view: panels;
+            is-editable: Grid.is-editable;
+            title-error: title-error;
+            key-error: key-error;
+            tempo-error: tempo-error;
+            section-error: section-error;
+        }
+    }
+
+    if confirm-text != "": Rectangle {
+        background: #00000040;
+        TouchArea { }
+        FocusScope {
+            init => { self.focus(); }
+            key-pressed(event) => {
+                if (event.text == Key.Escape) {
+                    root.confirm-answered(false);
+                    return accept;
+                }
+                reject
+            }
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: min(parent.width - 2rem, 28rem);
+                height: question.preferred-height;
+                background: Palette.background;
+                border-radius: 8px;
+                drop-shadow-blur: 16px;
+                drop-shadow-color: #00000040;
+                accessible-role: groupbox;
+                accessible-label: confirm-text;
+                question := VerticalLayout {
+                    padding: 16px;
+                    spacing: 12px;
+                    Text {
+                        text: confirm-text;
+                        wrap: word-wrap;
+                        color: Palette.foreground;
+                    }
+                    HorizontalLayout {
+                        alignment: end;
+                        spacing: 8px;
+                        Button {
+                            text: @tr("Cancel");
+                            clicked => { root.confirm-answered(false); }
+                        }
+                        Button {
+                            text: @tr("Delete");
+                            primary: true;
+                            clicked => { root.confirm-answered(true); }
                         }
                     }
                 }

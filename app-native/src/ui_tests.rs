@@ -9,12 +9,14 @@ use madsister::model::song::{Meter, empty_song};
 fn window() -> (AppWindow, Rc<RefCell<State>>) {
     i_slint_backend_testing::init_no_event_loop();
     let app = AppWindow::new().unwrap();
-    app.window().set_size(slint::LogicalSize::new(1000.0, 800.0));
+    // Tall enough for every panel: the element search skips what the sidebar's scroll view clips.
+    app.window().set_size(slint::LogicalSize::new(1000.0, 1800.0));
     app.show().unwrap();
     let song = empty_song(Meter { beats: 4, unit: 4, extra: Default::default() }, None);
-    let state = Rc::new(RefCell::new(State { settings: Settings::parse(&serde_json::Value::Null), editor: Some(Editor::new(song)), shown: None }));
+    let state = Rc::new(RefCell::new(State { settings: Settings::parse(&serde_json::Value::Null), editor: Some(Editor::new(song)), shown: None, errors: Errors::default(), pending: None }));
     wire(&app, &state);
     refresh(&app, &mut state.borrow_mut());
+    focus_grid_when_idle(&app, &state.borrow());
     (app, state)
 }
 
@@ -58,6 +60,13 @@ fn click(app: &AppWindow, element: &ElementHandle) {
 
 fn find(app: &AppWindow, label: &str) -> Option<ElementHandle> {
     ElementHandle::find_by_accessible_label(app, label).next()
+}
+
+/// A text field by its label (the label's own text has the same accessible name).
+fn field(app: &AppWindow, label: &str) -> ElementHandle {
+    ElementHandle::find_by_accessible_label(app, label)
+        .find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::TextInput))
+        .unwrap()
 }
 
 #[test]
@@ -149,3 +158,46 @@ fn mod_slash_while_typing_splits_the_slot_and_keeps_editing() {
     assert_eq!(find(&app, "Chord").and_then(|e| e.accessible_value()).as_deref(), Some("C"));
     assert_eq!(app.global::<Grid>().get_cursor_slot(), 1);
 }
+
+#[test]
+fn the_song_panel_sets_the_title_and_shows_errors() {
+    // Given
+    let (app, state) = window();
+    let title = field(&app, "Title");
+
+    // When typing a new title in its field and pressing Enter
+    click(&app, &title);
+    title.set_accessible_value("Blue");
+    press(&app, Key::Return);
+
+    // Then the song is renamed
+    assert_eq!(state.borrow().editor.as_ref().unwrap().song().meta.title, "Blue");
+
+    // When the tempo isn't a number, Then the field says so and nothing changes
+    let tempo = field(&app, "Tempo (BPM)");
+    click(&app, &tempo);
+    tempo.set_accessible_value("fast");
+    press(&app, Key::Return);
+    assert_eq!(app.get_tempo_error(), "the tempo must be a positive number");
+    assert_eq!(state.borrow().editor.as_ref().unwrap().song().meta.tempo_bpm, None);
+}
+
+#[test]
+fn deleting_a_section_with_chords_asks_first() {
+    // Given a chord in the only section
+    let (app, state) = window();
+    type_keys(&app, "C\n");
+
+    // When deleting the section, Then it asks, and Cancel keeps it
+    click(&app, &find(&app, "Delete section").unwrap());
+    assert!(app.get_confirm_text().starts_with("Delete the section \"Verse\""));
+    click(&app, &find(&app, "Cancel").unwrap());
+    assert_eq!(chords(&state, 0), ["C:maj"]);
+
+    // When accepting, Then an empty section replaces it
+    click(&app, &find(&app, "Delete section").unwrap());
+    click(&app, &find(&app, "Delete").unwrap());
+    assert_eq!(app.get_confirm_text(), "");
+    assert_eq!(state.borrow().editor.as_ref().unwrap().song().sections[0].label, "Song");
+}
+
