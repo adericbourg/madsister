@@ -4,7 +4,10 @@
 use crate::export::sheet::nashville_tonic;
 use crate::keymap::{Command, EditorState, KeyInput, Selection, clamp_cursor, key_to_command, next_slot, selected_bars};
 use crate::model::chord::parse_chord;
-use crate::model::commands::{BarRef, SlotRef, Step, remove_slot, rename_section, set_chord, split_slot};
+use crate::model::commands::{
+    BarRef, Position, SlotRef, Step, delete_bar, insert_bar, merge_with_previous, remove_slot, rename_section, set_chord,
+    split_section, split_slot,
+};
 use crate::model::display::{DisplayStyle, display_chord};
 use crate::model::history::History;
 use crate::model::nashville::{display_nashville, parse_nashville};
@@ -38,6 +41,21 @@ pub enum Outcome {
     Play,
     /// Play from this time in the audio.
     PlayFrom(f64),
+}
+
+/// A right-click menu item (F-ED-6), on a chord, a bar line (`bar` is the bar after it) or a section label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuAction {
+    Split(SlotRef),
+    AddBarBefore(BarRef),
+    AddBarAfter(BarRef),
+    RemoveBar(BarRef),
+    SplitSectionBefore(BarRef),
+    SplitSectionAfter(BarRef),
+    /// On a bar line: `bar` may be the bar count (the line closing the section), which appends.
+    AddBarAt(BarRef),
+    SplitSectionAt(BarRef),
+    MergeWithPrevious(usize),
 }
 
 pub struct Editor {
@@ -254,11 +272,39 @@ impl Editor {
         }
     }
 
+    /// Runs a right-click menu item, and puts the cursor where its edit is.
+    pub fn run(&mut self, action: MenuAction) {
+        let song = self.song();
+        let (edit, cursor) = match action {
+            MenuAction::Split(at) => (split_slot(song, at), SlotRef { slot: at.slot + 1, ..at }),
+            MenuAction::AddBarBefore(at) => (insert_bar(song, at, Position::Before), first_slot(at)),
+            MenuAction::AddBarAfter(at) => (insert_bar(song, at, Position::After), first_slot(BarRef { bar: at.bar + 1, ..at })),
+            MenuAction::RemoveBar(at) => (delete_bar(song, at), first_slot(at)),
+            MenuAction::SplitSectionBefore(at) => (split_section(song, at), first_slot(BarRef { section: at.section + 1, bar: 0 })),
+            MenuAction::SplitSectionAfter(at) => (split_section(song, BarRef { bar: at.bar + 1, ..at }), first_slot(at)),
+            MenuAction::AddBarAt(at) => (insert_bar(song, at, Position::Before), first_slot(at)),
+            MenuAction::SplitSectionAt(at) => (split_section(song, at), first_slot(BarRef { section: at.section + 1, bar: 0 })),
+            MenuAction::MergeWithPrevious(index) => {
+                let before = index.checked_sub(1).map_or(0, |previous| song.sections[previous].bars.len());
+                (merge_with_previous(song, index), first_slot(BarRef { section: index.saturating_sub(1), bar: before }))
+            }
+        };
+        self.draft = None;
+        if edit.is_ok() {
+            self.move_to(cursor);
+        }
+        self.apply(edit);
+    }
+
     /// A click on a section label, or a pick in the Section panel.
     pub fn select_section(&mut self, index: usize) {
         self.move_to(SlotRef { section: index, bar: 0, slot: 0 });
         self.draft = None;
     }
+}
+
+fn first_slot(at: BarRef) -> SlotRef {
+    SlotRef { section: at.section, bar: at.bar, slot: 0 }
 }
 
 #[cfg(test)]

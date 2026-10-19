@@ -30,6 +30,7 @@ export struct RowView {
 
 export struct SectionView {
     label: string,
+    bar-count: int,
     /// Shown as "x2" above 1.
     repeat: int,
     rows: [RowView],
@@ -71,11 +72,26 @@ global Ink {
     out property <color> selection: dark ? #1e3a5f : #dbeafe;
 }
 
+/// A right-click menu item (editor.rs `MenuAction`).
+export enum MenuChoice {
+    split,
+    add-bar-before,
+    add-bar-after,
+    remove-bar,
+    split-section-before,
+    split-section-after,
+    add-bar-at,
+    split-section-at,
+    merge-with-previous,
+}
+
 /// The editor's state as the grid shows it, and what the grid reports back (editor.rs).
 export global Grid {
     in property <int> cursor-section;
     in property <int> cursor-bar;
     in property <int> cursor-slot;
+    /// Edit mode: right-click menus and the hover frame.
+    in property <bool> is-editable;
     /// Keyboard focus is in the grid: the cursor slot gets its ring.
     in-out property <bool> has-focus;
     /// The inline input: none, a chord in the cursor slot, or the cursor section's name.
@@ -89,6 +105,8 @@ export global Grid {
     in property <int> selection-from;
     in property <int> selection-to;
     callback slot-clicked(int, int, int);
+    /// A right-click menu item on (section, bar, slot); a bar line's bar is the one after it.
+    callback menu(MenuChoice, int, int, int);
     callback section-clicked(int);
     callback draft-edited(string);
     /// A key in the inline input; true when the editor took it.
@@ -171,6 +189,7 @@ component Slot inherits Rectangle {
     in property <int> section;
     in property <int> bar;
     in property <int> index;
+    in property <int> bar-count;
     out property <bool> is-cursor: Grid.cursor-section == section && Grid.cursor-bar == bar && Grid.cursor-slot == index;
     accessible-role: text;
     accessible-label: slot.spoken;
@@ -179,8 +198,41 @@ component Slot inherits Rectangle {
             Grid.reveal(self.absolute-position.y, self.height);
         }
     }
+    // A left click edits the slot; above it, the menu area only takes right-clicks.
     TouchArea {
         clicked => { Grid.slot-clicked(section, bar, index); }
+    }
+    ContextMenuArea {
+        enabled: Grid.is-editable;
+        Menu {
+            MenuItem {
+                title: @tr("Split");
+                enabled: slot.beats > 1;
+                activated => { Grid.menu(MenuChoice.split, section, bar, index); }
+            }
+            MenuItem {
+                title: @tr("Add empty bar before");
+                activated => { Grid.menu(MenuChoice.add-bar-before, section, bar, index); }
+            }
+            MenuItem {
+                title: @tr("Add empty bar after");
+                activated => { Grid.menu(MenuChoice.add-bar-after, section, bar, index); }
+            }
+            MenuItem {
+                title: @tr("Remove bar");
+                activated => { Grid.menu(MenuChoice.remove-bar, section, bar, index); }
+            }
+            MenuItem {
+                title: @tr("Split section before this bar");
+                enabled: bar > 0;
+                activated => { Grid.menu(MenuChoice.split-section-before, section, bar, index); }
+            }
+            MenuItem {
+                title: @tr("Split section after this bar");
+                enabled: bar < bar-count - 1;
+                activated => { Grid.menu(MenuChoice.split-section-after, section, bar, index); }
+            }
+        }
     }
     label := Text {
         x: 0.5 * Size.rem;
@@ -216,9 +268,13 @@ component Bar inherits Rectangle {
     in property <BarView> bar;
     in property <int> section;
     in property <int> index;
+    in property <int> bar-count;
     min-height: 3 * Size.rem;
     background: Grid.selection-section == section && index >= Grid.selection-from && index <= Grid.selection-to
         ? Ink.selection : transparent;
+    // Holds the slots, so it sees the pointer over any of them: edit mode frames the hovered bar.
+    hover := TouchArea {
+        mouse-cursor: Grid.is-editable ? pointer : default;
     HorizontalLayout {
         if bar.meter != "": Text {
             // A per-bar meter override (F-ED-11), at the start of the bar like a time signature.
@@ -243,6 +299,7 @@ component Bar inherits Rectangle {
                 section: section;
                 bar: index;
                 index: i;
+                bar-count: bar-count;
             }
             if i > 0: Dots {
                 x: 0;
@@ -254,11 +311,17 @@ component Bar inherits Rectangle {
             }
         }
     }
+    }
     // The bar line closing it.
     Rectangle {
         x: parent.width - 2px;
         width: 2px;
         background: Ink.ink;
+    }
+    // Edit mode affordance: lighter than the cursor's ring.
+    if Grid.is-editable && hover.has-hover: Rectangle {
+        border-width: 1px;
+        border-color: Ink.focus;
     }
 }
 
@@ -279,6 +342,16 @@ component Section inherits VerticalLayout {
             background: is-current ? Ink.ink : transparent;
             TouchArea {
                 clicked => { Grid.section-clicked(index); }
+            }
+            ContextMenuArea {
+                enabled: Grid.is-editable;
+                Menu {
+                    MenuItem {
+                        title: @tr("Merge with previous section");
+                        enabled: index > 0;
+                        activated => { Grid.menu(MenuChoice.merge-with-previous, index, 0, 0); }
+                    }
+                }
             }
             if is-current && Grid.is-drafting-label: DraftInput {
                 font-size: Size.rem;
@@ -326,6 +399,25 @@ component Section inherits VerticalLayout {
             bar: bar;
             section: index;
             index: r * bars-per-row + i;
+            bar-count: section.bar-count;
+        }
+        // Bar lines (F-ED-6): a right-click this close to one is on the line, which can split the section or take a bar.
+        for i in row.bars.length + 1: ContextMenuArea {
+            property <int> after: r * bars-per-row + i;
+            x: i * parent.width / bars-per-row - 6px;
+            width: 12px;
+            enabled: Grid.is-editable;
+            Menu {
+                MenuItem {
+                    title: @tr("Split section here");
+                    enabled: after > 0 && after < section.bar-count;
+                    activated => { Grid.menu(MenuChoice.split-section-at, index, after, 0); }
+                }
+                MenuItem {
+                    title: @tr("Add empty bar here");
+                    activated => { Grid.menu(MenuChoice.add-bar-at, index, after, 0); }
+                }
+            }
         }
     }
     if section.rows.length == 0: Rectangle {

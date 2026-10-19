@@ -5,9 +5,9 @@ use std::rc::Rc;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit::event::WindowEvent};
 use slint::{Model, SharedString, VecModel};
 
-use madsister::editor::{DraftKind, Editor, MOD_LABEL};
+use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction};
 use madsister::keymap::{KeyInput, SHORTCUTS};
-use madsister::model::commands::SlotRef;
+use madsister::model::commands::{BarRef, SlotRef};
 use madsister::model::song::parse_song;
 use madsister::settings::Settings;
 
@@ -75,6 +75,7 @@ fn refresh(app: &AppWindow, state: &mut State) {
     grid.set_cursor_section(section as i32);
     grid.set_cursor_bar(bar as i32);
     grid.set_cursor_slot(slot as i32);
+    grid.set_is_editable(editor.is_editable);
     let draft = editor.draft.as_ref();
     grid.set_is_drafting_chord(draft.is_some_and(|d| d.kind == DraftKind::Chord));
     grid.set_is_drafting_label(draft.is_some_and(|d| d.kind == DraftKind::Label));
@@ -166,6 +167,23 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     grid.on_slot_clicked(move |section, bar, slot| {
         let at = SlotRef { section: section as usize, bar: bar as usize, slot: slot as usize };
         with_editor(&weak, &grid_state, |editor, settings| editor.click(at, settings));
+    });
+    let (weak, grid_state) = (app.as_weak(), state.clone());
+    grid.on_menu(move |choice, section, bar, slot| {
+        let at = SlotRef { section: section as usize, bar: bar as usize, slot: slot as usize };
+        let bar = BarRef { section: at.section, bar: at.bar };
+        let action = match choice {
+            MenuChoice::Split => MenuAction::Split(at),
+            MenuChoice::AddBarBefore => MenuAction::AddBarBefore(bar),
+            MenuChoice::AddBarAfter => MenuAction::AddBarAfter(bar),
+            MenuChoice::RemoveBar => MenuAction::RemoveBar(bar),
+            MenuChoice::SplitSectionBefore => MenuAction::SplitSectionBefore(bar),
+            MenuChoice::SplitSectionAfter => MenuAction::SplitSectionAfter(bar),
+            MenuChoice::AddBarAt => MenuAction::AddBarAt(bar),
+            MenuChoice::SplitSectionAt => MenuAction::SplitSectionAt(bar),
+            MenuChoice::MergeWithPrevious => MenuAction::MergeWithPrevious(at.section),
+        };
+        with_editor(&weak, &grid_state, |editor, _| editor.run(action));
     });
     let (weak, grid_state) = (app.as_weak(), state.clone());
     grid.on_section_clicked(move |index| with_editor(&weak, &grid_state, |editor, _| editor.select_section(index as usize)));
