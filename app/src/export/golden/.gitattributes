@@ -1,0 +1,2 @@
+# Byte-identical expected exports: no CRLF conversion on a Windows checkout
+* -text
