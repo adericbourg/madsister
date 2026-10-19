@@ -94,11 +94,18 @@ pub struct Song {
     pub extra: Extra,
 }
 
-/// Writes whole numbers without a fraction (`120`, not `120.0`), as the TypeScript app saved them.
+/// The value as an integer when it is a whole number JavaScript writes without a fraction (`120`, not `120.0`).
+pub fn whole(value: f64) -> Option<i64> {
+    (value.fract() == 0.0 && value.abs() < 9_007_199_254_740_992.0).then_some(value as i64)
+}
+
+/// Writes whole numbers without a fraction, as the TypeScript app saved them.
 fn js_number_opt<S: Serializer>(value: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error> {
     match *value {
-        Some(v) if v.fract() == 0.0 && v.abs() < 9_007_199_254_740_992.0 => serializer.serialize_i64(v as i64),
-        Some(v) => serializer.serialize_f64(v),
+        Some(v) => match whole(v) {
+            Some(w) => serializer.serialize_i64(w),
+            None => serializer.serialize_f64(v),
+        },
         None => serializer.serialize_none(),
     }
 }
