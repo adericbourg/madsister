@@ -12,8 +12,9 @@ export component Frame inherits Rectangle {
     border-width: 1px;
     border-radius: 8px;
     HorizontalLayout {
-        padding-left: 4px;
-        padding-right: 4px;
+        // app.css's .75rem side padding.
+        padding-left: 12px;
+        padding-right: 12px;
         GroupBox {
             title: root.title;
             enabled: root.enabled;
