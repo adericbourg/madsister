@@ -277,6 +277,7 @@ export component AppWindow inherits Window {
         sidebar.reveal-panel(index);
     }
 
+    property <length> scrollbar-width;
     // Handlers, not a binding: a binding would loop through the layout.
     function update-wide() {
         transport.is-wide = self.width - sidebar.width - rail.width > 40rem;
@@ -468,10 +469,18 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     visible: has-song;
                     VerticalLayout {
-                        transport := Transport {
+                        HorizontalLayout {
+                            alignment: center;
                             padding-left: Size.rem;
-                            padding-right: Size.rem;
+                            // The sheet is centered in the scroll's visible width, which leaves the scrollbar out.
+                            padding-right: Size.rem + scrollbar-width;
                             padding-top: 0.5 * Size.rem;
+                            transport := Transport {
+                                // The Sheet's width below.
+                                preferred-width: 63 * Size.rem;
+                                max-width: 63 * Size.rem;
+                                min-width: 0;
+                            }
                         }
                         Text {
                             text: notice;
@@ -487,6 +496,8 @@ export component AppWindow inherits Window {
                             scroll := ScrollView {
                                 content-width: self.visible-width;
                                 content-height: page.preferred-height;
+                                // A handler, not a binding: a binding would loop through the layout.
+                                changed visible-width => { scrollbar-width = self.width - self.visible-width; }
                                 page := VerticalLayout {
                                     width: parent.visible-width;
                                     padding: Size.rem;
