@@ -877,3 +877,45 @@ fn the_ribbon_opens_tabs_switches_modes_and_opens_the_preferences() {
     run_deferred();
     assert_eq!(app.get_dialog(), Dialog::Preferences);
 }
+
+#[test]
+fn ctrl_tab_and_the_tab_bar_arrows_switch_tabs_but_not_while_a_question_is_open() {
+    // Given three tabs, the last one in front
+    let (app, state) = window();
+    for _ in 0..2 {
+        with_ctrl(&app, "n");
+        run_deferred();
+    }
+    assert_eq!(app.get_active_tab(), 2);
+
+    // When pressing Ctrl+Tab, then Ctrl+Shift+Tab twice, Then it wraps around both ways
+    let control = SharedString::from(Key::Control);
+    app.window().dispatch_event(WindowEvent::KeyPressed { text: control.clone() });
+    press(&app, Key::Tab);
+    assert_eq!(app.get_active_tab(), 0);
+    let shift = SharedString::from(Key::Shift);
+    app.window().dispatch_event(WindowEvent::KeyPressed { text: shift.clone() });
+    press(&app, Key::Tab);
+    press(&app, Key::Tab);
+    app.window().dispatch_event(WindowEvent::KeyReleased { text: shift });
+    app.window().dispatch_event(WindowEvent::KeyReleased { text: control.clone() });
+    assert_eq!(app.get_active_tab(), 1);
+
+    // When the keyboard reaches the tab bar (Tab from the ribbon) and Right is pressed, Then the next tab shows
+    let mut presses = 0;
+    while app.get_active_tab() == 1 && presses < 12 {
+        press(&app, Key::Tab);
+        press(&app, Key::RightArrow);
+        presses += 1;
+    }
+    assert_eq!(app.get_active_tab(), 2, "after {presses} tabs");
+    press(&app, Key::RightArrow);
+    assert_eq!(app.get_active_tab(), 0);
+
+    // When a question is open, Then Ctrl+Tab and the tab bar leave the tabs alone
+    state.borrow_mut().pending = Some(Pending::CloseWindow);
+    app.invoke_tab_cycled(1);
+    app.invoke_tab_selected(2);
+    app.invoke_tab_closed(0);
+    assert_eq!((app.get_active_tab(), app.get_tabs().row_count()), (0, 3));
+}
