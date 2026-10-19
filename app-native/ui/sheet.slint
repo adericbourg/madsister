@@ -2,6 +2,7 @@
 // Sizes follow grid.css, Size.rem = 16px.
 
 import { Palette } from "std-widgets.slint";
+import { MetaChoice } from "panels.slint";
 import "../fonts/PatrickHand-Regular.ttf";
 import "../fonts/Kalam-Regular.ttf";
 import "../fonts/Kalam-Bold.ttf";
@@ -108,6 +109,9 @@ export global Grid {
     /// A right-click menu item on (section, bar, slot); a bar line's bar is the one after it.
     callback menu(MenuChoice, int, int, int);
     callback section-clicked(int);
+    /// Edit mode: a click on the title, artist, key or tempo, or on a bar's own time signature, edits it in its panel.
+    callback meta-clicked(MetaChoice);
+    callback meter-clicked(int, int);
     callback draft-edited(string);
     /// A key in the inline input; true when the editor took it.
     callback draft-key(KeyEvent) -> bool;
@@ -278,6 +282,11 @@ component Bar inherits Rectangle {
     HorizontalLayout {
         if bar.meter != "": Text {
             // A per-bar meter override (F-ED-11), at the start of the bar like a time signature.
+            TouchArea {
+                enabled: Grid.is-editable;
+                mouse-cursor: Grid.is-editable ? pointer : default;
+                clicked => { Grid.meter-clicked(section, index); }
+            }
             text: bar.meter;
             font-family: ChartFont.family;
             font-size: 0.9 * Size.rem;
@@ -467,6 +476,10 @@ export component Sheet inherits Rectangle {
         spacing: 1.75 * Size.rem;
         VerticalLayout {
             Text {
+                TouchArea {
+                    enabled: Grid.is-editable;
+                    clicked => { Grid.meta-clicked(MetaChoice.title); }
+                }
                 text: chart.title;
                 font-family: ChartFont.family;
                 font-size: 2 * Size.rem;
@@ -478,6 +491,10 @@ export component Sheet inherits Rectangle {
                 wrap: word-wrap;
             }
             if chart.artist != "": Text {
+                TouchArea {
+                    enabled: Grid.is-editable;
+                    clicked => { Grid.meta-clicked(MetaChoice.artist); }
+                }
                 text: chart.artist;
                 font-family: ChartFont.family;
                 font-size: Size.rem;
@@ -490,12 +507,20 @@ export component Sheet inherits Rectangle {
                     alignment: start;
                     spacing: 0.3 * Size.rem;
                     Text {
+                        TouchArea {
+                            enabled: Grid.is-editable;
+                            clicked => { Grid.meta-clicked(MetaChoice.key); }
+                        }
                         text: @tr("Key");
                         font-family: ChartFont.family;
                         font-size: Size.rem;
                         color: Ink.ink;
                     }
                     Text {
+                        TouchArea {
+                            enabled: Grid.is-editable;
+                            clicked => { Grid.meta-clicked(MetaChoice.key); }
+                        }
                         text: chart.key;
                         font-family: ChartFont.family;
                         font-size: Size.rem;
@@ -507,6 +532,10 @@ export component Sheet inherits Rectangle {
                 }
                 // Engraving convention: the tempo marking sits right above the first bar.
                 if chart.tempo != "": Text {
+                    TouchArea {
+                        enabled: Grid.is-editable;
+                        clicked => { Grid.meta-clicked(MetaChoice.tempo); }
+                    }
                     text: chart.tempo;
                     font-family: ChartFont.family;
                     font-size: Size.rem;

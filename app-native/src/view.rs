@@ -71,6 +71,41 @@ pub fn chart_view(song: &Song, settings: &Settings) -> ChartView {
     }
 }
 
+/// The panels' values for the editor's song and cursor.
+pub fn panels_view(editor: &madsister::editor::Editor) -> crate::PanelsView {
+    let song = editor.song();
+    let meta = &song.meta;
+    let cursor = editor.cursor();
+    let section = &song.sections[cursor.section];
+    let sections: Vec<SharedString> = song
+        .sections
+        .iter()
+        .map(|s| match s.repeat {
+            Some(n) if n > 1 => format!("{} ×{n}", s.label).into(),
+            _ => s.label.as_str().into(),
+        })
+        .collect();
+    let bar_meter = editor.cursor_bar_meter();
+    crate::PanelsView {
+        title: meta.title.as_str().into(),
+        artist: meta.artist.clone().unwrap_or_default().into(),
+        key: meta.key.clone().unwrap_or_default().into(),
+        tempo: meta.tempo_bpm.map(|t| whole(t).map_or(t.to_string(), |w| w.to_string())).unwrap_or_default().into(),
+        is_nashville: meta.notation == Some(madsister::model::song::Notation::Nashville),
+        transpose_locked: editor.is_transpose_locked(),
+        transposition: editor.history.present().transposition,
+        sections: model(sections),
+        section_index: cursor.section as i32,
+        section_name: section.label.as_str().into(),
+        repeat: section.repeat.unwrap_or(1) as i32,
+        is_first_section: cursor.section == 0,
+        is_last_section: cursor.section == song.sections.len() - 1,
+        has_bar: bar_meter.is_some(),
+        bar_beats: bar_meter.as_ref().map_or(song.meta.meter.beats, |m| m.beats) as i32,
+        bar_unit: bar_meter.as_ref().map_or(song.meta.meter.unit, |m| m.unit) as i32,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

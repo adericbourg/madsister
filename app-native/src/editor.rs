@@ -5,9 +5,13 @@ use crate::export::sheet::nashville_tonic;
 use crate::keymap::{Command, EditorState, KeyInput, Selection, clamp_cursor, key_to_command, next_slot, selected_bars};
 use crate::model::chord::parse_chord;
 use crate::model::commands::{
-    BarRef, Position, SlotRef, Step, delete_bar, insert_bar, merge_with_previous, remove_slot, rename_section, set_chord,
-    split_section, split_slot,
+    BarRef, Position, SlotRef, Step, WHOLE_SONG, add_section, delete_bar, delete_section, double_tempo, halve_tempo,
+    insert_bar, merge_with_previous, move_section, remove_slot, rename_section, set_bar_meter, set_chord, set_key,
+    set_notation, set_repeat, shift_phase, split_section, split_slot,
 };
+use crate::model::history::Snapshot;
+use crate::model::song::{Meter, Notation};
+use crate::model::transpose::{Spelling, transpose_song};
 use crate::model::display::{DisplayStyle, display_chord};
 use crate::model::history::History;
 use crate::model::nashville::{display_nashville, parse_nashville};
@@ -41,6 +45,15 @@ pub enum Outcome {
     Play,
     /// Play from this time in the audio.
     PlayFrom(f64),
+}
+
+/// A field of the Song panel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetaField {
+    Title,
+    Artist,
+    Key,
+    Tempo,
 }
 
 /// A right-click menu item (F-ED-6), on a chord, a bar line (`bar` is the bar after it) or a section label.
@@ -294,6 +307,143 @@ impl Editor {
             self.move_to(cursor);
         }
         self.apply(edit);
+    }
+
+    /// The Song panel's fields (F-ED-9 for the key): an empty artist, key or tempo removes it. The error is for the field.
+    pub fn set_meta(&mut self, field: MetaField, text: &str, settings: &Settings) -> Result<(), String> {
+        let text = text.trim();
+        let mut song = self.song().clone();
+        match field {
+            MetaField::Title if text.is_empty() => return Err("a song needs a title".into()),
+            MetaField::Title => song.meta.title = text.into(),
+            MetaField::Artist => song.meta.artist = (!text.is_empty()).then(|| text.into()),
+            MetaField::Key => {
+                let is_key = |t: &str| {
+                    let rest = t.strip_prefix(|c: char| ('A'..='G').contains(&c));
+                    let rest = rest.map(|r| r.strip_prefix(['#', 'b']).unwrap_or(r));
+                    matches!(rest, Some("" | "m"))
+                };
+                if !text.is_empty() && !is_key(text) {
+                    return Err("a key is a note, optionally followed by m (e.g. F#m)".into());
+                }
+                song = set_key(&song, (!text.is_empty()).then_some(text), settings.minor_convention);
+            }
+            MetaField::Tempo if text.is_empty() => song.meta.tempo_bpm = None,
+            MetaField::Tempo => match text.parse::<f64>() {
+                Ok(bpm) if bpm > 0.0 && bpm.is_finite() => song.meta.tempo_bpm = Some(bpm),
+                _ => return Err("the tempo must be a positive number".into()),
+            },
+        }
+        self.history.apply(song);
+        Ok(())
+    }
+
+    pub fn set_notation(&mut self, notation: Notation) {
+        let edit = set_notation(self.song(), notation);
+        self.apply(edit);
+    }
+
+    /// A key-less Nashville song keeps its chords relative to C: transposing would break that.
+    pub fn is_transpose_locked(&self) -> bool {
+        let meta = &self.song().meta;
+        meta.notation == Some(Notation::Nashville) && meta.key.is_none()
+    }
+
+    /// Transposes by `semitones` (F-ED-9); the net offset since the song was opened goes with the snapshot, so undo and
+    /// Reset see it.
+    pub fn transpose(&mut self, semitones: i32, spelling: Spelling) {
+        let Snapshot { song, transposition } = self.history.present();
+        let next = Snapshot { song: transpose_song(song, semitones, spelling), transposition: transposition + semitones };
+        self.history.apply_snapshot(next);
+    }
+
+    /// Edits the cursor's section, then puts the cursor at the start of section `to`.
+    fn edit_section(&mut self, edit: Result<Song, String>, to: usize) {
+        if edit.is_ok() {
+            self.move_to(SlotRef { section: to, bar: 0, slot: 0 });
+        }
+        self.apply(edit);
+    }
+
+    pub fn rename_cursor_section(&mut self, label: &str) -> Result<(), String> {
+        let label = label.trim();
+        if label.is_empty() {
+            return Err("a section needs a name".into());
+        }
+        let section = self.cursor().section;
+        if label != self.song().sections[section].label {
+            self.apply(rename_section(self.song(), section, label));
+        }
+        Ok(())
+    }
+
+    pub fn set_cursor_repeat(&mut self, n: u32) {
+        let section = self.cursor().section;
+        if n >= 1 && n != self.song().sections[section].repeat.unwrap_or(1) {
+            self.apply(set_repeat(self.song(), section, n));
+        }
+    }
+
+    pub fn move_cursor_section(&mut self, step: Step) {
+        let from = self.cursor().section;
+        let to = match step {
+            Step::Back => from.checked_sub(1),
+            Step::Forward => Some(from + 1),
+        };
+        match to {
+            Some(to) => self.edit_section(move_section(self.song(), from, to), to),
+            None => self.notice = "Not possible here".into(),
+        }
+    }
+
+    pub fn add_section_after_cursor(&mut self) {
+        let to = self.cursor().section + 1;
+        self.edit_section(Ok(add_section(self.song(), to, "New section")), to);
+    }
+
+    /// Whether deleting the cursor's section loses chords, and so asks first.
+    pub fn cursor_section_has_chords(&self) -> bool {
+        self.song().sections[self.cursor().section].bars.iter().flat_map(|b| &b.chords).any(|c| c.chord != "N")
+    }
+
+    pub fn delete_cursor_section(&mut self) {
+        let section = self.cursor().section;
+        self.edit_section(delete_section(self.song(), section), section.saturating_sub(1));
+    }
+
+    /// The cursor bar's meter (F-ED-11): its own or the song's.
+    pub fn cursor_bar_meter(&self) -> Option<Meter> {
+        let cursor = self.cursor();
+        let bar = self.song().sections[cursor.section].bars.get(cursor.bar)?;
+        Some(bar.meter.clone().unwrap_or_else(|| self.song().meta.meter.clone()))
+    }
+
+    pub fn set_cursor_bar_beats(&mut self, beats: u32) {
+        let Some(meter) = self.cursor_bar_meter() else { return };
+        if beats >= 1 && beats != meter.beats {
+            let edit = set_bar_meter(self.song(), self.cursor().bar_ref(), Some(Meter { beats, ..meter }));
+            self.apply(edit);
+        }
+    }
+
+    /// The bar lines move one beat (F-PB-3), from the cursor bar or for the whole song.
+    pub fn shift(&mut self, step: Step, from_cursor: bool) {
+        let from = if from_cursor { self.cursor().bar_ref() } else { WHOLE_SONG };
+        let edit = shift_phase(self.song(), step, from);
+        self.apply(edit);
+    }
+
+    /// Half or double tempo (F-PB-4), from the cursor bar or for the whole song.
+    pub fn fix_tempo(&mut self, is_half: bool, from_cursor: bool) {
+        let from = if from_cursor { self.cursor().bar_ref() } else { WHOLE_SONG };
+        let edit = if is_half { halve_tempo(self.song(), from) } else { double_tempo(self.song(), from) };
+        self.apply(edit);
+    }
+
+    /// Puts the cursor on a bar without editing it (a click on its time signature).
+    pub fn select_bar(&mut self, at: SlotRef) {
+        self.draft = None;
+        self.move_to(at);
     }
 
     /// A click on a section label, or a pick in the Section panel.

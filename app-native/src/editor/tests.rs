@@ -332,3 +332,127 @@ mod menu {
         assert!(!ed.notice.is_empty());
     }
 }
+
+mod panels {
+    use super::*;
+    use crate::model::song::Notation;
+    use crate::model::transpose::Spelling;
+
+    fn two_sections() -> Editor {
+        Editor::new(
+            parse_song(
+                r#"{ "version": 1, "meta": { "title": "Song", "meter": { "beats": 4, "unit": 4 } }, "sections": [
+                    { "id": "i", "label": "Intro", "bars": [{ "chords": [{ "chord": "N", "beats": 4 }] }] },
+                    { "id": "v", "label": "Verse", "bars": [{ "chords": [{ "chord": "C:maj", "beats": 4 }] }] }
+                ] }"#,
+            )
+            .unwrap(),
+        )
+    }
+
+    fn labels(ed: &Editor) -> Vec<(String, Option<u32>)> {
+        ed.song().sections.iter().map(|s| (s.label.clone(), s.repeat)).collect()
+    }
+
+    #[test]
+    fn the_section_controls_edit_the_cursor_section() {
+        // Given an empty intro (cursor there) and a verse with a chord
+        let mut ed = two_sections();
+
+        // When renaming the intro, repeating it 3 times and moving it down
+        ed.rename_cursor_section("Outro").unwrap();
+        ed.set_cursor_repeat(3);
+        ed.move_cursor_section(Step::Forward);
+
+        // Then the order changes and the cursor follows the moved section
+        assert_eq!(labels(&ed), [("Verse".into(), None), ("Outro".into(), Some(3))]);
+        assert_eq!(ed.cursor().section, 1);
+        assert_eq!(ed.rename_cursor_section(" "), Err("a section needs a name".into()));
+
+        // When deleting the outro (no chords), then the verse (chords: the UI asks first)
+        assert!(!ed.cursor_section_has_chords());
+        ed.delete_cursor_section();
+        assert_eq!(labels(&ed), [("Verse".into(), None)]);
+        assert!(ed.cursor_section_has_chords());
+        ed.delete_cursor_section();
+        assert_eq!(labels(&ed), [("Song".into(), None)]);
+    }
+
+    #[test]
+    fn the_bar_control_overrides_the_cursor_bar_meter() {
+        // Given an empty 4/4 song
+        let mut ed = editor();
+        assert_eq!(ed.cursor_bar_meter().map(|m| m.beats), Some(4));
+
+        // When setting 3 then 4 beats, Then the bar goes 3/4, then back to the song meter
+        ed.set_cursor_bar_beats(3);
+        assert_eq!(ed.song().sections[0].bars[0].meter.as_ref().map(|m| m.beats), Some(3));
+        ed.set_cursor_bar_beats(4);
+        assert_eq!(ed.song().sections[0].bars[0].meter, None);
+    }
+
+    #[test]
+    fn the_song_fields_are_checked_and_the_key_moves_nashville_chords() {
+        // Given
+        let mut ed = editor();
+        let s = settings();
+
+        // Then invalid values are refused with a message, valid ones set
+        assert_eq!(ed.set_meta(MetaField::Title, " ", &s), Err("a song needs a title".into()));
+        assert!(ed.set_meta(MetaField::Key, "H", &s).is_err());
+        assert!(ed.set_meta(MetaField::Tempo, "-3", &s).is_err());
+        ed.set_meta(MetaField::Title, "Blue", &s).unwrap();
+        ed.set_meta(MetaField::Key, "F#m", &s).unwrap();
+        ed.set_meta(MetaField::Tempo, "96", &s).unwrap();
+        let meta = &ed.song().meta;
+        assert_eq!((meta.title.as_str(), meta.key.as_deref(), meta.tempo_bpm), ("Blue", Some("F#m"), Some(96.0)));
+
+        // And an empty optional field removes it
+        ed.set_meta(MetaField::Tempo, "", &s).unwrap();
+        assert_eq!(ed.song().meta.tempo_bpm, None);
+
+        // And the notation needs the key
+        ed.set_notation(Notation::Nashville);
+        assert_eq!(ed.song().meta.notation, Some(Notation::Nashville));
+    }
+
+    #[test]
+    fn transposing_counts_the_offset_and_undo_restores_it() {
+        // Given C in the first bar
+        let mut ed = editor();
+        type_keys(&mut ed, "C\n");
+
+        // When transposing up twice, Then D and an offset of 2
+        ed.transpose(1, Spelling::Sharp);
+        ed.transpose(1, Spelling::Sharp);
+        assert_eq!((bar(&ed, 0, 0), ed.history.present().transposition), (chords(&[("D:maj", 4)]), 2));
+
+        // When undoing, Then C# and 1
+        ed.history.undo();
+        assert_eq!((bar(&ed, 0, 0), ed.history.present().transposition), (chords(&[("C#:maj", 4)]), 1));
+    }
+
+    #[test]
+    fn phase_and_tempo_buttons_act_from_the_cursor_or_on_the_whole_song() {
+        // Given 4 bars at 120 BPM, the cursor on bar 4
+        let mut ed = editor();
+        type_keys(&mut ed, "Am\nC\nG\nF\n");
+        ed.set_meta(MetaField::Tempo, "120", &settings()).unwrap();
+        ed.click(at(0, 3, 0), &settings());
+        ed.draft = None;
+
+        // When doubling from the cursor bar, Then only bar 4 is split and the tempo stays
+        ed.fix_tempo(false, true);
+        assert_eq!((ed.song().sections[0].bars.len(), ed.song().meta.tempo_bpm), (5, Some(120.0)));
+
+        // When halving the whole song, Then bars merge two by two and the tempo halves
+        ed.history.undo();
+        ed.fix_tempo(true, false);
+        assert_eq!((ed.song().sections[0].bars.len(), ed.song().meta.tempo_bpm), (2, Some(60.0)));
+
+        // When moving the whole song's bar lines one beat later, Then a pickup bar appears
+        ed.history.undo();
+        ed.shift(Step::Forward, false);
+        assert_eq!(bar(&ed, 0, 0), chords(&[("A:min", 1)]));
+    }
+}

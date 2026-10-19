@@ -5,9 +5,11 @@ use std::rc::Rc;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit::event::WindowEvent};
 use slint::{Model, SharedString, VecModel};
 
-use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction};
+use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField};
 use madsister::keymap::{KeyInput, SHORTCUTS};
-use madsister::model::commands::{BarRef, SlotRef};
+use madsister::model::commands::{BarRef, SlotRef, Step};
+use madsister::model::song::Notation;
+use madsister::model::transpose::Spelling;
 use madsister::model::song::parse_song;
 use madsister::settings::Settings;
 
@@ -24,6 +26,22 @@ struct State {
     editor: Option<Editor>,
     /// The song the sheet was last built from: rebuilding it recreates every slot, the inline input included.
     shown: Option<madsister::model::song::Song>,
+    /// The panels' last field errors.
+    errors: Errors,
+    /// What the open confirmation dialog would do.
+    pending: Option<Pending>,
+}
+
+#[derive(Default)]
+struct Errors {
+    title: String,
+    key: String,
+    tempo: String,
+    section: String,
+}
+
+enum Pending {
+    DeleteSection,
 }
 
 /// Slint's key text as the keymap names it: special keys come as private-use characters.
@@ -86,9 +104,35 @@ fn refresh(app: &AppWindow, state: &mut State) {
     grid.set_selection_section(selection.map_or(-1, |s| s.section as i32));
     grid.set_selection_from(selection.map_or(0, |s| s.from as i32));
     grid.set_selection_to(selection.map_or(0, |s| s.to as i32));
-    if draft.is_none() && !editor.is_help_open {
+    app.set_panels(view::panels_view(editor));
+    app.set_title_error(state.errors.title.as_str().into());
+    app.set_key_error(state.errors.key.as_str().into());
+    app.set_tempo_error(state.errors.tempo.as_str().into());
+    app.set_section_error(state.errors.section.as_str().into());
+    let question = match state.pending {
+        Some(Pending::DeleteSection) => {
+            format!("Delete the section \"{}\" and its chords?", editor.song().sections[editor.cursor().section].label)
+        }
+        None => String::new(),
+    };
+    app.set_confirm_text(question.into());
+}
+
+/// After an event from the grid: the keyboard goes back to it unless an input or a dialog holds it.
+fn focus_grid_when_idle(app: &AppWindow, state: &State) {
+    let is_idle = state.editor.as_ref().is_some_and(|e| e.draft.is_none() && !e.is_help_open) && state.pending.is_none();
+    if is_idle {
         app.invoke_focus_grid();
     }
+}
+
+/// `with_editor` for the grid's own events, which give it the keyboard back.
+fn with_grid<R: Default>(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>>, f: impl FnOnce(&mut Editor, &Settings) -> R) -> R {
+    let result = with_editor(app, state, f);
+    if let Some(window) = app.upgrade() {
+        focus_grid_when_idle(&window, &state.borrow());
+    }
+    result
 }
 
 /// Opens the song file at `path`; false when it can't be opened.
@@ -97,7 +141,9 @@ fn open(app: &AppWindow, state: &mut State, path: &Path) -> bool {
         Ok(song) => {
             state.editor = Some(Editor::new(song));
             state.shown = None;
+            state.errors = Errors::default();
             refresh(app, state);
+            focus_grid_when_idle(app, state);
             true
         }
         // shortcut: errors go to stderr until the app shell (step 11) shows them.
@@ -119,13 +165,124 @@ fn with_editor<R: Default>(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<Stat
     result
 }
 
+/// Like `with_editor`, with the whole state (field errors, pending confirmation).
+fn with_state(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>>, f: impl FnOnce(&mut State)) {
+    let Some(app) = app.upgrade() else { return };
+    let mut state = state.borrow_mut();
+    if state.editor.is_some() {
+        f(&mut state);
+        refresh(&app, &mut state);
+    }
+}
+
+/// Connects the panels' callbacks to the editor (F-UI-4).
+fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_meta_committed(move |field, text| {
+        with_state(&weak, &st, |state| {
+            let field = match field {
+                MetaChoice::Title => MetaField::Title,
+                MetaChoice::Artist => MetaField::Artist,
+                MetaChoice::Key => MetaField::Key,
+                MetaChoice::Tempo => MetaField::Tempo,
+            };
+            let editor = state.editor.as_mut().expect("with_state checked it");
+            let error = editor.set_meta(field, &text, &state.settings).err().unwrap_or_default();
+            match field {
+                MetaField::Title => state.errors.title = error,
+                MetaField::Key => state.errors.key = error,
+                MetaField::Tempo => state.errors.tempo = error,
+                MetaField::Artist => {}
+            }
+        });
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_notation_picked(move |is_nashville| {
+        let notation = if is_nashville { Notation::Nashville } else { Notation::Chords };
+        with_editor(&weak, &st, |editor, _| editor.set_notation(notation));
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_transpose(move |semitones, is_flat| {
+        let spelling = if is_flat { Spelling::Flat } else { Spelling::Sharp };
+        with_editor(&weak, &st, |editor, _| editor.transpose(semitones, spelling));
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_section_picked(move |index| with_editor(&weak, &st, |editor, _| editor.select_section(index as usize)));
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_section_renamed(move |text| {
+        with_state(&weak, &st, |state| {
+            let editor = state.editor.as_mut().expect("with_state checked it");
+            state.errors.section = editor.rename_cursor_section(&text).err().unwrap_or_default();
+        });
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_repeat_set(move |n| with_editor(&weak, &st, |editor, _| editor.set_cursor_repeat(n.max(1) as u32)));
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_section_moved(move |delta| {
+        let step = if delta < 0 { Step::Back } else { Step::Forward };
+        with_editor(&weak, &st, |editor, _| editor.move_cursor_section(step));
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_section_added(move || with_editor(&weak, &st, |editor, _| editor.add_section_after_cursor()));
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_section_deleted(move || {
+        with_state(&weak, &st, |state| {
+            let editor = state.editor.as_mut().expect("with_state checked it");
+            if editor.cursor_section_has_chords() {
+                state.pending = Some(Pending::DeleteSection);
+            } else {
+                editor.delete_cursor_section();
+            }
+        });
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_confirm_answered(move |is_yes| {
+        with_state(&weak, &st, |state| {
+            let editor = state.editor.as_mut().expect("with_state checked it");
+            match state.pending.take() {
+                Some(Pending::DeleteSection) if is_yes => editor.delete_cursor_section(),
+                _ => {}
+            }
+        });
+        if let Some(app) = weak.upgrade() {
+            focus_grid_when_idle(&app, &st.borrow());
+        }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_bar_beats_set(move |n| with_editor(&weak, &st, |editor, _| editor.set_cursor_bar_beats(n.max(1) as u32)));
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_shifted(move |is_later, from_cursor| {
+        let step = if is_later { Step::Forward } else { Step::Back };
+        with_editor(&weak, &st, |editor, _| editor.shift(step, from_cursor));
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_tempo_fixed(move |is_half, from_cursor| with_editor(&weak, &st, |editor, _| editor.fix_tempo(is_half, from_cursor)));
+
+    let grid = app.global::<Grid>();
+    let weak = app.as_weak();
+    grid.on_meta_clicked(move |field| {
+        if let Some(app) = weak.upgrade() {
+            app.invoke_focus_meta(field);
+        }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    grid.on_meter_clicked(move |section, bar| {
+        let at = SlotRef { section: section as usize, bar: bar as usize, slot: 0 };
+        with_editor(&weak, &st, |editor, _| editor.select_bar(at));
+        if let Some(app) = weak.upgrade() {
+            app.invoke_focus_bar_beats();
+        }
+    });
+}
+
 /// Connects the window's callbacks to the editor.
 fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
+    wire_panels(app, state);
     let weak = app.as_weak();
     let grid_state = state.clone();
     app.on_grid_key(move |event| {
         let e = key_input(&event);
-        with_editor(&weak, &grid_state, |editor, settings| {
+        with_grid(&weak, &grid_state, |editor, settings| {
             // The inline input appears at the next layout: keys typed before then still belong to it.
             if editor.draft.is_some() {
                 if editor.draft_key(e, settings) {
@@ -160,13 +317,13 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     });
     let weak = app.as_weak();
     let help_state = state.clone();
-    app.on_close_help(move || with_editor(&weak, &help_state, |editor, _| editor.is_help_open = false));
+    app.on_close_help(move || with_grid(&weak, &help_state, |editor, _| editor.is_help_open = false));
 
     let grid = app.global::<Grid>();
     let (weak, grid_state) = (app.as_weak(), state.clone());
     grid.on_slot_clicked(move |section, bar, slot| {
         let at = SlotRef { section: section as usize, bar: bar as usize, slot: slot as usize };
-        with_editor(&weak, &grid_state, |editor, settings| editor.click(at, settings));
+        with_grid(&weak, &grid_state, |editor, settings| editor.click(at, settings));
     });
     let (weak, grid_state) = (app.as_weak(), state.clone());
     grid.on_menu(move |choice, section, bar, slot| {
@@ -183,10 +340,10 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
             MenuChoice::SplitSectionAt => MenuAction::SplitSectionAt(bar),
             MenuChoice::MergeWithPrevious => MenuAction::MergeWithPrevious(at.section),
         };
-        with_editor(&weak, &grid_state, |editor, _| editor.run(action));
+        with_grid(&weak, &grid_state, |editor, _| editor.run(action));
     });
     let (weak, grid_state) = (app.as_weak(), state.clone());
-    grid.on_section_clicked(move |index| with_editor(&weak, &grid_state, |editor, _| editor.select_section(index as usize)));
+    grid.on_section_clicked(move |index| with_grid(&weak, &grid_state, |editor, _| editor.select_section(index as usize)));
     let (weak, grid_state) = (app.as_weak(), state.clone());
     // Only the editor's text: refreshing would reset the input's caret on every keystroke.
     grid.on_draft_edited(move |text| {
@@ -200,7 +357,7 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, grid_state) = (app.as_weak(), state.clone());
     grid.on_draft_key(move |event| {
         let e = key_input(&event);
-        with_editor(&weak, &grid_state, |editor, settings| editor.draft_key(e, settings))
+        with_grid(&weak, &grid_state, |editor, settings| editor.draft_key(e, settings))
     });
     let (weak, grid_state) = (app.as_weak(), state.clone());
     grid.on_draft_blurred(move || {
@@ -213,6 +370,7 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
         let (weak, grid_state) = (weak.clone(), grid_state.clone());
         slint::Timer::single_shot(std::time::Duration::ZERO, move || {
             if weak.upgrade().is_some_and(|app| !app.global::<Grid>().get_draft_focused()) {
+                // Not with_grid: the focus went where the user clicked.
                 with_editor(&weak, &grid_state, |editor, settings| editor.commit(settings, true));
             }
         });
@@ -247,7 +405,13 @@ fn main() -> Result<(), slint::PlatformError> {
     selector.select()?;
 
     let app = AppWindow::new()?;
-    let state = Rc::new(RefCell::new(State { settings: Settings::load(), editor: None, shown: None }));
+    let state = Rc::new(RefCell::new(State {
+        settings: Settings::load(),
+        editor: None,
+        shown: None,
+        errors: Errors::default(),
+        pending: None,
+    }));
     {
         let settings = &state.borrow().settings;
         let font = app.global::<ChartFont>();
