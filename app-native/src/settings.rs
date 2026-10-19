@@ -106,6 +106,31 @@ impl Settings {
         }
     }
 
+    /// `saved` (settings.json as read) with these settings written over it: the keys this app doesn't know are kept.
+    pub fn write_over(&self, saved: &Value) -> Value {
+        let mut json = saved.as_object().cloned().unwrap_or_default();
+        let style = match self.style {
+            DisplayStyle::Fr => "fr",
+            DisplayStyle::Intl => "intl",
+            DisplayStyle::Latin => "latin",
+        };
+        let minor_convention = match self.minor_convention {
+            MinorConvention::Relative => "relative",
+            MinorConvention::Tonic => "tonic",
+        };
+        json.extend([
+            ("style".into(), style.into()),
+            ("barsPerRow".into(), self.bars_per_row.into()),
+            ("lowConfidenceThreshold".into(), self.low_confidence_threshold.into()),
+            ("compactPrint".into(), self.compact_print.into()),
+            ("font".into(), self.font.id().into()),
+            ("minorConvention".into(), minor_convention.into()),
+            ("isSidebarCollapsed".into(), self.is_sidebar_collapsed.into()),
+            ("reopenTabs".into(), self.reopen_tabs.into()),
+        ]);
+        Value::Object(json)
+    }
+
     /// The saved settings, or the defaults when there are none or they can't be read.
     pub fn load() -> Settings {
         let saved = config_dir()
@@ -169,6 +194,24 @@ mod tests {
                 reopen_tabs: false,
             }
         );
+    }
+
+    #[test]
+    fn write_over_writes_every_key_back_and_keeps_the_unknown_ones() {
+        // Given settings.json with a key this app doesn't know, and settings that differ from it
+        let saved = json!({ "style": "fr", "theme": "dark" });
+        let settings = Settings::parse(&json!({
+            "style": "intl", "barsPerRow": 2, "lowConfidenceThreshold": 0.25, "compactPrint": true, "font": "kalam",
+            "minorConvention": "tonic", "isSidebarCollapsed": true, "reopenTabs": false
+        }));
+
+        // When writing them over it
+        let written = settings.write_over(&saved);
+
+        // Then the unknown key stays, and the file reads back as the same settings
+        assert_eq!(written["theme"], "dark");
+        assert_eq!(Settings::parse(&written), settings);
+        assert_eq!(Settings::parse(&Settings::parse(&Value::Null).write_over(&Value::Null)), Settings::parse(&Value::Null));
     }
 
     #[test]
