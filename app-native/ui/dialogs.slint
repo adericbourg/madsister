@@ -1,0 +1,132 @@
+// The app's dialogs: Preferences (F-UI-3).
+
+import { Button, CheckBox, ComboBox, SpinBox, Palette } from "std-widgets.slint";
+
+/// The user settings as the Preferences dialog edits them (settings.rs `Settings`, converted in main.rs).
+export struct PreferencesView {
+    /// 0 French, 1 international, 2 Latin.
+    style: int,
+    /// Index in settings.rs `ChartFont::ALL`.
+    font: int,
+    minor-from-tonic: bool,
+    bars-per-row: int,
+    threshold-percent: int,
+    compact-print: bool,
+    reopen-tabs: bool,
+}
+
+/// A card over the window, closed by Escape; whatever is behind it can't be clicked.
+component Modal inherits Rectangle {
+    in property <string> title;
+    callback cancelled();
+    background: #00000040;
+    TouchArea { }
+    FocusScope {
+        init => { self.focus(); }
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.cancelled();
+                return accept;
+            }
+            reject
+        }
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: min(parent.width - 2rem, 30rem);
+            height: min(parent.height - 2rem, card.preferred-height);
+            background: Palette.background;
+            border-radius: 8px;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #00000040;
+            accessible-role: groupbox;
+            accessible-label: title;
+            card := VerticalLayout {
+                padding: 16px;
+                spacing: 8px;
+                Text {
+                    text: title;
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                    color: Palette.foreground;
+                }
+                @children
+            }
+        }
+    }
+}
+
+component Label inherits Text {
+    color: Palette.foreground;
+}
+
+/// The user settings (F-UI-3), applied on Save; Cancel or Escape discards the edits.
+export component PreferencesDialog inherits Modal {
+    in property <PreferencesView> saved;
+    callback save(PreferencesView);
+    title: @tr("Preferences");
+    Label { text: @tr("Chord style"); }
+    style := ComboBox {
+        model: [@tr("French (C7M)"), @tr("International (Cmaj7)"), @tr("Latin (Sol7M)")];
+        current-index: saved.style;
+        accessible-label: @tr("Chord style");
+    }
+    Label { text: @tr("Font"); }
+    font := ComboBox {
+        // ChartFont::ALL's order.
+        model: ["Kalam", "Patrick Hand", "Petaluma Script", "Petaluma Text", "Serif"];
+        current-index: saved.font;
+        accessible-label: @tr("Font");
+    }
+    Label { text: @tr("Nashville numbers in minor keys"); }
+    minor := ComboBox {
+        model: [@tr("From the relative major (Am: 6m)"), @tr("From the minor tonic (Am: 1m)")];
+        current-index: saved.minor-from-tonic ? 1 : 0;
+        accessible-label: @tr("Nashville numbers in minor keys");
+    }
+    Label { text: @tr("Bars per row"); }
+    bars := ComboBox {
+        model: ["2", "4", "8"];
+        current-index: saved.bars-per-row == 2 ? 0 : saved.bars-per-row == 8 ? 2 : 1;
+        accessible-label: @tr("Bars per row");
+    }
+    Label { text: @tr("Review chords below confidence (%)"); }
+    threshold := SpinBox {
+        minimum: 0;
+        maximum: 100;
+        step-size: 5;
+        value: saved.threshold-percent;
+        accessible-label: @tr("Review chords below confidence (%)");
+    }
+    compact := CheckBox {
+        text: @tr("Compact print (2 columns)");
+        checked: saved.compact-print;
+    }
+    reopen := CheckBox {
+        text: @tr("Reopen previous tabs on launch");
+        checked: saved.reopen-tabs;
+    }
+    HorizontalLayout {
+        alignment: end;
+        spacing: 8px;
+        Button {
+            text: @tr("Cancel");
+            clicked => { root.cancelled(); }
+        }
+        Button {
+            text: @tr("Save");
+            primary: true;
+            clicked => {
+                root.save({
+                    style: style.current-index,
+                    font: font.current-index,
+                    minor-from-tonic: minor.current-index == 1,
+                    bars-per-row: bars.current-index == 0 ? 2 : bars.current-index == 2 ? 8 : 4,
+                    threshold-percent: threshold.value,
+                    compact-print: compact.checked,
+                    reopen-tabs: reopen.checked,
+                });
+            }
+        }
+    }
+}

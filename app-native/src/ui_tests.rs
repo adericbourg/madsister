@@ -752,3 +752,51 @@ fn quitting_with_unsaved_changes_asks_first() {
     click(&app, &find(&app, "Discard").unwrap());
     assert!(!app.window().is_visible());
 }
+
+#[test]
+fn the_preferences_are_saved_keeping_unknown_keys_and_applied_at_once() {
+    // Given a song of 4 bars, and settings.json with a key this app doesn't know
+    let (app, state) = window();
+    let dir = temp_dir("preferences");
+    std::fs::write(dir.join("settings.json"), r#"{"barsPerRow": 4, "theme": "dark"}"#).unwrap();
+    state.borrow_mut().config = Some(dir.clone());
+    assert_eq!(app.get_chart().sections.row_data(0).unwrap().rows.row_count(), 1);
+
+    // When opening the preferences with Ctrl+, then closing them with Escape
+    with_ctrl(&app, ",");
+    run_deferred();
+    assert!(find(&app, "Bars per row").is_some());
+    press(&app, Key::Escape);
+
+    // Then nothing is saved
+    assert!(find(&app, "Bars per row").is_none());
+    assert!(!std::fs::read_to_string(dir.join("settings.json")).unwrap().contains("font"));
+
+    // When the dialog saves 2 bars per row and Kalam
+    with_ctrl(&app, ",");
+    run_deferred();
+    let view = PreferencesView { bars_per_row: 2, font: 0, ..app.get_preferences() };
+    app.invoke_preferences_saved(view);
+
+    // Then the dialog closes, the chart has 2 rows of 2 bars in Kalam, and settings.json has them with the unknown key
+    let saved: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("settings.json")).unwrap()).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(app.get_dialog(), Dialog::None);
+    assert_eq!(app.get_chart().sections.row_data(0).unwrap().rows.row_count(), 2);
+    assert_eq!(app.global::<ChartFont>().get_family(), "Kalam");
+    assert_eq!((&saved["barsPerRow"], &saved["font"], &saved["theme"]), (&2.into(), &"kalam".into(), &"dark".into()));
+    assert_eq!(Settings::parse(&saved), state.borrow().settings);
+}
+
+#[test]
+fn the_menu_shortcuts_wait_while_a_dialog_is_open() {
+    // Given a song, the preferences open
+    let (app, _state) = window();
+    with_ctrl(&app, ",");
+    run_deferred();
+
+    // When pressing Ctrl+N, Then no tab opens
+    with_ctrl(&app, "n");
+    run_deferred();
+    assert_eq!(app.get_tabs().row_count(), 1);
+}

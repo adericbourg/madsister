@@ -3,6 +3,9 @@ import { Sheet, ChartView, Size, Grid } from "sheet.slint";
 import { Panels, PanelsView, MetaChoice } from "panels.slint";
 import { Transport, Player } from "transport.slint";
 import { StartScreen, Import } from "start.slint";
+import { PreferencesDialog, PreferencesView } from "dialogs.slint";
+
+export { PreferencesView } from "dialogs.slint";
 
 export { Import } from "start.slint";
 
@@ -24,7 +27,10 @@ export struct TabView {
 }
 
 /// What a menu item asks for.
-export enum AppAction { new-tab, open, clear-recent, close-tab, save, save-as, quit, undo, redo, edit-mode, minimize, zoom }
+export enum AppAction { new-tab, open, clear-recent, close-tab, save, save-as, quit, undo, redo, edit-mode, minimize, zoom, preferences }
+
+/// The dialog open over the window.
+export enum Dialog { none, preferences }
 
 /// What File ▸ Export writes (F-EX-1..4).
 export enum ExportFormat { chord-pro, music-xml, midi, pdf }
@@ -106,6 +112,10 @@ export component AppWindow inherits Window {
     callback app-action(AppAction);
     /// The menus follow macOS conventions.
     in property <bool> is-mac;
+    in-out property <Dialog> dialog;
+    /// The settings the Preferences dialog opens with.
+    in property <PreferencesView> preferences;
+    callback preferences-saved(PreferencesView);
     /// The active tab's song is in edit mode; the Edit mode menu item checks it.
     in-out property <bool> is-editing;
     callback export(ExportFormat);
@@ -262,6 +272,14 @@ export component AppWindow inherits Window {
                 activated => { root.app-action(AppAction.edit-mode); }
             }
         }
+        Menu {
+            title: @tr("Settings");
+            MenuItem {
+                title: is-mac ? @tr("Settings…") : @tr("Preferences…");
+                shortcut: @keys(Control + ",");
+                activated => { root.app-action(AppAction.preferences); }
+            }
+        }
         if is-mac: Menu {
             title: @tr("Window");
             MenuItem {
@@ -399,6 +417,15 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
+
+    if dialog == Dialog.preferences: PreferencesDialog {
+        saved: preferences;
+        cancelled => {
+            root.dialog = Dialog.none;
+            root.focus-grid();
+        }
+        save(view) => { root.preferences-saved(view); }
     }
 
     if is-help-open: Rectangle {

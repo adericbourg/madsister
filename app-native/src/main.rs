@@ -22,6 +22,8 @@ use madsister::model::commands::{BarRef, SlotRef, Step};
 use madsister::model::song::{Meter, Notation, Song, empty_song};
 use madsister::model::transpose::Spelling;
 use madsister::model::song::{parse_song, serialize_song};
+use madsister::model::display::DisplayStyle;
+use madsister::model::nashville::MinorConvention;
 use madsister::settings::Settings;
 
 mod view;
@@ -444,9 +446,14 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
     });
 }
 
+/// A question or a dialog is open over the window: the menu's shortcuts, which still fire, wait.
+fn is_asking(app: &AppWindow, state: &State) -> bool {
+    state.pending.is_some() || app.get_dialog() != Dialog::None
+}
+
 /// After an event from the grid: the keyboard goes back to it unless an input or a dialog holds it.
 fn focus_grid_when_idle(app: &AppWindow, state: &State) {
-    let is_idle = state.tab().editor.as_ref().is_some_and(|e| e.draft.is_none() && !e.is_help_open) && state.pending.is_none();
+    let is_idle = state.tab().editor.as_ref().is_some_and(|e| e.draft.is_none() && !e.is_help_open) && !is_asking(app, state);
     if is_idle {
         app.invoke_focus_grid();
     }
@@ -731,6 +738,52 @@ fn write_config(state: &State, name: &str, json: &str) -> std::io::Result<()> {
     let Some(dir) = &state.config else { return Ok(()) };
     std::fs::create_dir_all(dir)?;
     write_atomic(&dir.join(name), json)
+}
+
+/// The chord styles in the Preferences dialog's order.
+const STYLES: [DisplayStyle; 3] = [DisplayStyle::Fr, DisplayStyle::Intl, DisplayStyle::Latin];
+
+/// The settings as the Preferences dialog shows them.
+fn preferences_view(settings: &Settings) -> PreferencesView {
+    PreferencesView {
+        style: STYLES.iter().position(|s| *s == settings.style).unwrap_or_default() as i32,
+        font: madsister::settings::ChartFont::ALL.iter().position(|f| *f == settings.font).unwrap_or_default() as i32,
+        minor_from_tonic: settings.minor_convention == MinorConvention::Tonic,
+        bars_per_row: settings.bars_per_row as i32,
+        threshold_percent: (settings.low_confidence_threshold * 100.0).round() as i32,
+        compact_print: settings.compact_print,
+        reopen_tabs: settings.reopen_tabs,
+    }
+}
+
+/// The settings the Preferences dialog saved; the ones it doesn't show stay.
+fn settings_of(view: &PreferencesView, settings: &Settings) -> Settings {
+    Settings {
+        style: STYLES[view.style as usize],
+        font: madsister::settings::ChartFont::ALL[view.font as usize],
+        minor_convention: if view.minor_from_tonic { MinorConvention::Tonic } else { MinorConvention::Relative },
+        bars_per_row: view.bars_per_row as usize,
+        low_confidence_threshold: f64::from(view.threshold_percent) / 100.0,
+        compact_print: view.compact_print,
+        reopen_tabs: view.reopen_tabs,
+        ..settings.clone()
+    }
+}
+
+/// Writes settings.json, keeping the keys this app doesn't know.
+fn save_settings(state: &mut State) {
+    let json = state.settings.write_over(&read_config(state, "settings.json").unwrap_or_default()).to_string();
+    if let Err(e) = write_config(state, "settings.json", &json) {
+        state.tab_mut().error = format!("Can't save the preferences: {e}");
+    }
+}
+
+/// Shows the settings: the chart font, and the chart rebuilt with the others at the next refresh.
+fn apply_settings(app: &AppWindow, state: &mut State) {
+    let font = app.global::<ChartFont>();
+    font.set_family(state.settings.font.family().into());
+    font.set_has_bold(state.settings.font.has_bold());
+    state.shown = None;
 }
 
 /// Writes session.json when the tabs that have a file, or the active one, changed.
@@ -1072,8 +1125,8 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
         slint::Timer::single_shot(std::time::Duration::ZERO, move || {
             let Some(app) = weak.upgrade() else { return };
             let mut state = st.borrow_mut();
-            // The menu's shortcuts still fire under the confirmation dialog; refreshing unchecks what the menu toggled.
-            if state.pending.is_some() {
+            // The menu's shortcuts still fire under the dialogs; refreshing unchecks what the menu toggled.
+            if is_asking(&app, &state) {
                 refresh(&app, &mut state);
                 return;
             }
@@ -1132,10 +1185,25 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
                     refresh(&app, &mut state);
                     focus_grid_when_idle(&app, &state);
                 }
+                AppAction::Preferences => {
+                    app.set_preferences(preferences_view(&state.settings));
+                    app.set_dialog(Dialog::Preferences);
+                }
                 AppAction::Minimize => app.window().set_minimized(true),
                 AppAction::Zoom => app.window().set_maximized(!app.window().is_maximized()),
             }
         });
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_preferences_saved(move |view| {
+        let Some(app) = weak.upgrade() else { return };
+        let mut state = st.borrow_mut();
+        state.settings = settings_of(&view, &state.settings);
+        save_settings(&mut state);
+        app.set_dialog(Dialog::None);
+        apply_settings(&app, &mut state);
+        refresh(&app, &mut state);
+        focus_grid_when_idle(&app, &state);
     });
     let (weak, st) = (app.as_weak(), state.clone());
     app.on_export(move |format| {
@@ -1143,7 +1211,7 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
         // Deferred, as the File menu's actions.
         slint::Timer::single_shot(std::time::Duration::ZERO, move || {
             if let Some(app) = weak.upgrade()
-                && st.borrow().pending.is_none()
+                && !is_asking(&app, &st.borrow())
             {
                 export(&app, &st, format);
             }
@@ -1157,7 +1225,7 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
             let Some(app) = weak.upgrade() else { return };
             let mut state = st.borrow_mut();
             let Some(path) = state.recent.get(index as usize).cloned() else { return };
-            if state.pending.is_none() && !open(&app, &mut state, Path::new(&path)) {
+            if !is_asking(&app, &state) && !open(&app, &mut state, Path::new(&path)) {
                 let recent = state.recent.iter().filter(|p| **p != path).cloned().collect();
                 set_recent(&app, &mut state, recent);
             }
@@ -1350,13 +1418,8 @@ fn main() -> Result<(), slint::PlatformError> {
     state.recent = read_config(&state, "recent.json").map_or_else(Vec::new, |json| parse_paths(&json));
     show_recent(&app, &state);
     restore_session(&mut state);
+    apply_settings(&app, &mut state);
     let state = Rc::new(RefCell::new(state));
-    {
-        let settings = &state.borrow().settings;
-        let font = app.global::<ChartFont>();
-        font.set_family(settings.font.family().into());
-        font.set_has_bold(settings.font.has_bold());
-    }
     let shortcuts: Vec<Shortcut> = SHORTCUTS
         .iter()
         .map(|(keys, what)| Shortcut { keys: keys.replace("Mod", MOD_LABEL).into(), what: (*what).into() })
