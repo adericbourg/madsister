@@ -2,7 +2,9 @@
 //! input, read-only view mode and notices. Pure, so the UI only shows it and forwards events.
 
 use crate::export::sheet::nashville_tonic;
-use crate::keymap::{Command, EditorState, KeyInput, Selection, clamp_cursor, key_to_command, next_slot, selected_bars};
+use crate::keymap::{
+    Command, EditorState, KeyInput, Selection, clamp_cursor, key_to_command, next_flagged_bar, next_slot, selected_bars,
+};
 use crate::model::chord::parse_chord;
 use crate::model::commands::{
     BarRef, Position, SlotRef, Step, WHOLE_SONG, add_section, delete_bar, delete_section, double_tempo, halve_tempo,
@@ -37,9 +39,10 @@ pub struct Draft {
 }
 
 /// What the UI does after a key the editor handled.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Outcome {
     /// Not a grid key: let it through.
+    #[default]
     Ignored,
     Handled,
     Play,
@@ -444,6 +447,19 @@ impl Editor {
     pub fn select_bar(&mut self, at: SlotRef) {
         self.draft = None;
         self.move_to(at);
+    }
+
+    /// Where the bar at `at` starts in the audio, if it's aligned to it.
+    pub fn bar_start(&self, at: SlotRef) -> Option<f64> {
+        self.song().sections.get(at.section)?.bars.get(at.bar)?.start_sec
+    }
+
+    /// Moves to the next (or previous) bar with a low-confidence chord (F-ED-8); returns where it starts in the audio.
+    pub fn review(&mut self, step: Step, settings: &Settings) -> Option<f64> {
+        let target = next_flagged_bar(self.song(), self.cursor(), settings.low_confidence_threshold, step)?;
+        self.draft = None;
+        self.move_to(target);
+        self.bar_start(target)
     }
 
     /// A click on a section label, or a pick in the Section panel.

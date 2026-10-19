@@ -17,8 +17,8 @@ jobs:
         working-directory: app-native
     steps:
       - uses: actions/checkout@v7
-      # Slint's winit backend on Linux: fonts and keyboard layouts
-      - run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev
+      # Slint's winit backend on Linux: fonts and keyboard layouts; cpal: ALSA; the audio tests decode with ffmpeg
+      - run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libasound2-dev ffmpeg
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy

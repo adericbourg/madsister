@@ -5,7 +5,10 @@ use std::rc::Rc;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit::event::WindowEvent};
 use slint::{Model, SharedString, VecModel};
 
-use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField};
+use madsister::audio::{Player as AudioPlayer, Status};
+use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField, Outcome};
+use madsister::keymap::{count_flagged, has_confidence};
+use madsister::model::playback::bar_at_time;
 use madsister::keymap::{KeyInput, SHORTCUTS};
 use madsister::model::commands::{BarRef, SlotRef, Step};
 use madsister::model::song::Notation;
@@ -30,6 +33,8 @@ struct State {
     errors: Errors,
     /// What the open confirmation dialog would do.
     pending: Option<Pending>,
+    /// The song's audio, when it has one; or why it can't play.
+    player: Result<Option<AudioPlayer>, String>,
 }
 
 #[derive(Default)]
@@ -105,6 +110,9 @@ fn refresh(app: &AppWindow, state: &mut State) {
     grid.set_selection_from(selection.map_or(0, |s| s.from as i32));
     grid.set_selection_to(selection.map_or(0, |s| s.to as i32));
     app.set_panels(view::panels_view(editor));
+    let player = app.global::<Player>();
+    player.set_has_review(has_confidence(editor.song()));
+    player.set_flagged(count_flagged(editor.song(), state.settings.low_confidence_threshold) as i32);
     app.set_title_error(state.errors.title.as_str().into());
     app.set_key_error(state.errors.key.as_str().into());
     app.set_tempo_error(state.errors.tempo.as_str().into());
@@ -135,10 +143,59 @@ fn with_grid<R: Default>(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>
     result
 }
 
+/// The song's audio file: a relative `audio.path` is relative to the song file's folder.
+fn audio_path(song_path: &Path, audio: &str) -> std::path::PathBuf {
+    let audio = Path::new(audio);
+    if audio.is_absolute() { audio.to_path_buf() } else { song_path.parent().unwrap_or(Path::new("")).join(audio) }
+}
+
+fn minutes(sec: f64) -> String {
+    format!("{:02}:{:02}", (sec / 60.0) as u32, (sec % 60.0) as u32)
+}
+
+/// Shows the player's state: the transport, and the bar being played (F-PB-1).
+fn tick(app: &AppWindow, state: &State) {
+    let Some(editor) = &state.editor else { return };
+    let ui = app.global::<Player>();
+    let (player, error) = match &state.player {
+        Ok(player) => (player.as_ref(), String::new()),
+        Err(e) => (None, e.clone()),
+    };
+    let status = player.map(AudioPlayer::status);
+    let error = match &status {
+        Some(Status::Failed(e)) => e.clone(),
+        _ => error,
+    };
+    let (time, duration) = player.map_or((0.0, 0.0), |p| (p.time(), p.duration()));
+    ui.set_has_audio(editor.song().audio.is_some());
+    ui.set_is_ready(status == Some(Status::Ready));
+    ui.set_is_playing(player.is_some_and(AudioPlayer::is_playing));
+    ui.set_time(time as f32);
+    ui.set_duration(duration as f32);
+    ui.set_time_text(format!("{}/{}", minutes(time), minutes(duration)).into());
+    ui.set_error(error.into());
+    let playing = player.and_then(|_| bar_at_time(editor.song(), time));
+    let grid = app.global::<Grid>();
+    grid.set_playing_section(playing.map_or(-1, |at| at.section as i32));
+    grid.set_playing_bar(playing.map_or(0, |at| at.bar as i32));
+}
+
+/// Plays from `sec`, or says why it can't.
+fn play_from(state: &mut State, sec: f64) {
+    let started = matches!(&state.player, Ok(Some(player)) if player.seek(sec) && (player.is_playing() || player.toggle()));
+    if !started && let Some(editor) = &mut state.editor {
+        editor.notice = "No audio to play".into();
+    }
+}
+
 /// Opens the song file at `path`; false when it can't be opened.
 fn open(app: &AppWindow, state: &mut State, path: &Path) -> bool {
     match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|text| parse_song(&text)) {
         Ok(song) => {
+            state.player = match &song.audio {
+                None => Ok(None),
+                Some(audio) => AudioPlayer::open(&audio_path(path, &audio.path)).map(Some),
+            };
             state.editor = Some(Editor::new(song));
             state.shown = None;
             state.errors = Errors::default();
@@ -258,6 +315,34 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, st) = (app.as_weak(), state.clone());
     app.on_tempo_fixed(move |is_half, from_cursor| with_editor(&weak, &st, |editor, _| editor.fix_tempo(is_half, from_cursor)));
 
+    let player = app.global::<Player>();
+    let (weak, st) = (app.as_weak(), state.clone());
+    player.on_toggle(move || {
+        if let Ok(Some(player)) = &st.borrow().player {
+            player.toggle();
+        }
+        if let Some(app) = weak.upgrade() {
+            tick(&app, &st.borrow());
+        }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    player.on_seek(move |sec| {
+        if let Ok(Some(player)) = &st.borrow().player {
+            player.seek(f64::from(sec));
+        }
+        if let Some(app) = weak.upgrade() {
+            tick(&app, &st.borrow());
+        }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    player.on_review(move |is_forward| {
+        let step = if is_forward { Step::Forward } else { Step::Back };
+        let start = with_grid(&weak, &st, |editor, settings| editor.review(step, settings));
+        if let (Some(start), Ok(Some(player))) = (start, &st.borrow().player) {
+            player.seek(start);
+        }
+    });
+
     let grid = app.global::<Grid>();
     let weak = app.as_weak();
     grid.on_meta_clicked(move |field| {
@@ -282,11 +367,11 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let grid_state = state.clone();
     app.on_grid_key(move |event| {
         let e = key_input(&event);
-        with_grid(&weak, &grid_state, |editor, settings| {
+        let outcome = with_grid(&weak, &grid_state, |editor, settings| {
             // The inline input appears at the next layout: keys typed before then still belong to it.
             if editor.draft.is_some() {
                 if editor.draft_key(e, settings) {
-                    return true;
+                    return Outcome::Handled;
                 }
                 if let Some(draft) = &editor.draft
                     && !(e.ctrl || e.meta || e.alt)
@@ -295,25 +380,34 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
                 {
                     let text = format!("{}{}", draft.text, e.key);
                     editor.set_draft_text(&text);
-                    return true;
+                    return Outcome::Handled;
                 }
             }
             if (e.ctrl || e.meta) && e.key.eq_ignore_ascii_case("e") {
                 editor.is_editable = !editor.is_editable;
                 editor.draft = None;
                 editor.notice.clear();
-                return true;
+                return Outcome::Handled;
             }
-            // shortcut: playback comes with step 9; until then there's no audio to play.
-            match editor.key(e, settings) {
-                madsister::editor::Outcome::Ignored => false,
-                madsister::editor::Outcome::Handled => true,
-                _ => {
+            editor.key(e, settings)
+        });
+        let mut state = grid_state.borrow_mut();
+        match outcome {
+            Outcome::Ignored => return false,
+            Outcome::Handled => return true,
+            Outcome::Play => {
+                let is_toggled = matches!(&state.player, Ok(Some(player)) if player.toggle());
+                if !is_toggled && let Some(editor) = &mut state.editor {
                     editor.notice = "No audio to play".into();
-                    true
                 }
             }
-        })
+            Outcome::PlayFrom(sec) => play_from(&mut state, sec),
+        }
+        if let Some(app) = weak.upgrade() {
+            refresh(&app, &mut state);
+            tick(&app, &state);
+        }
+        true
     });
     let weak = app.as_weak();
     let help_state = state.clone();
@@ -323,7 +417,14 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, grid_state) = (app.as_weak(), state.clone());
     grid.on_slot_clicked(move |section, bar, slot| {
         let at = SlotRef { section: section as usize, bar: bar as usize, slot: slot as usize };
-        with_grid(&weak, &grid_state, |editor, settings| editor.click(at, settings));
+        // F-PB-2: the audio goes to the bar's start, playing or not.
+        let start = with_grid(&weak, &grid_state, |editor, settings| {
+            editor.click(at, settings);
+            editor.bar_start(at)
+        });
+        if let (Some(start), Ok(Some(player))) = (start, &grid_state.borrow().player) {
+            player.seek(start);
+        }
     });
     let (weak, grid_state) = (app.as_weak(), state.clone());
     grid.on_menu(move |choice, section, bar, slot| {
@@ -411,6 +512,7 @@ fn main() -> Result<(), slint::PlatformError> {
         shown: None,
         errors: Errors::default(),
         pending: None,
+        player: Ok(None),
     }));
     {
         let settings = &state.borrow().settings;
@@ -448,16 +550,24 @@ fn main() -> Result<(), slint::PlatformError> {
         EventResult::Propagate
     });
 
-    let weak = app.as_weak();
+    let (weak, recent_state) = (app.as_weak(), state.clone());
     app.on_open_recent(move |path| {
         if let Some(app) = weak.upgrade() {
-            open(&app, &mut state.borrow_mut(), Path::new(path.as_str()));
+            open(&app, &mut recent_state.borrow_mut(), Path::new(path.as_str()));
         }
     });
     // Deferred: macOS native menus break if their structure changes while an item's activation is being handled.
     app.on_clear_recent(move || {
         let recent = recent.clone();
         slint::Timer::single_shot(std::time::Duration::ZERO, move || recent.set_vec(Vec::new()));
+    });
+
+    let ticker = slint::Timer::default();
+    let weak = app.as_weak();
+    ticker.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(100), move || {
+        if let Some(app) = weak.upgrade() {
+            tick(&app, &state.borrow());
+        }
     });
 
     app.run()
