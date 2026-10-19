@@ -125,6 +125,10 @@ fn check(song: &Song) -> Result<(), String> {
         return Err(format!("unsupported version {}", song.version));
     }
     check_meter(&song.meta.meter, "meta.meter")?;
+    // The editor always has a section to put its cursor in; deleting the last one leaves an empty one.
+    if song.sections.is_empty() {
+        return Err("sections: a song needs at least one section".into());
+    }
     for (s, section) in song.sections.iter().enumerate() {
         if section.repeat == Some(0) {
             return Err(format!("sections[{s}].repeat: expected a positive integer, got 0"));
@@ -299,7 +303,7 @@ mod tests {
     #[test]
     fn parse_song_when_invalid_returns_error_with_path() {
         type Mutation = fn(&mut Value);
-        let cases: [(&str, Mutation, &str); 10] = [
+        let cases: [(&str, Mutation, &str); 11] = [
             ("wrong version", |f| f["version"] = json!(2), "unsupported version 2"),
             ("beat sum mismatch", |f| f["sections"][0]["bars"][0]["chords"][0]["beats"] = json!(3), "sections[0].bars[0]"),
             (
@@ -323,6 +327,7 @@ mod tests {
                 "sections[0].bars[0].chords[0].chord",
             ),
             ("missing sections", |f| _ = f.as_object_mut().unwrap().remove("sections"), "sections"),
+            ("no section", |f| f["sections"] = json!([]), "sections: a song needs at least one section"),
             ("unsupported meter unit", |f| f["meta"]["meter"]["unit"] = json!(16), "meta.meter.unit"),
             ("zero meter beats", |f| f["meta"]["meter"]["beats"] = json!(0), "meta.meter.beats"),
             ("unknown notation", |f| f["meta"]["notation"] = json!("roman"), "meta.notation"),
