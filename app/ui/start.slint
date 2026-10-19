@@ -1,6 +1,7 @@
 // The start screen (F-IN-1..6): a new empty grid, or a song transcribed from audio.
 
-import { GroupBox, ComboBox, Button, CheckBox, LineEdit, TabWidget, ProgressIndicator, Palette, ScrollView } from "std-widgets.slint";
+import { ComboBox, Button, CheckBox, LineEdit, TabWidget, ProgressIndicator, Palette, ScrollView } from "std-widgets.slint";
+import { Frame } from "frame.slint";
 
 export global Import {
     /// 0 from a file, 1 from a URL, 2 recording.
@@ -43,7 +44,7 @@ component Hint inherits Text {
     font-size: 0.9rem;
 }
 
-component NewGrid inherits GroupBox {
+component NewGrid inherits Frame {
     callback create(int, int, bool);
     title: @tr("New grid");
     VerticalLayout {
@@ -114,7 +115,7 @@ component Failure inherits VerticalLayout {
 }
 
 /// A packaged app's first launch (M6-2): installs the engine, which the importer then uses.
-component EngineSetup inherits GroupBox {
+component EngineSetup inherits Frame {
     title: @tr("Import audio");
     VerticalLayout {
         spacing: 8px;
@@ -148,7 +149,7 @@ component EngineSetup inherits GroupBox {
     }
 }
 
-component Importer inherits GroupBox {
+component Importer inherits Frame {
     title: @tr("Import audio");
     VerticalLayout {
         spacing: 8px;
@@ -268,14 +269,18 @@ export component StartScreen inherits ScrollView {
         spacing: 1rem;
         alignment: center;
         NewGrid {
-            width: 18rem;
+            // One width for both, shrunk evenly in a narrow window (app.css: flex: 1 1 22rem).
+            horizontal-stretch: 1;
+            preferred-width: 30rem;
             create(beats, unit, nashville) => { root.create-grid(beats, unit, nashville); }
         }
         if Import.needs-setup: EngineSetup {
-            width: 30rem;
+            horizontal-stretch: 1;
+            preferred-width: 30rem;
         }
         if !Import.needs-setup: Importer {
-            width: 30rem;
+            horizontal-stretch: 1;
+            preferred-width: 30rem;
         }
     }
 }
