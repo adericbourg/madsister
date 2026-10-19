@@ -1078,3 +1078,18 @@ fn every_panel_fits_its_card() {
         assert!(right(&content) <= right(&card) - 12.0, "{:?} spills out of its card", content.accessible_label());
     }
 }
+
+#[test]
+fn the_start_cards_stack_in_a_narrow_window() {
+    let (app, _state) = start_screen();
+    let top = |name: &str| ElementHandle::find_by_element_type_name(&app, name).next().unwrap().absolute_position().y;
+
+    // Given a wide window, Then the two cards sit side by side
+    assert_eq!(top("NewGrid"), top("Importer"));
+
+    // When the window narrows below both cards, Then the importer goes under the new grid
+    app.window().set_size(slint::LogicalSize::new(500.0, 1800.0));
+    let grid = ElementHandle::find_by_element_type_name(&app, "NewGrid").next().unwrap();
+    assert!(top("Importer") >= grid.absolute_position().y + grid.size().height);
+    assert!(grid.absolute_position().x + grid.size().width <= 500.0, "the card fits the window");
+}
