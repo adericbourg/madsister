@@ -36,14 +36,24 @@ pub struct SheetSlot {
     pub beats: u32,
 }
 
+/// Pitch class of degree 1 when the song is in Nashville notation.
+pub fn nashville_tonic(song: &Song, settings: &Settings) -> Option<i32> {
+    let meta = &song.meta;
+    (meta.notation == Some(Notation::Nashville)).then(|| tonic_pc(meta.key.as_deref(), settings.minor_convention))
+}
+
+/// A chord as the grid shows it: Nashville degrees of the key's tonic, or its name.
+pub fn chord_text(harte: &str, tonic: Option<i32>, settings: &Settings) -> String {
+    match tonic {
+        Some(tonic) => display_nashville(harte, tonic, settings.style),
+        None => display_chord(harte, settings.style),
+    }
+}
+
 pub fn to_sheet(song: &Song, options: &Settings) -> Sheet {
     let meta = &song.meta;
-    // As the grid shows it: Nashville degrees of the key's tonic, or chord names.
-    let tonic = (meta.notation == Some(Notation::Nashville)).then(|| tonic_pc(meta.key.as_deref(), options.minor_convention));
-    let show = |harte: &str| match tonic {
-        Some(tonic) => display_nashville(harte, tonic, options.style),
-        None => display_chord(harte, options.style),
-    };
+    let tonic = nashville_tonic(song, options);
+    let show = |harte: &str| chord_text(harte, tonic, options);
     let mut facts = Vec::new();
     facts.extend(meta.key.as_ref().map(|key| format!("Key {}", display_key(key, options.style))));
     facts.extend(meta.tempo_bpm.map(|tempo| format!("♩ = {}", whole(tempo).map_or(tempo.to_string(), |w| w.to_string()))));
