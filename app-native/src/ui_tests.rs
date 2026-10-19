@@ -800,3 +800,19 @@ fn the_menu_shortcuts_wait_while_a_dialog_is_open() {
     run_deferred();
     assert_eq!(app.get_tabs().row_count(), 1);
 }
+
+#[test]
+fn about_opens_from_the_help_menu_and_closes() {
+    // Given the start screen
+    let (app, _state) = start_screen();
+
+    // When opening Help > About
+    app.invoke_app_action(AppAction::About);
+    run_deferred();
+
+    // Then it credits the author, with the models' links as buttons; Close closes it
+    assert!(find(&app, "Alban Dericbourg").is_some());
+    assert_eq!(find(&app, "madmom").and_then(|e| e.accessible_role()), Some(i_slint_backend_testing::AccessibleRole::Button));
+    click(&app, &find(&app, "Close").unwrap());
+    assert_eq!(app.get_dialog(), Dialog::None);
+}

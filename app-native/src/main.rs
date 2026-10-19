@@ -1189,6 +1189,7 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
                     app.set_preferences(preferences_view(&state.settings));
                     app.set_dialog(Dialog::Preferences);
                 }
+                AppAction::About => app.set_dialog(Dialog::About),
                 AppAction::Minimize => app.window().set_minimized(true),
                 AppAction::Zoom => app.window().set_maximized(!app.window().is_maximized()),
             }
@@ -1204,6 +1205,16 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
         apply_settings(&app, &mut state);
         refresh(&app, &mut state);
         focus_grid_when_idle(&app, &state);
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_open_url(move |url| {
+        if let Err(e) = opener::open_browser(url.as_str())
+            && let Some(app) = weak.upgrade()
+        {
+            let mut state = st.borrow_mut();
+            state.tab_mut().error = format!("Can't open {url}: {e}");
+            refresh(&app, &mut state);
+        }
     });
     let (weak, st) = (app.as_weak(), state.clone());
     app.on_export(move |format| {
@@ -1413,6 +1424,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
     let app = AppWindow::new()?;
     app.set_is_mac(cfg!(target_os = "macos"));
+    app.set_version(env!("CARGO_PKG_VERSION").into());
     let mut state = State::new(Settings::load());
     state.config = madsister::settings::config_dir();
     state.recent = read_config(&state, "recent.json").map_or_else(Vec::new, |json| parse_paths(&json));
