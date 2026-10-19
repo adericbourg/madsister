@@ -31,7 +31,7 @@ Product brief §5, checked against `app/` on the same songs. Removed when `app/`
 - [ ] Grid editor: F-ED-1 to F-ED-11
 - [ ] Display styles: F-DS-1, F-DS-2
 - [x] Playback: F-PB-1 to F-PB-4
-- [ ] Exports: PDF (F-EX-1), ChordPro (F-EX-2), MusicXML (F-EX-3), MIDI (F-EX-4)
+- [x] Exports: PDF (F-EX-1), ChordPro (F-EX-2), MusicXML (F-EX-3), MIDI (F-EX-4)
 - [ ] App shell: F-UI-1 to F-UI-8
 - [ ] `madsister print`
 - [ ] Packaging: deb, AppImage, dmg, msi

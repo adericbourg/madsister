@@ -658,3 +658,50 @@ fn at_launch_with_reopen_tabs_off_the_start_screen_shows_without_tabs() {
     assert_eq!(tab_labels(&app), ["New tab"]);
     assert!(!app.get_has_song());
 }
+
+#[test]
+fn each_export_writes_its_format_and_a_failure_shows_on_the_tab() {
+    // Given a song with a chord
+    let (app, state) = window();
+    type_keys(&app, "C\n");
+    let dir = temp_dir("export");
+
+    // When exporting it in each format
+    let mut state = state.borrow_mut();
+    let state = &mut *state;
+    let song = state.tabs[0].editor.as_ref().unwrap().song().clone();
+    let starts = [
+        (ExportFormat::ChordPro, "cho", &b"{title: Untitled}"[..]),
+        (ExportFormat::MusicXml, "musicxml", b"<?xml"),
+        (ExportFormat::Midi, "mid", b"MThd"),
+        (ExportFormat::Pdf, "pdf", b"%PDF"),
+    ];
+    for (format, extension, start) in starts {
+        let (_, ext, contents) = export_file(format, &song, &state.settings).unwrap();
+        let path = dir.join(format!("Untitled.{ext}"));
+        save_export(&mut state.tabs[0], &path, &contents);
+
+        // Then each file is written with its format's extension and start
+        assert_eq!(ext, extension);
+        assert!(std::fs::read(&path).unwrap().starts_with(start), "{ext}");
+    }
+
+    // When the folder is gone, Then the tab says why
+    std::fs::remove_dir_all(&dir).unwrap();
+    save_export(&mut state.tabs[0], &dir.join("Untitled.cho"), b"");
+    refresh(&app, state);
+    assert!(app.get_error().starts_with("Can't export"));
+}
+
+#[test]
+fn the_exports_are_locked_for_a_nashville_song_without_a_key() {
+    // Given a new Nashville grid
+    let (app, _state) = start_screen();
+    assert!(!app.get_has_song());
+    app.invoke_create_grid(4, 4, true);
+
+    // Then it can't be exported until it has a key
+    assert!(app.get_is_export_locked());
+    app.invoke_meta_committed(MetaChoice::Key, "A".into());
+    assert!(!app.get_is_export_locked());
+}

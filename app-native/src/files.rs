@@ -40,7 +40,7 @@ pub fn shortest_unique_paths(paths: &[String]) -> Vec<String> {
 
 /// Writes `contents` to a temporary file next to `path`, then renames it over `path`: a crash or a full disk midway
 /// leaves the previous file whole. The new file keeps the previous one's permissions.
-pub fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
+pub fn write_atomic(path: &Path, contents: impl AsRef<[u8]>) -> std::io::Result<()> {
     let name = path.file_name().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "not a file path"))?;
     static COUNTER: AtomicU32 = AtomicU32::new(0);
     let temp_names = (0..100).map(|_| {
@@ -48,12 +48,12 @@ pub fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.subsec_nanos());
         path.with_file_name(format!(".{}.{}-{n}-{nanos}.tmp", name.to_string_lossy(), std::process::id()))
     });
-    write_through(path, contents, temp_names)
+    write_through(path, contents.as_ref(), temp_names)
 }
 
 /// `write_atomic` through the first of `temp_names` that doesn't exist yet: created new, so an existing file or
 /// symlink planted at that name is never written through.
-fn write_through(path: &Path, contents: &str, temp_names: impl Iterator<Item = PathBuf>) -> std::io::Result<()> {
+fn write_through(path: &Path, contents: &[u8], temp_names: impl Iterator<Item = PathBuf>) -> std::io::Result<()> {
     let mut last_error = std::io::Error::new(std::io::ErrorKind::AlreadyExists, "no free temporary file name");
     for temp in temp_names {
         let mut file = match OpenOptions::new().write(true).create_new(true).open(&temp) {
@@ -65,7 +65,7 @@ fn write_through(path: &Path, contents: &str, temp_names: impl Iterator<Item = P
             Err(e) => return Err(e),
         };
         let written = file
-            .write_all(contents.as_bytes())
+            .write_all(contents)
             .and_then(|()| match std::fs::metadata(path) {
                 Ok(previous) => file.set_permissions(previous.permissions()),
                 Err(_) => Ok(()),
@@ -155,7 +155,7 @@ mod tests {
         std::os::unix::fs::symlink(&victim, &planted).unwrap();
 
         // When writing through those names
-        write_through(&path, "new", [planted.clone(), free.clone()].into_iter()).unwrap();
+        write_through(&path, b"new", [planted.clone(), free.clone()].into_iter()).unwrap();
 
         // Then the other file is untouched, the song has the new contents and its permissions, through the free name
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
