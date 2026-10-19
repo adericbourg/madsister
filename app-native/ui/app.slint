@@ -1,4 +1,4 @@
-import { ScrollView, Palette, Button } from "std-widgets.slint";
+import { ScrollView, Palette, Button, Switch } from "std-widgets.slint";
 import { Sheet, ChartView, Size, Grid } from "sheet.slint";
 import { Panels, PanelsView, MetaChoice, Rail } from "panels.slint";
 import { Transport, Player } from "transport.slint";
@@ -91,6 +91,70 @@ component TabBar inherits Rectangle {
                 }
             }
         }
+    }
+}
+
+/// The most frequent actions (F-UI-6); the rest is in the menu.
+component Ribbon inherits HorizontalLayout {
+    in property <bool> has-song;
+    in-out property <bool> is-editing;
+    callback action(AppAction);
+    callback export-pdf();
+    padding: 0.25 * Size.rem;
+    padding-left: 0.5 * Size.rem;
+    padding-right: 0.5 * Size.rem;
+    spacing: 0.5 * Size.rem;
+    accessible-role: groupbox;
+    accessible-label: @tr("File");
+    Button {
+        text: @tr("New");
+        icon: @image-url("icons/file-plus.svg");
+        colorize-icon: true;
+        clicked => { root.action(AppAction.new-tab); }
+    }
+    Button {
+        text: @tr("Open…");
+        icon: @image-url("icons/folder-open.svg");
+        colorize-icon: true;
+        clicked => { root.action(AppAction.open); }
+    }
+    Button {
+        text: @tr("Save");
+        icon: @image-url("icons/save.svg");
+        colorize-icon: true;
+        primary: true;
+        enabled: has-song;
+        clicked => { root.action(AppAction.save); }
+    }
+    Button {
+        text: @tr("Export PDF…");
+        icon: @image-url("icons/file-down.svg");
+        colorize-icon: true;
+        enabled: has-song;
+        clicked => { root.export-pdf(); }
+    }
+    Rectangle { }
+    if has-song: HorizontalLayout {
+        spacing: 0.5 * Size.rem;
+        Text {
+            text: @tr("View");
+            color: Palette.foreground;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        Switch {
+            text: @tr("Edit");
+            accessible-label: @tr("Edit mode");
+            // Switching toggles is-editing at once; Rust sets it back to the editor's mode.
+            checked <=> root.is-editing;
+            toggled => { root.action(AppAction.edit-mode); }
+        }
+    }
+    Button {
+        text: @tr("Preferences");
+        icon: @image-url("icons/settings.svg");
+        colorize-icon: true;
+        clicked => { root.action(AppAction.preferences); }
     }
 }
 
@@ -327,6 +391,12 @@ export component AppWindow inherits Window {
 
     callback create-grid <=> start-screen.create-grid;
     VerticalLayout {
+        Ribbon {
+            has-song: has-song;
+            is-editing <=> root.is-editing;
+            action(action) => { root.app-action(action); }
+            export-pdf => { root.export(ExportFormat.pdf); }
+        }
         // Tabs show up with the first song: a lone start screen has none.
         if tabs.length > 1 || has-song: TabBar {
             tabs: tabs;

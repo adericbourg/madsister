@@ -851,3 +851,29 @@ fn the_sidebar_collapses_to_a_rail_remembered_in_the_settings() {
     std::fs::remove_dir_all(&dir).unwrap();
     assert!(app.get_is_sidebar_shown());
 }
+
+#[test]
+fn the_ribbon_opens_tabs_switches_modes_and_opens_the_preferences() {
+    // Given the start screen, Then the song actions are disabled and there's no mode switch
+    let (app, state) = start_screen();
+    assert!(!find(&app, "Save").unwrap().accessible_enabled().unwrap());
+    assert!(find(&app, "Edit mode").is_none());
+
+    // When creating a grid, then switching to view mode from the ribbon
+    click(&app, &find(&app, "Create grid").unwrap());
+    assert!(find(&app, "Save").unwrap().accessible_enabled().unwrap());
+    click(&app, &find(&app, "Edit mode").unwrap());
+    run_deferred();
+
+    // Then the song is read-only
+    assert!(!state.borrow().tab().editor.as_ref().unwrap().is_editable);
+    assert_eq!(find(&app, "Edit mode").and_then(|e| e.accessible_checked()), Some(false));
+
+    // When clicking New, then Preferences, Then a tab opens, then the dialog
+    click(&app, &find(&app, "New").unwrap());
+    run_deferred();
+    assert_eq!(app.get_tabs().row_count(), 2);
+    click(&app, &find(&app, "Preferences").unwrap());
+    run_deferred();
+    assert_eq!(app.get_dialog(), Dialog::Preferences);
+}
