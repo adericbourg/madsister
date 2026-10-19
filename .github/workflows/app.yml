@@ -20,33 +20,16 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12
-      - uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-      - run: pnpm build
-      # https://v2.tauri.app/start/prerequisites/#linux (build-essential, curl, wget, file are on the runner)
-      - run: >-
-          sudo apt-get update && sudo apt-get install -y
-          libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      # Slint's winit backend on Linux: fonts and keyboard layouts; cpal: ALSA; the audio tests decode with ffmpeg
+      - run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libasound2-dev ffmpeg
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app/src-tauri
-      - run: cargo check --locked
-        working-directory: app/src-tauri
-      - run: cargo clippy --locked -- -D warnings
-        working-directory: app/src-tauri
+          workspaces: app
+      - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
-        working-directory: app/src-tauri
 
   changed:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -75,23 +58,11 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12
-      - uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build # tauri's build script embeds the frontend
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app/src-tauri
+          workspaces: app
       - run: cargo clippy --locked --all-targets -- -D warnings
-        working-directory: app/src-tauri
       - run: cargo test --locked
-        working-directory: app/src-tauri

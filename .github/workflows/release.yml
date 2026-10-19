@@ -3,7 +3,7 @@ name: release
 # Every night, if main got a commit in the last 25 hours, publishes a snapshot pre-release `v<last tag or 0.0.0>-snapshot.<run number>` (only the latest is kept);
 # running it by hand (Actions > release > Run workflow, on main) with a patch/minor/major bump publishes the release
 # `vX.Y.Z` that is kept; the tag is created by the publication itself. With the `snapshot` bump, a manual run publishes
-# a snapshot on demand, the same as the nightly one. It doesn't wait for the `app-native`/`engine` workflows: the clean-install
+# a snapshot on demand, the same as the nightly one. It doesn't wait for the `app`/`engine` workflows: the clean-install
 # check below gates the publication, and the next nightly snapshot replaces a bad one.
 # A release is the package `madsister`, a snapshot the package `madsister-snapshot` (own binary, files and data dir: both
 # can be installed together). The `apt` job then republishes the signed apt repository on GitHub Pages: its only suite
@@ -104,8 +104,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app-native
-      # Slint's winit backend: fonts and keyboard layouts; cpal: ALSA (as in app-native.yml).
+          workspaces: app
+      # Slint's winit backend: fonts and keyboard layouts; cpal: ALSA (as in app.yml).
       # Plain apt-get: cache-apt-pkgs-action swallowed a mirror 404 and cached an empty package set.
       - run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libasound2-dev
       - run: cargo install cargo-packager --locked --version "$PACKAGER_VERSION"
@@ -134,12 +134,12 @@ jobs:
           PACKAGE: ${{ needs.version.outputs.package }}
         run: |
           triple=$(rustc -vV | sed -n 's/^host: //p')
-          mkdir -p app-native/binaries
+          mkdir -p app/binaries
           curl -fsSL "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.tar.gz" |
-            tar -xzO "uv-$triple/uv" > "app-native/binaries/$PACKAGE-uv-$triple"
-          chmod +x "app-native/binaries/$PACKAGE-uv-$triple"
+            tar -xzO "uv-$triple/uv" > "app/binaries/$PACKAGE-uv-$triple"
+          chmod +x "app/binaries/$PACKAGE-uv-$triple"
       - name: Build the deb and the AppImage
-        working-directory: app-native
+        working-directory: app
         env:
           VERSION: ${{ needs.version.outputs.version }}
           PACKAGE: ${{ needs.version.outputs.package }}
@@ -157,8 +157,8 @@ jobs:
           name: linux
           if-no-files-found: error
           path: |
-            app-native/target/release/*.deb
-            app-native/target/release/*.AppImage
+            app/target/release/*.deb
+            app/target/release/*.AppImage
 
   # M6 "done when" on Linux: the deb installs on a clean system and its engine sets up and transcribes, with no compiler.
   linux-clean-install:
@@ -184,7 +184,7 @@ jobs:
           PACKAGE: ${{ needs.version.outputs.package }}
         run: |
           useradd --create-home user
-          cp app-native/setup-engine.py /tmp/ # readable by the user
+          cp app/setup-engine.py /tmp/ # readable by the user
           project=$(dirname "$(dpkg -L "$PACKAGE" | grep '/engine/pyproject.toml$')")
           su user -c "sh -eu" <<EOF
           cd
@@ -213,7 +213,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app-native
+          workspaces: app
       - run: cargo install cargo-packager --locked --version "$PACKAGER_VERSION"
       - id: madmom
         run: echo "rev=$(sed -n 's/^madmom = .*rev = "\([0-9a-f]*\)".*/\1/p' engine/pyproject.toml)" >> "$GITHUB_OUTPUT"
@@ -236,12 +236,12 @@ jobs:
           PACKAGE: ${{ needs.version.outputs.package }}
         run: |
           triple=$(rustc -vV | sed -n 's/^host: //p')
-          mkdir -p app-native/binaries
+          mkdir -p app/binaries
           curl -fsSL "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.tar.gz" |
-            tar -xzO "uv-$triple/uv" > "app-native/binaries/$PACKAGE-uv-$triple"
-          chmod +x "app-native/binaries/$PACKAGE-uv-$triple"
+            tar -xzO "uv-$triple/uv" > "app/binaries/$PACKAGE-uv-$triple"
+          chmod +x "app/binaries/$PACKAGE-uv-$triple"
       - name: Build the dmg
-        working-directory: app-native
+        working-directory: app
         env:
           VERSION: ${{ needs.version.outputs.version }}
           PACKAGE: ${{ needs.version.outputs.package }}
@@ -255,7 +255,7 @@ jobs:
         with:
           name: macos
           if-no-files-found: error
-          path: app-native/target/release/*.dmg
+          path: app/target/release/*.dmg
 
   # The macOS twin of linux-clean-install: the engine sets up from the installed .app and transcribes, with ffmpeg as the only prerequisite.
   macos-clean-install:
@@ -277,7 +277,7 @@ jobs:
           app="$RUNNER_TEMP/dmg/$PACKAGE.app"
           env=$RUNNER_TEMP/engine-env
           start=$(date +%s)
-          "$app/Contents/MacOS/$PACKAGE-uv" run --no-project --managed-python --python 3.11 python -I app-native/setup-engine.py "$app/Contents/MacOS/$PACKAGE-uv" "$app/Contents/Resources/engine" "$env" "$VERSION"
+          "$app/Contents/MacOS/$PACKAGE-uv" run --no-project --managed-python --python 3.11 python -I app/setup-engine.py "$app/Contents/MacOS/$PACKAGE-uv" "$app/Contents/Resources/engine" "$env" "$VERSION"
           echo "setup: $(($(date +%s) - start)) s, env: $(du -sh "$env" | cut -f1)"
           ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
           start=$(date +%s)
@@ -303,7 +303,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app-native
+          workspaces: app
       - run: cargo install cargo-packager --locked --version "$PACKAGER_VERSION"
       - id: madmom
         run: echo "rev=$(sed -n 's/^madmom = .*rev = "\([0-9a-f]*\)".*/\1/p' engine/pyproject.toml)" >> "$GITHUB_OUTPUT"
@@ -327,14 +327,14 @@ jobs:
         # ffmpeg ships to users inside the installer: a dated BtbN build, checked against the sha256 recorded here.
         run: |
           triple=$(rustc -vV | sed -n 's/^host: //p')
-          mkdir -p app-native/binaries
+          mkdir -p app/binaries
           curl -fsSLo "$RUNNER_TEMP/uv.zip" "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.zip"
-          unzip -p "$RUNNER_TEMP/uv.zip" uv.exe > "app-native/binaries/$PACKAGE-uv-$triple.exe"
+          unzip -p "$RUNNER_TEMP/uv.zip" uv.exe > "app/binaries/$PACKAGE-uv-$triple.exe"
           curl -fsSLo "$RUNNER_TEMP/ffmpeg.zip" "https://github.com/BtbN/FFmpeg-Builds/releases/download/$FFMPEG_BUILD"
           echo "$FFMPEG_SHA256  $RUNNER_TEMP/ffmpeg.zip" | sha256sum -c -
-          unzip -p "$RUNNER_TEMP/ffmpeg.zip" '*/bin/ffmpeg.exe' > "app-native/binaries/ffmpeg-$triple.exe"
+          unzip -p "$RUNNER_TEMP/ffmpeg.zip" '*/bin/ffmpeg.exe' > "app/binaries/ffmpeg-$triple.exe"
       - name: Build the installer
-        working-directory: app-native
+        working-directory: app
         env:
           VERSION: ${{ needs.version.outputs.version }}
           PACKAGE: ${{ needs.version.outputs.package }}
@@ -348,7 +348,7 @@ jobs:
         with:
           name: windows
           if-no-files-found: error
-          path: app-native/target/release/*-setup.exe
+          path: app/target/release/*-setup.exe
 
   # The Windows twin of linux-clean-install: the installer's engine sets up and transcribes with the bundled ffmpeg only.
   windows-clean-install:
@@ -374,7 +374,7 @@ jobs:
           export PATH="$(cygpath -u "$app"):$PATH" # as the app does for the engine: the bundled ffmpeg (cygpath: C: would split PATH)
           env=$LOCALAPPDATA/dev.dericbourg.$PACKAGE/engine-env
           start=$(date +%s)
-          "$app/$PACKAGE-uv.exe" run --no-project --managed-python --python 3.11 python -I app-native/setup-engine.py "$app/$PACKAGE-uv.exe" "$app/engine" "$env" "$VERSION"
+          "$app/$PACKAGE-uv.exe" run --no-project --managed-python --python 3.11 python -I app/setup-engine.py "$app/$PACKAGE-uv.exe" "$app/engine" "$env" "$VERSION"
           echo "setup: $(($(date +%s) - start)) s, env: $(du -sh "$env" | cut -f1)"
           ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
           start=$(date +%s)

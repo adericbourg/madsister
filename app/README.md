@@ -1,7 +1,7 @@
-# app-native
+# app
 
-The native rewrite of `app/` in Rust with [Slint](https://slint.dev), built next to it until it reaches parity; then it
-replaces `app/`. The chord sheet keeps its look; everything around it uses Slint's native widgets.
+The desktop app, in Rust with [Slint](https://slint.dev). The chord sheet is drawn by the app; everything around it uses
+Slint's native widgets.
 
 ```sh
 cargo run            # the app
@@ -50,21 +50,6 @@ cargo packager --release -f deb,appimage   # into target/release/
   file dialogs): `ldd` only shows fontconfig and ALSA. The file dialogs go through xdg-desktop-portal, which desktops
   install.
 - The AppImage bundles no GStreamer any more (audio goes through ffmpeg and ALSA): only FreeType's libpng, brotli and
-  bzip2, which linuxdeploy copies. Its name keeps the deb's arch, `amd64`, as the Tauri one had (the workflow renames
-  cargo-packager's `x86_64`).
+  bzip2, which linuxdeploy copies. Its name keeps the deb's arch, `amd64` (the workflow renames cargo-packager's
+  `x86_64`).
 
-## Parity checklist
-
-Product brief §5, checked against `app/` on the same songs. Removed when `app/` is.
-
-- [ ] Import: file dialog + drop (F-IN-1), URL (F-IN-2), recording (F-IN-3), progress + cancel (F-IN-4), meter (F-IN-5),
-      empty grid (F-IN-6), mode (F-IN-7)
-- [x] Grid editor: F-ED-1 to F-ED-11
-- [x] Display styles: F-DS-1, F-DS-2
-- [x] Playback: F-PB-1 to F-PB-4
-- [x] Exports: PDF (F-EX-1), ChordPro (F-EX-2), MusicXML (F-EX-3), MIDI (F-EX-4)
-- [x] App shell: F-UI-1 to F-UI-8
-- [ ] `madsister print`
-- [ ] Packaging: deb and AppImage built and checked locally (contents; the deb in an Ubuntu 26.04 container: every
-      library resolves, the first launch runs the setup with the bundled uv and engine into the expected env); dmg and
-      NSIS installer only from the release workflow, not run yet
