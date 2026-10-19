@@ -1,0 +1,36 @@
+import "../fonts/PetalumaScript.ttf";
+
+export component AppWindow inherits Window {
+    title: "madsister";
+    preferred-width: 1280px;
+    preferred-height: 800px;
+
+    in property <[string]> recent;
+    in property <string> dropped;
+    callback open-recent(string);
+    callback clear-recent();
+
+    MenuBar {
+        Menu {
+            title: @tr("File");
+            Menu {
+                title: @tr("Open recent");
+                for path in root.recent: MenuItem {
+                    title: path;
+                    activated => { root.open-recent(path); }
+                }
+                MenuSeparator { }
+                MenuItem {
+                    title: @tr("Clear recent");
+                    activated => { root.clear-recent(); }
+                }
+            }
+        }
+    }
+
+    Text {
+        text: root.dropped == "" ? @tr("Drop an audio file here") : root.dropped;
+        font-family: "Petaluma Script";
+        font-size: 24px;
+    }
+}
