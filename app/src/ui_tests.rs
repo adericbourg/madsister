@@ -1000,3 +1000,23 @@ fn the_ribbon_keeps_its_height_and_the_chart_takes_the_room_left() {
     assert_eq!(find(&app, "New").unwrap().size().height, height);
     assert!(height < 50.0, "the ribbon buttons are {height}px high");
 }
+
+#[test]
+fn the_transport_spans_the_charts_width_with_the_sidebar_collapsed() {
+    // Given a wide window, the sidebar collapsed, and both transport boxes
+    let (app, _state) = window();
+    app.window().set_size(slint::LogicalSize::new(1600.0, 900.0));
+    click(&app, &find(&app, "Hide parameters").unwrap());
+    run_deferred();
+    app.global::<Player>().set_has_audio(true);
+    app.global::<Player>().set_has_review(true);
+
+    // Then they start and end with the chart (their frame pads the titled box by 4px)
+    let sheet = ElementHandle::find_by_element_type_name(&app, "Sheet").next().unwrap();
+    let (playback, review) = (find(&app, "Playback").unwrap(), find(&app, "Review").unwrap());
+    assert_eq!(playback.absolute_position().x - 4.0, sheet.absolute_position().x);
+    assert_eq!(
+        review.absolute_position().x + review.size().width + 4.0,
+        sheet.absolute_position().x + sheet.size().width
+    );
+}
