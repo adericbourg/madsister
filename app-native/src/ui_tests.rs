@@ -245,7 +245,8 @@ fn a_song_whose_audio_file_is_missing_says_so_until_it_is_located() {
     let (app, state) = start_screen();
     let mut song = empty_song(Meter { beats: 4, unit: 4, extra: Default::default() }, None);
     let extra = serde_json::json!({ "future": 1 }).as_object().unwrap().clone();
-    song.audio = Some(madsister::model::song::Audio { path: "gone.mp3".into(), sha256: "abc".into(), extra });
+    let sha256 = "6ed8919ce20490a5e3ad8630a4fab69475297abd07db73918dd5f36fcfaeb11b"; // printf audio | sha256sum
+    song.audio = Some(madsister::model::song::Audio { path: "gone.mp3".into(), sha256: sha256.into(), extra });
     let dir = std::env::temp_dir().join(format!("madsister-missing-audio-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("song.madsister.json");
@@ -268,7 +269,7 @@ fn a_song_whose_audio_file_is_missing_says_so_until_it_is_located() {
     assert!(find(&app, "Locate audio…").is_some() && find(&app, "Show song file").is_some());
     assert!(find(&app, "Playback").is_none() && matches!(state.borrow().tab().player, Ok(None)));
 
-    // When an audio file next to the song is located (what the dialog's pick does)
+    // When the transcribed audio file is located next to the song (what the dialog's pick does)
     let found = dir.join("found.mp3");
     std::fs::write(&found, "audio").unwrap();
     state.borrow_mut().tab_mut().audio.locating = Some((found.clone(), hash_in_background(found.clone())));
@@ -278,8 +279,52 @@ fn a_song_whose_audio_file_is_missing_says_so_until_it_is_located() {
     let audio = state.borrow().tab().editor.as_ref().unwrap().song().audio.clone().unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
     assert_eq!((audio.path.as_str(), audio.extra["future"].as_i64()), ("found.mp3", Some(1)));
-    assert_eq!(audio.sha256, "6ed8919ce20490a5e3ad8630a4fab69475297abd07db73918dd5f36fcfaeb11b"); // printf audio | sha256sum
-    assert!(find(&app, notice).is_none() && find(&app, "Playback").is_some());
+    assert_eq!(audio.sha256, sha256);
+    assert!(app.get_confirm_text().is_empty() && find(&app, notice).is_none() && find(&app, "Playback").is_some());
+}
+
+#[test]
+fn locating_another_audio_file_than_the_transcribed_one_asks_first() {
+    // Given a song file whose audio file isn't there
+    let (app, state) = start_screen();
+    let mut song = empty_song(Meter { beats: 4, unit: 4, extra: Default::default() }, None);
+    song.audio = Some(madsister::model::song::Audio { path: "gone.mp3".into(), sha256: "abc".into(), extra: Default::default() });
+    let dir = temp_dir("other-audio");
+    let path = dir.join("song.madsister.json");
+    std::fs::write(&path, madsister::model::song::serialize_song(&song)).unwrap();
+    let settle = || {
+        while state.borrow().tab().audio.hashing.is_some() || state.borrow().tab().audio.locating.is_some() {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            poll_audio(&app, &mut state.borrow_mut());
+        }
+        tick(&app, &state.borrow());
+    };
+    assert!(open(&app, &mut state.borrow_mut(), &path));
+    settle();
+    let other = dir.join("other.mp3");
+    std::fs::write(&other, "audio").unwrap();
+    let locate = || {
+        state.borrow_mut().tab_mut().audio.locating = Some((other.clone(), hash_in_background(other.clone())));
+        settle();
+    };
+    let audio = || state.borrow().tab().editor.as_ref().unwrap().song().audio.clone().unwrap();
+
+    // When locating a file with another sha256, Then it asks, and Cancel keeps the song as it was
+    locate();
+    assert_eq!(app.get_confirm_text(), "other.mp3 isn't the file that was transcribed. Use it anyway?");
+    click(&app, &find(&app, "Cancel").unwrap());
+    assert_eq!((audio().path.as_str(), audio().sha256.as_str()), ("gone.mp3", "abc"));
+
+    // When locating it again and accepting, Then the song points to it, keeping the transcribed file's sha256, so the
+    // "changed" notice shows with the player
+    locate();
+    click(&app, &find(&app, "Use it").unwrap());
+    settle();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(app.get_confirm_text(), "");
+    assert_eq!((audio().path.as_str(), audio().sha256.as_str()), ("other.mp3", "abc"));
+    assert!(find(&app, "Audio file has changed since the transcription: other.mp3").is_some());
+    assert!(find(&app, "Playback").is_some());
 }
 
 /// Runs the timers due now: the File menu's actions are deferred.
