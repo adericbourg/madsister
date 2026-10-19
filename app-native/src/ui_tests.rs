@@ -133,6 +133,7 @@ fn shortcuts_edit_undo_and_announce_refusals() {
 
     // When switching to view mode and typing, Then it's read-only
     with_ctrl(&app, "e");
+    run_deferred();
     press(&app, "A");
     assert!(find(&app, "Chord").is_none());
     assert!(app.get_notice().starts_with("Read-only"));
@@ -445,6 +446,7 @@ fn saving_writes_the_song_file_and_edits_are_autosaved_after_two_seconds() {
     let path = song_file(&dir, "Blues");
     assert!(open(&app, &mut state.borrow_mut(), &path));
     with_ctrl(&app, "e");
+    run_deferred();
     type_keys(&app, "C\n");
     assert_eq!(tab_labels(&app), ["•Blues"]);
 
@@ -575,7 +577,7 @@ fn opened_files_are_listed_as_recent_and_saved_in_the_config_folder() {
     assert_eq!((tab_labels(&app), app.get_error()), (vec!["Blues".to_string()], "".into()));
 
     // When clearing the recent files, Then the list is empty, on disk too
-    app.invoke_file_action(FileAction::ClearRecent);
+    app.invoke_app_action(AppAction::ClearRecent);
     run_deferred();
     let saved = std::fs::read_to_string(dir.join("config").join("recent.json")).unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
@@ -704,4 +706,49 @@ fn the_exports_are_locked_for_a_nashville_song_without_a_key() {
     assert!(app.get_is_export_locked());
     app.invoke_meta_committed(MetaChoice::Key, "A".into());
     assert!(!app.get_is_export_locked());
+}
+
+#[test]
+fn the_edit_menu_undoes_in_edit_mode_only_and_the_view_menu_switches_modes() {
+    // Given a chord typed in a new grid (edit mode)
+    let (app, state) = window();
+    type_keys(&app, "C\n");
+    assert!(app.get_is_editing());
+
+    // When undoing from the Edit menu, then redoing, Then the chord goes and comes back
+    app.invoke_app_action(AppAction::Undo);
+    run_deferred();
+    assert_eq!(chords(&state, 0), ["N"]);
+    app.invoke_app_action(AppAction::Redo);
+    run_deferred();
+    assert_eq!(chords(&state, 0), ["C:maj"]);
+
+    // When switching to view mode from the menu, Then undo does nothing
+    app.invoke_app_action(AppAction::EditMode);
+    run_deferred();
+    assert!(!app.get_is_editing() && !app.global::<Grid>().get_is_editable());
+    app.invoke_app_action(AppAction::Undo);
+    run_deferred();
+    assert_eq!(chords(&state, 0), ["C:maj"]);
+
+    // When the menu toggles its checkmark while a question is open, Then the action is ignored and the mark comes back
+    state.borrow_mut().pending = Some(Pending::CloseWindow);
+    app.set_is_editing(true);
+    app.invoke_app_action(AppAction::EditMode);
+    run_deferred();
+    assert!(!app.get_is_editing());
+}
+
+#[test]
+fn quitting_with_unsaved_changes_asks_first() {
+    // Given an unsaved chord
+    let (app, _state) = window();
+    type_keys(&app, "C\n");
+
+    // When quitting from the menu, Then it asks, and discarding closes the window
+    with_ctrl(&app, "q");
+    run_deferred();
+    assert_eq!(app.get_confirm_text(), "Discard unsaved changes?");
+    click(&app, &find(&app, "Discard").unwrap());
+    assert!(!app.window().is_visible());
 }
