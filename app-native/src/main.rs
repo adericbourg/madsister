@@ -7,11 +7,13 @@ use slint::{Model, SharedString, VecModel};
 
 use madsister::audio::{Player as AudioPlayer, Status};
 use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField, Outcome};
+use madsister::engine::{EngineEvent, Jobs};
+use madsister::importer::{ForcedMeter, Importer, Next, Request, Source, recording_name};
 use madsister::keymap::{count_flagged, has_confidence};
 use madsister::model::playback::bar_at_time;
 use madsister::keymap::{KeyInput, SHORTCUTS};
 use madsister::model::commands::{BarRef, SlotRef, Step};
-use madsister::model::song::Notation;
+use madsister::model::song::{Meter, Notation, empty_song};
 use madsister::model::transpose::Spelling;
 use madsister::model::song::parse_song;
 use madsister::settings::Settings;
@@ -35,6 +37,10 @@ struct State {
     pending: Option<Pending>,
     /// The song's audio, when it has one; or why it can't play.
     player: Result<Option<AudioPlayer>, String>,
+    importer: Importer,
+    jobs: Jobs,
+    /// The running engine job's events, sent from its thread, read by the ticker.
+    engine_events: (std::sync::mpsc::Sender<EngineEvent>, std::sync::mpsc::Receiver<EngineEvent>),
 }
 
 #[derive(Default)]
@@ -47,6 +53,8 @@ struct Errors {
 
 enum Pending {
     DeleteSection,
+    /// The import would write over this song file.
+    Overwrite(std::path::PathBuf),
 }
 
 /// Slint's key text as the keymap names it: special keys come as private-use characters.
@@ -117,13 +125,173 @@ fn refresh(app: &AppWindow, state: &mut State) {
     app.set_key_error(state.errors.key.as_str().into());
     app.set_tempo_error(state.errors.tempo.as_str().into());
     app.set_section_error(state.errors.section.as_str().into());
-    let question = match state.pending {
+    show_question(app, state);
+}
+
+/// The confirmation dialog, when a question is pending.
+fn show_question(app: &AppWindow, state: &State) {
+    let (question, action) = match &state.pending {
         Some(Pending::DeleteSection) => {
-            format!("Delete the section \"{}\" and its chords?", editor.song().sections[editor.cursor().section].label)
+            let label = state.editor.as_ref().map(|e| e.song().sections[e.cursor().section].label.as_str()).unwrap_or_default();
+            (format!("Delete the section \"{label}\" and its chords?"), "Delete")
         }
-        None => String::new(),
+        Some(Pending::Overwrite(path)) => (format!("{} already exists. Overwrite it?", path.display()), "Overwrite"),
+        None => (String::new(), ""),
     };
     app.set_confirm_text(question.into());
+    app.set_confirm_action(action.into());
+}
+
+/// Where downloads and recordings go: the app's local data folder, as the Tauri app had it.
+fn sources_dir() -> std::path::PathBuf {
+    dirs::data_local_dir().unwrap_or_default().join("dev.dericbourg.madsister").join("sources")
+}
+
+// shortcut: no packaged engine yet (step 12), so every feature counts as installed, as in dev.
+fn engine_has(_feature: &str) -> bool {
+    true
+}
+
+/// Starts an engine job; its events go to the ticker.
+fn start_job(state: &State, request: Request) -> Result<u32, String> {
+    let mut argv = madsister::engine::engine_command(std::env::var("MADSISTER_ENGINE").ok(), None);
+    if let Some(hint) = madsister::engine::missing_dev_engine(&argv) {
+        return Err(hint);
+    }
+    let has_stdin = matches!(request, Request::Record { .. });
+    let path = |p: &Path| p.display().to_string();
+    match request {
+        Request::Setup(_) => return Err("the engine isn't packaged".into()),
+        Request::Transcribe { audio, out, meter, sections, mode } => {
+            argv.extend(madsister::engine::transcribe_args(path(&audio), path(&out), meter, sections, mode));
+        }
+        Request::Fetch { url, out_dir } => argv.extend(["fetch".into(), url, "--out-dir".into(), path(&out_dir)]),
+        Request::Record { out } => {
+            if let Some(dir) = out.parent() {
+                std::fs::create_dir_all(dir).map_err(|e| format!("can't create {}: {e}", dir.display()))?;
+            }
+            argv.extend(["record".into(), "--out".into(), path(&out)]);
+        }
+    }
+    let events = state.engine_events.0.clone();
+    state
+        .jobs
+        .spawn(&argv, has_stdin, move |event| _ = events.send(event))
+        .map_err(|e| format!("can't start the engine ({}): {e}", argv[0]))
+}
+
+/// Does what the importer asks for next.
+fn follow(app: &AppWindow, state: &mut State, next: Next) {
+    match next {
+        Next::Nothing => {}
+        Next::Start(request) => {
+            let started = start_job(state, request);
+            state.importer.started(started);
+        }
+        Next::ConfirmOverwrite(path) => state.pending = Some(Pending::Overwrite(path)),
+        Next::Open(path) => {
+            open(app, state, &path);
+        }
+    }
+    show_import(app, state);
+    show_question(app, state);
+}
+
+/// Shows the importer's state.
+fn show_import(app: &AppWindow, state: &State) {
+    let importer = &state.importer;
+    let ui = app.global::<Import>();
+    let file_name = importer.audio_path.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned());
+    ui.set_file_name(file_name.unwrap_or_default().into());
+    ui.set_is_running(importer.is_running());
+    ui.set_is_recording(importer.is_recording());
+    ui.set_status(importer.status().into());
+    ui.set_pct(importer.job.as_ref().map_or(0, |j| i32::from(j.pct)));
+    ui.set_failure(importer.failure.as_ref().map(|f| f.message.as_str()).unwrap_or_default().into());
+    ui.set_stderr(importer.failure.as_ref().map(|f| f.stderr.as_str()).unwrap_or_default().into());
+}
+
+/// Reads the engine's events that arrived since the last tick.
+fn drain_engine_events(app: &AppWindow, state: &mut State) {
+    while let Ok(event) = state.engine_events.1.try_recv() {
+        let next = state.importer.event(event, engine_has, Path::exists);
+        follow(app, state, next);
+    }
+}
+
+/// Connects the start screen (F-IN-1..6).
+fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_create_grid(move |beats, unit, is_nashville| {
+        let Some(app) = weak.upgrade() else { return };
+        let meter = Meter { beats: beats as u32, unit: unit as u32, extra: Default::default() };
+        let notation = is_nashville.then_some(Notation::Nashville);
+        let mut state = st.borrow_mut();
+        state.editor = Some(Editor::new(empty_song(meter, notation)));
+        state.player = Ok(None);
+        state.shown = None;
+        state.errors = Errors::default();
+        refresh(&app, &mut state);
+        tick(&app, &state);
+        focus_grid_when_idle(&app, &state);
+    });
+    let import = app.global::<Import>();
+    let (weak, st) = (app.as_weak(), state.clone());
+    import.on_pick_file(move || {
+        let (weak, st) = (weak.clone(), st.clone());
+        let dialog = rfd::AsyncFileDialog::new().add_filter("Audio", &madsister::importer::AUDIO_EXTENSIONS);
+        let picking = slint::spawn_local(async move {
+            let Some(file) = dialog.pick_file().await else { return };
+            let Some(app) = weak.upgrade() else { return };
+            let mut state = st.borrow_mut();
+            state.importer.select_file(file.path());
+            show_import(&app, &state);
+        });
+        if let Err(e) = picking {
+            eprintln!("can't open the file dialog: {e}");
+        }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    import.on_run(move || {
+        let Some(app) = weak.upgrade() else { return };
+        let ui = app.global::<Import>();
+        let mut state = st.borrow_mut();
+        let importer = &mut state.importer;
+        importer.source = match ui.get_source() {
+            1 => Source::Url,
+            2 => Source::Record,
+            _ => Source::File,
+        };
+        importer.url = ui.get_url().into();
+        importer.meter = match ui.get_meter() {
+            1 => Some(ForcedMeter::Four),
+            2 => Some(ForcedMeter::Three),
+            3 => Some(ForcedMeter::SixEight),
+            _ => None,
+        };
+        importer.detect_sections = ui.get_detect_sections();
+        importer.accurate = ui.get_accurate();
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+        let next = importer.run(&sources_dir(), &recording_name(now), engine_has, Path::exists);
+        follow(&app, &mut state, next);
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    import.on_cancel(move || {
+        let state = st.borrow();
+        if let Some(id) = state.importer.job_id() {
+            state.jobs.cancel(id);
+        }
+        if let Some(app) = weak.upgrade() {
+            show_import(&app, &state);
+        }
+    });
+    let st = state.clone();
+    import.on_stop(move || {
+        let state = st.borrow();
+        if let Some(id) = state.importer.job_id() {
+            state.jobs.stop(id);
+        }
+    });
 }
 
 /// After an event from the grid: the keyboard goes back to it unless an input or a dialog holds it.
@@ -196,7 +364,10 @@ fn open(app: &AppWindow, state: &mut State, path: &Path) -> bool {
                 None => Ok(None),
                 Some(audio) => AudioPlayer::open(&audio_path(path, &audio.path)).map(Some),
             };
-            state.editor = Some(Editor::new(song));
+            // Opened files start in view mode, as in the Tauri app; a new grid starts in edit mode.
+            let mut editor = Editor::new(song);
+            editor.is_editable = false;
+            state.editor = Some(editor);
             state.shown = None;
             state.errors = Errors::default();
             refresh(app, state);
@@ -294,16 +465,23 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     });
     let (weak, st) = (app.as_weak(), state.clone());
     app.on_confirm_answered(move |is_yes| {
-        with_state(&weak, &st, |state| {
-            let editor = state.editor.as_mut().expect("with_state checked it");
-            match state.pending.take() {
-                Some(Pending::DeleteSection) if is_yes => editor.delete_cursor_section(),
-                _ => {}
+        let Some(app) = weak.upgrade() else { return };
+        let mut state = st.borrow_mut();
+        match state.pending.take() {
+            Some(Pending::DeleteSection) if is_yes => {
+                if let Some(editor) = state.editor.as_mut() {
+                    editor.delete_cursor_section();
+                }
+                refresh(&app, &mut state);
             }
-        });
-        if let Some(app) = weak.upgrade() {
-            focus_grid_when_idle(&app, &st.borrow());
+            Some(Pending::Overwrite(_)) if is_yes => {
+                let next = state.importer.transcribe_confirmed(engine_has);
+                follow(&app, &mut state, next);
+            }
+            _ => {}
         }
+        show_question(&app, &state);
+        focus_grid_when_idle(&app, &state);
     });
     let (weak, st) = (app.as_weak(), state.clone());
     app.on_bar_beats_set(move |n| with_editor(&weak, &st, |editor, _| editor.set_cursor_bar_beats(n.max(1) as u32)));
@@ -363,6 +541,7 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
 /// Connects the window's callbacks to the editor.
 fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     wire_panels(app, state);
+    wire_start(app, state);
     let weak = app.as_weak();
     let grid_state = state.clone();
     app.on_grid_key(move |event| {
@@ -513,6 +692,9 @@ fn main() -> Result<(), slint::PlatformError> {
         errors: Errors::default(),
         pending: None,
         player: Ok(None),
+        importer: Importer::default(),
+        jobs: Jobs::default(),
+        engine_events: std::sync::mpsc::channel(),
     }));
     {
         let settings = &state.borrow().settings;
@@ -537,10 +719,19 @@ fn main() -> Result<(), slint::PlatformError> {
     let dropped_into = recent.clone();
     let drop_state = state.clone();
     app.window().on_winit_window_event(move |_, event| {
-        if let WindowEvent::DroppedFile(path) = event
-            && let Some(app) = weak.upgrade()
-            && open(&app, &mut drop_state.borrow_mut(), path)
-        {
+        let Some(app) = weak.upgrade() else { return EventResult::Propagate };
+        let WindowEvent::DroppedFile(path) = event else { return EventResult::Propagate };
+        let mut state = drop_state.borrow_mut();
+        let is_song = path.to_string_lossy().ends_with(".json");
+        // On the start screen, an audio file is for the importer (F-IN-1); a song file opens.
+        if !is_song && state.editor.is_none() {
+            if !state.importer.is_running() {
+                state.importer.select_file(path);
+                show_import(&app, &state);
+            }
+            return EventResult::Propagate;
+        }
+        if open(&app, &mut state, path) {
             let path = SharedString::from(path.display().to_string());
             if let Some(i) = dropped_into.iter().position(|p| p == path) {
                 dropped_into.remove(i);
@@ -564,11 +755,17 @@ fn main() -> Result<(), slint::PlatformError> {
 
     let ticker = slint::Timer::default();
     let weak = app.as_weak();
+    let ticking = state.clone();
     ticker.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(100), move || {
         if let Some(app) = weak.upgrade() {
-            tick(&app, &state.borrow());
+            let mut state = ticking.borrow_mut();
+            drain_engine_events(&app, &mut state);
+            tick(&app, &state);
         }
     });
 
-    app.run()
+    let result = app.run();
+    // The engine's jobs run in their own process groups: they'd outlive the app.
+    state.borrow().jobs.cancel_all();
+    result
 }

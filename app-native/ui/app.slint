@@ -2,6 +2,9 @@ import { ScrollView, Palette, Button } from "std-widgets.slint";
 import { Sheet, ChartView, Size, Grid } from "sheet.slint";
 import { Panels, PanelsView, MetaChoice } from "panels.slint";
 import { Transport, Player } from "transport.slint";
+import { StartScreen, Import } from "start.slint";
+
+export { Import } from "start.slint";
 
 export { Player } from "transport.slint";
 
@@ -38,8 +41,9 @@ export component AppWindow inherits Window {
     in property <string> key-error;
     in property <string> tempo-error;
     in property <string> section-error;
-    /// A question that blocks until answered (deleting a section with chords...).
+    /// A question that blocks until answered (deleting a section with chords...), and its yes button.
     in property <string> confirm-text;
+    in property <string> confirm-action;
     callback confirm-answered(bool);
     callback meta-committed <=> sidebar.meta-committed;
     callback notation-picked <=> sidebar.notation-picked;
@@ -86,9 +90,9 @@ export component AppWindow inherits Window {
         }
     }
 
-    if !has-song: Text {
-        text: @tr("Drop a song file (.madsister.json) here");
-        color: Palette.foreground;
+    callback create-grid <=> start-screen.create-grid;
+    start-screen := StartScreen {
+        visible: !has-song;
     }
 
     HorizontalLayout {
@@ -181,7 +185,7 @@ export component AppWindow inherits Window {
                             clicked => { root.confirm-answered(false); }
                         }
                         Button {
-                            text: @tr("Delete");
+                            text: confirm-action;
                             primary: true;
                             clicked => { root.confirm-answered(true); }
                         }

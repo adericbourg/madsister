@@ -1,0 +1,225 @@
+// The start screen (F-IN-1..6): a new empty grid, or a song transcribed from audio.
+
+import { GroupBox, ComboBox, Button, CheckBox, LineEdit, TabWidget, ProgressIndicator, Palette, ScrollView } from "std-widgets.slint";
+
+export global Import {
+    /// 0 from a file, 1 from a URL, 2 recording.
+    in-out property <int> source;
+    in property <string> file-name;
+    in-out property <string> url;
+    /// 0 auto, 1 4/4, 2 3/4, 3 6/8.
+    in-out property <int> meter;
+    in-out property <bool> detect-sections;
+    in-out property <bool> accurate;
+    /// Installed on first use when false (a packaged engine).
+    in property <bool> sections-installed: true;
+    in property <bool> accurate-installed: true;
+    in property <bool> is-running;
+    out property <bool> can-run: !is-running && (source == 0 ? file-name != "" : source == 1 ? url != "" : true);
+    in property <bool> is-recording;
+    in property <string> status;
+    in property <int> pct;
+    in property <string> failure;
+    in property <string> stderr;
+    callback pick-file();
+    callback run();
+    callback stop();
+    callback cancel();
+}
+
+component Hint inherits Text {
+    color: Palette.foreground;
+    opacity: 0.7;
+    wrap: word-wrap;
+    font-size: 0.9rem;
+}
+
+component NewGrid inherits GroupBox {
+    callback create(int, int, bool);
+    title: @tr("New grid");
+    VerticalLayout {
+        spacing: 6px;
+        alignment: start;
+        Text {
+            text: @tr("Beats per bar");
+            color: Palette.foreground;
+        }
+        beats := ComboBox {
+            model: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"];
+            current-index: 3;
+            accessible-label: @tr("Beats per bar");
+        }
+        Text {
+            text: @tr("Beat unit");
+            color: Palette.foreground;
+        }
+        unit := ComboBox {
+            model: ["2", "4", "8"];
+            current-index: 1;
+            accessible-label: @tr("Beat unit");
+        }
+        Text {
+            text: @tr("Notation");
+            color: Palette.foreground;
+        }
+        notation := ComboBox {
+            model: [@tr("Chords"), @tr("Nashville numbers")];
+            accessible-label: @tr("Notation");
+        }
+        Button {
+            text: @tr("Create grid");
+            primary: true;
+            clicked => { root.create(beats.current-index + 1, unit.current-index == 0 ? 2 : unit.current-index == 1 ? 4 : 8, notation.current-index == 1); }
+        }
+    }
+}
+
+component Importer inherits GroupBox {
+    title: @tr("Import audio");
+    property <bool> show-output;
+    VerticalLayout {
+        spacing: 8px;
+        alignment: start;
+        TabWidget {
+            current-index <=> Import.source;
+            min-height: 6rem;
+            Tab {
+                title: @tr("From file");
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    padding: 8px;
+                    Button {
+                        text: @tr("Import audio…");
+                        enabled: !Import.is-running;
+                        clicked => { Import.pick-file(); }
+                    }
+                    Text {
+                        text: Import.file-name != "" ? Import.file-name : @tr("or drop an audio file on the window.");
+                        color: Palette.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+            Tab {
+                title: @tr("From URL");
+                VerticalLayout {
+                    padding: 8px;
+                    LineEdit {
+                        text <=> Import.url;
+                        placeholder-text: "https://";
+                        accessible-label: @tr("Audio URL");
+                    }
+                }
+            }
+            Tab {
+                title: @tr("Record");
+                VerticalLayout {
+                    padding: 8px;
+                    Text {
+                        text: @tr("Records the default audio input. Press Run, then Stop.");
+                        color: Palette.foreground;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Text {
+                text: @tr("Meter");
+                color: Palette.foreground;
+                vertical-alignment: center;
+            }
+            ComboBox {
+                model: [@tr("Auto"), "4/4", "3/4", "6/8"];
+                current-index <=> Import.meter;
+                accessible-label: @tr("Meter");
+            }
+        }
+        CheckBox {
+            text: @tr("Detect sections");
+            checked <=> Import.detect-sections;
+        }
+        Hint {
+            text: Import.sections-installed ? @tr("Slower (~6 min for a 4-min song)") : @tr("Slower (~6 min for a 4-min song). Installed on first use, requires a network connection");
+        }
+        CheckBox {
+            text: @tr("Accurate (slower)");
+            checked <=> Import.accurate;
+        }
+        Hint {
+            text: Import.accurate-installed ? @tr("Separates the instruments first (~+1 min for a 4-min song)") : @tr("Separates the instruments first (~+1 min for a 4-min song). Installed on first use, requires a network connection");
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Button {
+                text: @tr("Run");
+                primary: true;
+                enabled: Import.can-run;
+                clicked => { Import.run(); }
+            }
+            if Import.is-recording: Button {
+                text: @tr("Stop");
+                clicked => { Import.stop(); }
+            }
+            if Import.is-running: Button {
+                text: @tr("Cancel");
+                clicked => { Import.cancel(); }
+            }
+        }
+        Text {
+            text: Import.status;
+            color: Palette.foreground;
+            accessible-role: text;
+        }
+        if Import.is-running && !Import.is-recording: ProgressIndicator {
+            progress: Import.pct / 100;
+            accessible-label: Import.status;
+        }
+        if Import.failure != "": VerticalLayout {
+            spacing: 4px;
+            Text {
+                text: Import.failure;
+                color: Palette.color-scheme == ColorScheme.dark ? #f97066 : #b42318;
+                wrap: word-wrap;
+                accessible-role: text;
+            }
+            if Import.stderr != "": Button {
+                text: show-output ? @tr("Hide engine output") : @tr("Engine output");
+                clicked => { show-output = !show-output; }
+            }
+            if show-output && Import.stderr != "": ScrollView {
+                height: 12rem;
+                content-height: output.preferred-height;
+                output := Text {
+                    width: parent.visible-width;
+                    text: Import.stderr;
+                    font-family: "monospace";
+                    color: Palette.foreground;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}
+
+export component StartScreen inherits ScrollView {
+    callback create-grid(int, int, bool);
+    content-height: layout.preferred-height;
+    layout := HorizontalLayout {
+        width: parent.visible-width;
+        padding: 1rem;
+        spacing: 1rem;
+        alignment: center;
+        NewGrid {
+            width: 18rem;
+            create(beats, unit, nashville) => { root.create-grid(beats, unit, nashville); }
+        }
+        Importer {
+            width: 30rem;
+        }
+    }
+}
