@@ -26,6 +26,9 @@ export struct TabView {
 /// What a File menu item asks for.
 export enum FileAction { new-tab, open, clear-recent, close-tab, save, save-as }
 
+/// What File ▸ Export writes (F-EX-1..4).
+export enum ExportFormat { chord-pro, music-xml, midi, pdf }
+
 /// One tab per open song (F-UI-7); the close buttons sit next to the tabs, not inside them.
 component TabBar inherits Rectangle {
     in property <[TabView]> tabs;
@@ -101,6 +104,9 @@ export component AppWindow inherits Window {
     callback tab-selected(int);
     callback tab-closed(int);
     callback file-action(FileAction);
+    callback export(ExportFormat);
+    /// A Nashville song without a key has no notes to export.
+    in property <bool> is-export-locked;
     in property <ChartView> chart;
     in property <bool> has-song;
     /// The active tab's last save or open error.
@@ -194,6 +200,29 @@ export component AppWindow inherits Window {
                 shortcut: @keys(Control + Shift + S);
                 enabled: has-song;
                 activated => { root.file-action(FileAction.save-as); }
+            }
+            MenuSeparator { }
+            Menu {
+                title: @tr("Export");
+                enabled: has-song && !is-export-locked;
+                MenuItem {
+                    title: @tr("ChordPro…");
+                    activated => { root.export(ExportFormat.chord-pro); }
+                }
+                MenuItem {
+                    title: @tr("MusicXML…");
+                    activated => { root.export(ExportFormat.music-xml); }
+                }
+                MenuItem {
+                    title: @tr("MIDI…");
+                    activated => { root.export(ExportFormat.midi); }
+                }
+            }
+            MenuItem {
+                title: @tr("Export PDF…");
+                shortcut: @keys(Control + P);
+                enabled: has-song;
+                activated => { root.export(ExportFormat.pdf); }
             }
         }
     }

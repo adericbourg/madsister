@@ -9,13 +9,17 @@ use slint::{SharedString, VecModel};
 use madsister::audio::{FileCheck, Player as AudioPlayer, Status, audio_path, check_file, located_sha256, relative_audio_path};
 use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField, Outcome};
 use madsister::engine::{EngineEvent, Jobs};
+use madsister::export::chordpro::to_chord_pro;
+use madsister::export::midi::to_midi;
+use madsister::export::musicxml::to_music_xml;
+use madsister::export::sheet::to_sheet;
 use madsister::files::{parse_paths, push_recent, shortest_unique_paths, write_atomic};
 use madsister::importer::{ForcedMeter, Importer, Next, Request, Source, recording_name};
 use madsister::keymap::{count_flagged, has_confidence};
 use madsister::model::playback::bar_at_time;
 use madsister::keymap::{KeyInput, SHORTCUTS};
 use madsister::model::commands::{BarRef, SlotRef, Step};
-use madsister::model::song::{Meter, Notation, empty_song};
+use madsister::model::song::{Meter, Notation, Song, empty_song};
 use madsister::model::transpose::Spelling;
 use madsister::model::song::{parse_song, serialize_song};
 use madsister::settings::Settings;
@@ -218,6 +222,8 @@ fn refresh(app: &AppWindow, state: &mut State) {
     let tab = &state.tabs[state.active];
     app.set_error(tab.error.as_str().into());
     app.set_has_song(tab.editor.is_some());
+    // The exports write real notes, which a key-less Nashville song (chords relative to C) doesn't have: same lock as transposing.
+    app.set_is_export_locked(tab.editor.as_ref().is_some_and(Editor::is_transpose_locked));
     // shortcut: a new song without a file isn't autosaved (no recovery file); add one if users lose work.
     if tab.is_dirty() && tab.path.is_some() {
         state.autosave.restart();
@@ -600,7 +606,7 @@ fn save_to(tab: &mut Tab, path: PathBuf) -> bool {
     {
         audio.path = relative_audio_path(&path, &audio_path(old, &audio.path));
     }
-    match write_atomic(&path, &serialize_song(&song)) {
+    match write_atomic(&path, serialize_song(&song)) {
         Ok(()) => {
             if song != *editor.song() {
                 editor.history.apply(song.clone());
@@ -635,6 +641,55 @@ fn save_as(app: &AppWindow, state: &Rc<RefCell<State>>) {
         if save_to(tab, file.path().to_path_buf()) {
             remember(&app, &mut state, file.path());
         }
+        refresh(&app, &mut state);
+    });
+    if let Err(e) = picking {
+        eprintln!("can't open the file dialog: {e}");
+    }
+}
+
+/// File ▸ Export (F-EX-1..4): the dialog's filter name, the extension, and the file's contents.
+fn export_file(format: ExportFormat, song: &Song, settings: &Settings) -> Result<(&'static str, &'static str, Vec<u8>), String> {
+    Ok(match format {
+        ExportFormat::ChordPro => ("ChordPro", "cho", to_chord_pro(song).into_bytes()),
+        ExportFormat::MusicXml => ("MusicXML", "musicxml", to_music_xml(song).into_bytes()),
+        ExportFormat::Midi => ("MIDI", "mid", to_midi(song)),
+        ExportFormat::Pdf => ("PDF", "pdf", madsister::pdf::render(&to_sheet(song, settings))?),
+    })
+}
+
+/// Writes an export where the user picked; a failure shows on the tab.
+fn save_export(tab: &mut Tab, path: &Path, contents: &[u8]) {
+    tab.error = match write_atomic(path, contents) {
+        Ok(()) => String::new(),
+        Err(e) => format!("Can't export {}: {e}", path.display()),
+    };
+}
+
+/// Asks where to export the active tab's song as `<title>.<extension>`, then writes it there.
+fn export(app: &AppWindow, state: &Rc<RefCell<State>>, format: ExportFormat) {
+    let (id, title, exported) = {
+        let state = state.borrow();
+        let Some(editor) = &state.tab().editor else { return };
+        (state.tab().id, editor.song().meta.title.clone(), export_file(format, editor.song(), &state.settings))
+    };
+    let (name, extension, contents) = match exported {
+        Ok(exported) => exported,
+        Err(e) => {
+            let mut state = state.borrow_mut();
+            state.tab_mut().error = format!("Can't export: {e}");
+            refresh(app, &mut state);
+            return;
+        }
+    };
+    let dialog = rfd::AsyncFileDialog::new().set_file_name(format!("{title}.{extension}")).add_filter(name, &[extension]);
+    let (weak, st) = (app.as_weak(), state.clone());
+    let picking = slint::spawn_local(async move {
+        let Some(file) = dialog.save_file().await else { return };
+        let Some(app) = weak.upgrade() else { return };
+        let mut state = st.borrow_mut();
+        let Some(tab) = state.tab_by_id(id) else { return };
+        save_export(tab, file.path(), &contents);
         refresh(&app, &mut state);
     });
     if let Err(e) = picking {
@@ -1050,6 +1105,18 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
                     pick_song(&app, &st);
                 }
                 FileAction::ClearRecent => set_recent(&app, &mut state, Vec::new()),
+            }
+        });
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_export(move |format| {
+        let (weak, st) = (weak.clone(), st.clone());
+        // Deferred, as the File menu's actions.
+        slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+            if let Some(app) = weak.upgrade()
+                && st.borrow().pending.is_none()
+            {
+                export(&app, &st, format);
             }
         });
     });
