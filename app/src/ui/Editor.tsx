@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { AudioLines, Flag } from "lucide-react";
 import { Menu } from "@tauri-apps/api/menu";
@@ -425,6 +425,7 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
               step={0.1}
               value={Math.min(player.time, player.duration)}
               onChange={(e) => player.seek(Number(e.target.value))}
+              style={{ "--p": player.duration ? Math.min(player.time, player.duration) / player.duration : 0 } as CSSProperties}
             />
             <span>
               {minutes(player.time)}/{minutes(player.duration)}
