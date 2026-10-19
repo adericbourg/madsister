@@ -25,6 +25,8 @@ fn start_screen() -> (AppWindow, Rc<RefCell<State>>) {
     let state = Rc::new(RefCell::new(State {
         settings: Settings::parse(&serde_json::Value::Null),
         editor: None,
+        path: None,
+        audio: AudioFile::default(),
         shown: None,
         errors: Errors::default(),
         pending: None,
@@ -247,4 +249,47 @@ fn the_importer_refuses_a_url_that_isnt_http() {
     import.invoke_run();
     assert!(import.get_failure().contains("http"));
     assert!(!import.get_is_running());
+}
+
+#[test]
+fn a_song_whose_audio_file_is_missing_says_so_until_it_is_located() {
+    // Given a song file whose audio file isn't there, with a field this version doesn't know in its audio
+    let (app, state) = start_screen();
+    let mut song = empty_song(Meter { beats: 4, unit: 4, extra: Default::default() }, None);
+    let extra = serde_json::json!({ "future": 1 }).as_object().unwrap().clone();
+    song.audio = Some(madsister::model::song::Audio { path: "gone.mp3".into(), sha256: "abc".into(), extra });
+    let dir = std::env::temp_dir().join(format!("madsister-missing-audio-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("song.madsister.json");
+    std::fs::write(&path, madsister::model::song::serialize_song(&song)).unwrap();
+    let settle = || {
+        while state.borrow().audio.hashing.is_some() || state.borrow().audio.locating.is_some() {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            poll_audio(&app, &mut state.borrow_mut());
+        }
+        tick(&app, &state.borrow());
+    };
+
+    // When opening it, once its audio file is checked
+    assert!(open(&app, &mut state.borrow_mut(), &path));
+    settle();
+
+    // Then the notice names the file and offers to locate it, and there's nothing to play
+    let notice = "Audio file not found next to the song: gone.mp3.\nThe song can't be played until you locate it.";
+    assert!(find(&app, notice).is_some());
+    assert!(find(&app, "Locate audio…").is_some() && find(&app, "Show song file").is_some());
+    assert!(find(&app, "Playback").is_none() && matches!(state.borrow().player, Ok(None)));
+
+    // When an audio file next to the song is located (what the dialog's pick does)
+    let found = dir.join("found.mp3");
+    std::fs::write(&found, "audio").unwrap();
+    state.borrow_mut().audio.locating = Some((found.clone(), hash_in_background(found.clone())));
+    settle();
+
+    // Then the song points to it, relative to the song, keeping the unknown field, and the notice gives way to the player
+    let audio = state.borrow().editor.as_ref().unwrap().song().audio.clone().unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!((audio.path.as_str(), audio.extra["future"].as_i64()), ("found.mp3", Some(1)));
+    assert_eq!(audio.sha256, "6ed8919ce20490a5e3ad8630a4fab69475297abd07db73918dd5f36fcfaeb11b"); // printf audio | sha256sum
+    assert!(find(&app, notice).is_none() && find(&app, "Playback").is_some());
 }

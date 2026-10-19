@@ -1,11 +1,12 @@
 use std::cell::RefCell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::Receiver;
 use std::rc::Rc;
 
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit::event::WindowEvent};
 use slint::{Model, SharedString, VecModel};
 
-use madsister::audio::{Player as AudioPlayer, Status};
+use madsister::audio::{FileCheck, Player as AudioPlayer, Status, audio_path, check_file, relative_audio_path};
 use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField, Outcome};
 use madsister::engine::{EngineEvent, Jobs};
 use madsister::importer::{ForcedMeter, Importer, Next, Request, Source, recording_name};
@@ -29,6 +30,9 @@ slint::include_modules!();
 struct State {
     settings: Settings,
     editor: Option<Editor>,
+    /// The open song's file; None for a new grid.
+    path: Option<PathBuf>,
+    audio: AudioFile,
     /// The song the sheet was last built from: rebuilding it recreates every slot, the inline input included.
     shown: Option<madsister::model::song::Song>,
     /// The panels' last field errors.
@@ -41,6 +45,18 @@ struct State {
     jobs: Jobs,
     /// The running engine job's events, sent from its thread, read by the ticker.
     engine_events: (std::sync::mpsc::Sender<EngineEvent>, std::sync::mpsc::Receiver<EngineEvent>),
+}
+
+/// The checks of the song's audio file.
+#[derive(Default)]
+struct AudioFile {
+    /// The audio reference last checked; None until the open song's is.
+    checked: Option<Option<madsister::model::song::Audio>>,
+    check: Option<FileCheck>,
+    /// The audio file's sha256 being computed for the check.
+    hashing: Option<Receiver<Option<String>>>,
+    /// The file picked by "Locate audio…", and its sha256 being computed.
+    locating: Option<(PathBuf, Receiver<Option<String>>)>,
 }
 
 #[derive(Default)]
@@ -93,6 +109,7 @@ fn key_input(event: &slint::language::KeyEvent) -> KeyInput<'_> {
 
 /// Shows the editor's state.
 fn refresh(app: &AppWindow, state: &mut State) {
+    check_audio(state);
     let Some(editor) = &state.editor else { return };
     if state.shown.as_ref() != Some(editor.song()) {
         app.set_chart(view::chart_view(editor.song(), &state.settings));
@@ -121,6 +138,15 @@ fn refresh(app: &AppWindow, state: &mut State) {
     let player = app.global::<Player>();
     player.set_has_review(has_confidence(editor.song()));
     player.set_flagged(count_flagged(editor.song(), state.settings.low_confidence_threshold) as i32);
+    let name = audio_file(state).and_then(|f| f.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
+    let notice = match state.audio.check {
+        Some(FileCheck::Missing) => {
+            format!("Audio file not found next to the song: {name}.\nThe song can't be played until you locate it.")
+        }
+        Some(FileCheck::Changed) => format!("Audio file has changed since the transcription: {name}"),
+        None => String::new(),
+    };
+    player.set_audio_notice(notice.into());
     app.set_title_error(state.errors.title.as_str().into());
     app.set_key_error(state.errors.key.as_str().into());
     app.set_tempo_error(state.errors.tempo.as_str().into());
@@ -228,7 +254,8 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
         let notation = is_nashville.then_some(Notation::Nashville);
         let mut state = st.borrow_mut();
         state.editor = Some(Editor::new(empty_song(meter, notation)));
-        state.player = Ok(None);
+        state.path = None;
+        state.audio = AudioFile::default();
         state.shown = None;
         state.errors = Errors::default();
         refresh(&app, &mut state);
@@ -239,7 +266,7 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, st) = (app.as_weak(), state.clone());
     import.on_pick_file(move || {
         let (weak, st) = (weak.clone(), st.clone());
-        let dialog = rfd::AsyncFileDialog::new().add_filter("Audio", &madsister::importer::AUDIO_EXTENSIONS);
+        let dialog = audio_dialog();
         let picking = slint::spawn_local(async move {
             let Some(file) = dialog.pick_file().await else { return };
             let Some(app) = weak.upgrade() else { return };
@@ -311,10 +338,62 @@ fn with_grid<R: Default>(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>
     result
 }
 
-/// The song's audio file: a relative `audio.path` is relative to the song file's folder.
-fn audio_path(song_path: &Path, audio: &str) -> std::path::PathBuf {
-    let audio = Path::new(audio);
-    if audio.is_absolute() { audio.to_path_buf() } else { song_path.parent().unwrap_or(Path::new("")).join(audio) }
+/// The open song's audio file.
+fn audio_file(state: &State) -> Option<PathBuf> {
+    let audio = state.editor.as_ref()?.song().audio.as_ref()?;
+    Some(audio_path(state.path.as_deref()?, &audio.path))
+}
+
+/// The file's sha256, computed on its own thread: the song shows first.
+fn hash_in_background(path: PathBuf) -> Receiver<Option<String>> {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || _ = sender.send(madsister::audio::sha256(&path)));
+    receiver
+}
+
+/// Checks the song's audio file when its reference changed (opened, located, undone); the player waits for the result.
+fn check_audio(state: &mut State) {
+    let audio = state.editor.as_ref().and_then(|e| e.song().audio.clone());
+    if state.audio.checked.as_ref() == Some(&audio) {
+        return;
+    }
+    state.player = Ok(None);
+    state.audio.check = None;
+    state.audio.hashing = audio_file(state).map(hash_in_background);
+    state.audio.checked = Some(audio);
+}
+
+/// Takes the audio file hashes that are ready: the check's result opens the player, a located file becomes the song's audio.
+fn poll_audio(app: &AppWindow, state: &mut State) {
+    if let Some(Ok(sha256)) = state.audio.hashing.as_ref().map(Receiver::try_recv) {
+        state.audio.hashing = None;
+        let expected = state.editor.as_ref().and_then(|e| e.song().audio.as_ref()).map(|a| a.sha256.clone()).unwrap_or_default();
+        state.audio.check = check_file(&expected, sha256.as_deref());
+        // A missing file would only fail to load, repeating the notice.
+        if state.audio.check != Some(FileCheck::Missing) {
+            state.player = audio_file(state).map(|file| AudioPlayer::open(&file)).transpose();
+        }
+        refresh(app, state);
+    }
+    if let Some((file, Ok(sha256))) = state.audio.locating.as_ref().map(|(file, hashing)| (file.clone(), hashing.try_recv())) {
+        state.audio.locating = None;
+        let (Some(editor), Some(song_path)) = (state.editor.as_mut(), state.path.as_deref()) else { return };
+        match sha256 {
+            None => editor.notice = format!("Can't read {}", file.display()),
+            Some(sha256) => {
+                let mut song = editor.song().clone();
+                let extra = song.audio.take().map(|a| a.extra).unwrap_or_default();
+                song.audio = Some(madsister::model::song::Audio { path: relative_audio_path(song_path, &file), sha256, extra });
+                editor.history.apply(song);
+            }
+        }
+        refresh(app, state);
+    }
+}
+
+/// The native dialog that picks an audio file.
+fn audio_dialog() -> rfd::AsyncFileDialog {
+    rfd::AsyncFileDialog::new().add_filter("Audio", &madsister::importer::AUDIO_EXTENSIONS)
 }
 
 fn minutes(sec: f64) -> String {
@@ -335,7 +414,7 @@ fn tick(app: &AppWindow, state: &State) {
         _ => error,
     };
     let (time, duration) = player.map_or((0.0, 0.0), |p| (p.time(), p.duration()));
-    ui.set_has_audio(editor.song().audio.is_some());
+    ui.set_has_audio(editor.song().audio.is_some() && state.audio.check != Some(FileCheck::Missing));
     ui.set_is_ready(status == Some(Status::Ready));
     ui.set_is_playing(player.is_some_and(AudioPlayer::is_playing));
     ui.set_time(time as f32);
@@ -360,10 +439,8 @@ fn play_from(state: &mut State, sec: f64) {
 fn open(app: &AppWindow, state: &mut State, path: &Path) -> bool {
     match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|text| parse_song(&text)) {
         Ok(song) => {
-            state.player = match &song.audio {
-                None => Ok(None),
-                Some(audio) => AudioPlayer::open(&audio_path(path, &audio.path)).map(Some),
-            };
+            state.path = Some(path.to_path_buf());
+            state.audio = AudioFile::default();
             // Opened files start in view mode, as in the Tauri app; a new grid starts in edit mode.
             let mut editor = Editor::new(song);
             editor.is_editable = false;
@@ -519,6 +596,29 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
         if let (Some(start), Ok(Some(player))) = (start, &st.borrow().player) {
             player.seek(start);
         }
+    });
+
+    let st = state.clone();
+    player.on_locate_audio(move || {
+        let (st, dialog) = (st.clone(), audio_dialog());
+        let picking = slint::spawn_local(async move {
+            let Some(file) = dialog.pick_file().await else { return };
+            let file = file.path().to_path_buf();
+            st.borrow_mut().audio.locating = Some((file.clone(), hash_in_background(file)));
+        });
+        if let Err(e) = picking {
+            eprintln!("can't open the file dialog: {e}");
+        }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    player.on_show_song_file(move || {
+        with_state(&weak, &st, |state| {
+            if let (Some(path), Some(editor)) = (&state.path, &mut state.editor)
+                && let Err(e) = opener::reveal(path)
+            {
+                editor.notice = format!("Can't show {}: {e}", path.display());
+            }
+        });
     });
 
     let grid = app.global::<Grid>();
@@ -688,6 +788,8 @@ fn main() -> Result<(), slint::PlatformError> {
     let state = Rc::new(RefCell::new(State {
         settings: Settings::load(),
         editor: None,
+        path: None,
+        audio: AudioFile::default(),
         shown: None,
         errors: Errors::default(),
         pending: None,
@@ -760,6 +862,7 @@ fn main() -> Result<(), slint::PlatformError> {
         if let Some(app) = weak.upgrade() {
             let mut state = ticking.borrow_mut();
             drain_engine_events(&app, &mut state);
+            poll_audio(&app, &mut state);
             tick(&app, &state);
         }
     });

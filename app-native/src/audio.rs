@@ -43,6 +43,65 @@ pub fn decode(path: &Path, rate: u32, channels: u16) -> Result<Vec<f32>, String>
     Ok(output.stdout.as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)).collect())
 }
 
+/// The song's audio file: a relative `audio.path` is relative to the song file's folder.
+pub fn audio_path(song_path: &Path, audio: &str) -> PathBuf {
+    let audio = Path::new(audio);
+    if audio.is_absolute() { audio.to_path_buf() } else { song_path.parent().unwrap_or(Path::new("")).join(audio) }
+}
+
+/// The inverse of `audio_path`: `audio` relative to the song file's folder, so the song and its audio can move together.
+/// Stays as is when the paths share no root (another drive).
+/// shortcut: the comparison is case-sensitive, so Windows paths differing only by case stay absolute; normalise if that bites.
+pub fn relative_audio_path(song_path: &Path, audio: &Path) -> String {
+    let (song, audio) = (song_path.to_string_lossy(), audio.to_string_lossy());
+    let song: Vec<&str> = song.split(['/', '\\']).collect();
+    let song = &song[..song.len() - 1];
+    let parts: Vec<&str> = audio.split(['/', '\\']).collect();
+    let mut common = 0;
+    while common < song.len() && common < parts.len() - 1 && song[common] == parts[common] {
+        common += 1;
+    }
+    if common == 0 {
+        return audio.into_owned();
+    }
+    let ups = song[common..].iter().map(|_| "..");
+    ups.chain(parts[common..].iter().copied()).collect::<Vec<_>>().join("/")
+}
+
+/// The file's sha256 in hex, read in chunks; None when it can't be read.
+pub fn sha256(path: &Path) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let mut hasher = Sha256::new();
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        match file.read(&mut buf).ok()? {
+            0 => break,
+            n => hasher.update(&buf[..n]),
+        }
+    }
+    Some(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// What's wrong with the song's audio file, if anything.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FileCheck {
+    /// It can't be read: the song can't be played until it's located.
+    Missing,
+    /// It isn't the file the song was transcribed from.
+    Changed,
+}
+
+/// The audio file's state from the sha256 the song expects and the file's own (None: the file can't be read).
+pub fn check_file(expected: &str, actual: Option<&str>) -> Option<FileCheck> {
+    match actual {
+        None => Some(FileCheck::Missing),
+        Some(sha256) if sha256 != expected => Some(FileCheck::Changed),
+        Some(_) => None,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Status {
     Loading,
@@ -238,5 +297,50 @@ mod tests {
         // When / Then
         assert!(decode(&path, 48_000, 2).is_err());
         std::fs::remove_file(&path).unwrap();
+    }
+
+    #[test]
+    fn audio_path_resolves_relative_paths_against_the_song_folder_and_keeps_absolute_ones() {
+        // Given a relative audio path, Then it is resolved next to the song
+        assert_eq!(audio_path(Path::new("/music/s.madsister.json"), "a.mp3"), Path::new("/music/a.mp3"));
+        // And absolute paths are left alone
+        assert_eq!(audio_path(Path::new("/music/s.madsister.json"), "/other/a.mp3"), Path::new("/other/a.mp3"));
+    }
+
+    #[test]
+    fn relative_audio_path_is_relative_to_the_song_folder_and_round_trips_with_audio_path() {
+        let relative = |song: &str, audio: &str| relative_audio_path(Path::new(song), Path::new(audio));
+        // Given a song file, When the audio is next to it, below it or above it, Then the path is relative
+        assert_eq!(relative("/music/s.madsister.json", "/music/a.mp3"), "a.mp3");
+        assert_eq!(relative("/music/s.madsister.json", "/music/live/a.mp3"), "live/a.mp3");
+        assert_eq!(relative("/music/songs/s.madsister.json", "/music/live/a.mp3"), "../live/a.mp3");
+        assert_eq!(relative("C:\\music\\s.madsister.json", "C:\\music\\live\\a.mp3"), "live/a.mp3");
+        // And resolving it gives back the same file
+        let back = audio_path(Path::new("/music/songs/s.madsister.json"), &relative("/music/songs/s.madsister.json", "/music/live/a.mp3"));
+        assert_eq!(back, Path::new("/music/songs/../live/a.mp3"));
+        // And another drive keeps the absolute path
+        assert_eq!(relative("C:\\music\\s.madsister.json", "D:\\a.mp3"), "D:\\a.mp3");
+    }
+
+    #[test]
+    fn sha256_streams_the_file_and_is_none_when_it_cant_be_read() {
+        // Given a file bigger than one read
+        let path = std::env::temp_dir().join(format!("madsister-sha-{}.bin", std::process::id()));
+        std::fs::write(&path, vec![b'a'; 100_000]).unwrap();
+
+        // When hashing it, and a missing file
+        let sha = sha256(&path);
+        std::fs::remove_file(&path).unwrap();
+
+        // Then (from `head -c 100000 /dev/zero | tr '\\0' a | sha256sum`)
+        assert_eq!(sha.as_deref(), Some("6d1cf22d7cc09b085dfc25ee1a1f3ae0265804c607bc2074ad253bcc82fd81ee"));
+        assert_eq!(sha256(Path::new("/nonexistent/a.mp3")), None);
+    }
+
+    #[test]
+    fn check_file_tells_a_missing_file_from_a_changed_one() {
+        assert_eq!(check_file("abc", None), Some(FileCheck::Missing));
+        assert_eq!(check_file("abc", Some("def")), Some(FileCheck::Changed));
+        assert_eq!(check_file("abc", Some("abc")), None);
     }
 }
