@@ -7,16 +7,33 @@ use super::*;
 use madsister::model::song::{Meter, empty_song};
 
 fn window() -> (AppWindow, Rc<RefCell<State>>) {
+    let (app, state) = start_screen();
+    let song = empty_song(Meter { beats: 4, unit: 4, extra: Default::default() }, None);
+    state.borrow_mut().editor = Some(Editor::new(song));
+    refresh(&app, &mut state.borrow_mut());
+    focus_grid_when_idle(&app, &state.borrow());
+    (app, state)
+}
+
+/// The window as it opens: no song yet.
+fn start_screen() -> (AppWindow, Rc<RefCell<State>>) {
     i_slint_backend_testing::init_no_event_loop();
     let app = AppWindow::new().unwrap();
     // Tall enough for every panel: the element search skips what the sidebar's scroll view clips.
     app.window().set_size(slint::LogicalSize::new(1000.0, 1800.0));
     app.show().unwrap();
-    let song = empty_song(Meter { beats: 4, unit: 4, extra: Default::default() }, None);
-    let state = Rc::new(RefCell::new(State { settings: Settings::parse(&serde_json::Value::Null), editor: Some(Editor::new(song)), shown: None, errors: Errors::default(), pending: None, player: Ok(None) }));
+    let state = Rc::new(RefCell::new(State {
+        settings: Settings::parse(&serde_json::Value::Null),
+        editor: None,
+        shown: None,
+        errors: Errors::default(),
+        pending: None,
+        player: Ok(None),
+        importer: Importer::default(),
+        jobs: Jobs::default(),
+        engine_events: std::sync::mpsc::channel(),
+    }));
     wire(&app, &state);
-    refresh(&app, &mut state.borrow_mut());
-    focus_grid_when_idle(&app, &state.borrow());
     (app, state)
 }
 
@@ -201,3 +218,33 @@ fn deleting_a_section_with_chords_asks_first() {
     assert_eq!(state.borrow().editor.as_ref().unwrap().song().sections[0].label, "Song");
 }
 
+
+#[test]
+fn the_start_screen_creates_an_editable_grid_of_the_chosen_meter() {
+    // Given the start screen
+    let (app, state) = start_screen();
+    assert!(!app.get_has_song());
+
+    // When creating a grid with the defaults
+    click(&app, &find(&app, "Create grid").unwrap());
+
+    // Then a 4/4 song opens in edit mode
+    let state = state.borrow();
+    let editor = state.editor.as_ref().unwrap();
+    assert!(app.get_has_song() && editor.is_editable);
+    assert_eq!((editor.song().meta.meter.beats, editor.song().meta.meter.unit), (4, 4));
+}
+
+#[test]
+fn the_importer_refuses_a_url_that_isnt_http() {
+    // Given a file URL in the URL tab
+    let (app, _state) = start_screen();
+    let import = app.global::<Import>();
+    import.set_source(1);
+    import.set_url("file:///etc/passwd".into());
+
+    // When running, Then it's refused and nothing runs
+    import.invoke_run();
+    assert!(import.get_failure().contains("http"));
+    assert!(!import.get_is_running());
+}
