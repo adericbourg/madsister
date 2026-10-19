@@ -6,7 +6,7 @@ use std::rc::Rc;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit::event::WindowEvent};
 use slint::{SharedString, VecModel};
 
-use madsister::audio::{FileCheck, Player as AudioPlayer, Status, audio_path, check_file, relative_audio_path};
+use madsister::audio::{FileCheck, Player as AudioPlayer, Status, audio_path, check_file, located_sha256, relative_audio_path};
 use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField, Outcome};
 use madsister::engine::{EngineEvent, Jobs};
 use madsister::files::{parse_paths, push_recent, shortest_unique_paths, write_atomic};
@@ -162,6 +162,8 @@ enum Pending {
     CloseTab(usize),
     /// Closing the window drops unsaved changes.
     CloseWindow,
+    /// The located audio file, and the sha256 to keep, isn't the one that was transcribed.
+    OtherAudio(PathBuf, String),
 }
 
 /// Slint's key text as the keymap names it: special keys come as private-use characters.
@@ -272,6 +274,10 @@ fn show_question(app: &AppWindow, state: &State) {
         }
         Some(Pending::Overwrite(path)) => (format!("{} already exists. Overwrite it?", path.display()), "Overwrite"),
         Some(Pending::CloseTab(_) | Pending::CloseWindow) => ("Discard unsaved changes?".into(), "Discard"),
+        Some(Pending::OtherAudio(file, _)) => {
+            let name = file.file_name().unwrap_or_default().to_string_lossy();
+            (format!("{name} isn't the file that was transcribed. Use it anyway?"), "Use it")
+        }
         None => (String::new(), ""),
     };
     app.set_confirm_text(question.into());
@@ -487,21 +493,33 @@ fn poll_audio(app: &AppWindow, state: &mut State) {
         }
         refresh(app, state);
     }
+    let asking = state.pending.is_some();
     let tab = state.tab_mut();
-    if let Some((file, Ok(sha256))) = tab.audio.locating.as_ref().map(|(file, hashing)| (file.clone(), hashing.try_recv())) {
+    // An open question waits to be answered before the located file can ask its own.
+    if !asking && let Some((file, Ok(sha256))) = tab.audio.locating.as_ref().map(|(file, hashing)| (file.clone(), hashing.try_recv())) {
         tab.audio.locating = None;
-        let (Some(editor), Some(song_path)) = (tab.editor.as_mut(), tab.path.as_deref()) else { return };
+        let Some(editor) = tab.editor.as_mut() else { return };
         match sha256 {
             None => editor.notice = format!("Can't read {}", file.display()),
             Some(sha256) => {
-                let mut song = editor.song().clone();
-                let extra = song.audio.take().map(|a| a.extra).unwrap_or_default();
-                song.audio = Some(madsister::model::song::Audio { path: relative_audio_path(song_path, &file), sha256, extra });
-                editor.history.apply(song);
+                let recorded = editor.song().audio.as_ref().map(|a| a.sha256.as_str());
+                match located_sha256(recorded, &sha256) {
+                    (sha256, true) => state.pending = Some(Pending::OtherAudio(file, sha256)),
+                    (sha256, false) => link_audio(tab, &file, sha256),
+                }
             }
         }
         refresh(app, state);
     }
+}
+
+/// Makes the file the song's audio, relative to the song file, as an undoable edit keeping the audio's unknown fields.
+fn link_audio(tab: &mut Tab, file: &Path, sha256: String) {
+    let (Some(editor), Some(song_path)) = (tab.editor.as_mut(), tab.path.as_deref()) else { return };
+    let mut song = editor.song().clone();
+    let extra = song.audio.take().map(|a| a.extra).unwrap_or_default();
+    song.audio = Some(madsister::model::song::Audio { path: relative_audio_path(song_path, file), sha256, extra });
+    editor.history.apply(song);
 }
 
 /// The native dialog that picks an audio file.
@@ -880,6 +898,10 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
                 follow(&app, &mut state, next);
             }
             Some(Pending::CloseTab(index)) if is_yes => close_tab_now(&app, &mut state, index),
+            Some(Pending::OtherAudio(file, sha256)) if is_yes => {
+                link_audio(state.tab_mut(), &file, sha256);
+                refresh(&app, &mut state);
+            }
             Some(Pending::CloseWindow) if is_yes => {
                 drop(state);
                 _ = app.hide();

@@ -102,6 +102,15 @@ pub fn check_file(expected: &str, actual: Option<&str>) -> Option<FileCheck> {
     }
 }
 
+/// What "Locate audio…" stores for a picked file: the sha256 to keep, and whether to ask first. Another file than the
+/// transcribed one keeps the recorded sha256, so the "changed" notice keeps reminding it.
+pub fn located_sha256(recorded: Option<&str>, picked: &str) -> (String, bool) {
+    match recorded {
+        Some(recorded) if !recorded.is_empty() && recorded != picked => (recorded.to_owned(), true),
+        _ => (picked.to_owned(), false),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Status {
     Loading,
@@ -342,5 +351,13 @@ mod tests {
         assert_eq!(check_file("abc", None), Some(FileCheck::Missing));
         assert_eq!(check_file("abc", Some("def")), Some(FileCheck::Changed));
         assert_eq!(check_file("abc", Some("abc")), None);
+    }
+
+    #[test]
+    fn located_sha256_asks_and_keeps_the_recorded_one_only_for_another_file() {
+        assert_eq!(located_sha256(Some("abc"), "def"), ("abc".into(), true));
+        assert_eq!(located_sha256(Some("abc"), "abc"), ("abc".into(), false));
+        assert_eq!(located_sha256(Some(""), "def"), ("def".into(), false));
+        assert_eq!(located_sha256(None, "def"), ("def".into(), false));
     }
 }
