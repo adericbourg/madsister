@@ -262,25 +262,35 @@ component Importer inherits Frame {
 
 export component StartScreen inherits ScrollView {
     callback create-grid(int, int, bool);
+    // Under 22rem each, the cards stack (app.css: flex: 1 1 22rem, flex-wrap).
+    property <bool> is-wide: self.width >= 2 * 22rem + 3rem;
     content-height: layout.preferred-height;
     layout := HorizontalLayout {
         width: parent.visible-width;
         padding: 1rem;
-        spacing: 1rem;
         alignment: center;
-        NewGrid {
-            // One width for both, shrunk evenly in a narrow window (app.css: flex: 1 1 22rem).
-            horizontal-stretch: 1;
-            preferred-width: 30rem;
-            create(beats, unit, nashville) => { root.create-grid(beats, unit, nashville); }
-        }
-        if Import.needs-setup: EngineSetup {
-            horizontal-stretch: 1;
-            preferred-width: 30rem;
-        }
-        if !Import.needs-setup: Importer {
-            horizontal-stretch: 1;
-            preferred-width: 30rem;
+        GridLayout {
+            spacing: 1rem;
+            NewGrid {
+                row: 0;
+                col: 0;
+                // One width for both, shrunk evenly in a narrow window.
+                horizontal-stretch: 1;
+                preferred-width: 30rem;
+                create(beats, unit, nashville) => { root.create-grid(beats, unit, nashville); }
+            }
+            if Import.needs-setup: EngineSetup {
+                row: is-wide ? 0 : 1;
+                col: is-wide ? 1 : 0;
+                horizontal-stretch: 1;
+                preferred-width: 30rem;
+            }
+            if !Import.needs-setup: Importer {
+                row: is-wide ? 0 : 1;
+                col: is-wide ? 1 : 0;
+                horizontal-stretch: 1;
+                preferred-width: 30rem;
+            }
         }
     }
 }
