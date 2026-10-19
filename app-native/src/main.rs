@@ -4,12 +4,12 @@ use std::sync::mpsc::Receiver;
 use std::rc::Rc;
 
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit::event::WindowEvent};
-use slint::{Model, SharedString, VecModel};
+use slint::{SharedString, VecModel};
 
 use madsister::audio::{FileCheck, Player as AudioPlayer, Status, audio_path, check_file, relative_audio_path};
 use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField, Outcome};
 use madsister::engine::{EngineEvent, Jobs};
-use madsister::files::write_atomic;
+use madsister::files::{parse_paths, push_recent, shortest_unique_paths, write_atomic};
 use madsister::importer::{ForcedMeter, Importer, Next, Request, Source, recording_name};
 use madsister::keymap::{count_flagged, has_confidence};
 use madsister::model::playback::bar_at_time;
@@ -41,6 +41,10 @@ struct State {
     last_tab_id: u32,
     /// Saves the songs that have a file 2 s after the last edit; restarted by every refresh while one has changes.
     autosave: slint::Timer,
+    /// Where recent.json is kept; None in tests.
+    config: Option<PathBuf>,
+    /// The recent song files, most recent first.
+    recent: Vec<String>,
 }
 
 impl State {
@@ -54,6 +58,8 @@ impl State {
             jobs: Jobs::default(),
             last_tab_id: 0,
             autosave: slint::Timer::default(),
+            config: None,
+            recent: Vec::new(),
         }
     }
 
@@ -316,9 +322,14 @@ fn follow(app: &AppWindow, state: &mut State, next: Next) {
         }
         Next::ConfirmOverwrite(path) => state.pending = Some(Pending::Overwrite(path)),
         Next::Open(path) => match read_song(&path) {
-            Ok(song) => load(app, state, viewer(song), Some(path)),
-            // shortcut: errors go to stderr until the app shell (step 11) shows them.
-            Err(e) => eprintln!("can't open {}: {e}", path.display()),
+            Ok(song) => {
+                load(app, state, viewer(song), Some(path.clone()));
+                remember(app, state, &path);
+            }
+            Err(e) => {
+                state.tab_mut().error = format!("Can't open {}: {e}", path.display());
+                refresh(app, state);
+            }
         },
     }
     show_import(app, state);
@@ -557,9 +568,9 @@ fn load(app: &AppWindow, state: &mut State, editor: Editor, path: Option<PathBuf
     show_tab(app, state);
 }
 
-/// Writes the tab's song to `path` (F-ED-10), which becomes its file.
-fn save_to(tab: &mut Tab, path: PathBuf) {
-    let Some(editor) = &mut tab.editor else { return };
+/// Writes the tab's song to `path` (F-ED-10), which becomes its file; false when it couldn't.
+fn save_to(tab: &mut Tab, path: PathBuf) -> bool {
+    let Some(editor) = &mut tab.editor else { return false };
     let mut song = editor.song().clone();
     // The audio path is relative to the song file: a copy in another folder needs it rebased.
     if let (Some(old), Some(audio)) = (tab.path.as_deref(), song.audio.as_mut())
@@ -575,8 +586,12 @@ fn save_to(tab: &mut Tab, path: PathBuf) {
             tab.saved = Some(song);
             tab.path = Some(path);
             tab.error.clear();
+            true
         }
-        Err(e) => tab.error = format!("Can't save {}: {e}", path.display()),
+        Err(e) => {
+            tab.error = format!("Can't save {}: {e}", path.display());
+            false
+        }
     }
 }
 
@@ -595,8 +610,60 @@ fn save_as(app: &AppWindow, state: &Rc<RefCell<State>>) {
         let Some(app) = weak.upgrade() else { return };
         let mut state = st.borrow_mut();
         let Some(tab) = state.tab_by_id(id) else { return };
-        save_to(tab, file.path().to_path_buf());
+        if save_to(tab, file.path().to_path_buf()) {
+            remember(&app, &mut state, file.path());
+        }
         refresh(&app, &mut state);
+    });
+    if let Err(e) = picking {
+        eprintln!("can't open the file dialog: {e}");
+    }
+}
+
+/// Puts the song file first in the recent files.
+fn remember(app: &AppWindow, state: &mut State, path: &Path) {
+    let recent = push_recent(&state.recent, &path.to_string_lossy());
+    set_recent(app, state, recent);
+}
+
+/// Shows the recent files in the File menu.
+fn show_recent(app: &AppWindow, state: &State) {
+    let labels: Vec<SharedString> = shortest_unique_paths(&state.recent).into_iter().map(SharedString::from).collect();
+    app.set_recent(Rc::new(VecModel::from(labels)).into());
+}
+
+/// Changes the recent files, and saves them.
+fn set_recent(app: &AppWindow, state: &mut State, recent: Vec<String>) {
+    let json = serde_json::to_string(&recent).expect("strings always serialize");
+    state.recent = recent;
+    show_recent(app, state);
+    if let Err(e) = write_config(state, "recent.json", &json) {
+        state.tab_mut().error = format!("Can't save the recent files: {e}");
+        refresh(app, state);
+    }
+}
+
+/// Reads a file of the config folder; None when it's missing or unreadable (first run, tests).
+fn read_config(state: &State, name: &str) -> Option<serde_json::Value> {
+    let text = std::fs::read_to_string(state.config.as_ref()?.join(name)).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn write_config(state: &State, name: &str, json: &str) -> std::io::Result<()> {
+    let Some(dir) = &state.config else { return Ok(()) };
+    std::fs::create_dir_all(dir)?;
+    write_atomic(&dir.join(name), json)
+}
+
+/// Asks for a song file to open.
+fn pick_song(app: &AppWindow, state: &Rc<RefCell<State>>) {
+    let dialog = rfd::AsyncFileDialog::new().add_filter("madsister song", &["json"]);
+    let (weak, st) = (app.as_weak(), state.clone());
+    let picking = slint::spawn_local(async move {
+        let Some(file) = dialog.pick_file().await else { return };
+        if let Some(app) = weak.upgrade() {
+            open(&app, &mut st.borrow_mut(), file.path());
+        }
     });
     if let Err(e) = picking {
         eprintln!("can't open the file dialog: {e}");
@@ -626,22 +693,25 @@ fn show_tab(app: &AppWindow, state: &mut State) {
 /// tab. False when it can't be opened.
 fn open(app: &AppWindow, state: &mut State, path: &Path) -> bool {
     if let Some(index) = state.tabs.iter().position(|tab| tab.path.as_deref() == Some(path)) {
+        state.tab_mut().error.clear();
         activate(state, index);
         show_tab(app, state);
         return true;
     }
     match read_song(path) {
         Ok(song) => {
+            state.tab_mut().error.clear();
             if !state.tab().is_idle() {
                 let index = state.push_tab();
                 activate(state, index);
             }
             load(app, state, viewer(song), Some(path.to_path_buf()));
+            remember(app, state, path);
             true
         }
-        // shortcut: errors go to stderr until the app shell (step 11) shows them.
         Err(e) => {
-            eprintln!("can't open {}: {e}", path.display());
+            state.tab_mut().error = format!("Can't open {}: {e}", path.display());
+            refresh(app, state);
             false
         }
     }
@@ -915,6 +985,25 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
                     drop(state);
                     save_as(&app, &st);
                 }
+                FileAction::Open => {
+                    drop(state);
+                    pick_song(&app, &st);
+                }
+                FileAction::ClearRecent => set_recent(&app, &mut state, Vec::new()),
+            }
+        });
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_open_recent(move |index| {
+        let (weak, st) = (weak.clone(), st.clone());
+        // Deferred, as the File menu's actions.
+        slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+            let Some(app) = weak.upgrade() else { return };
+            let mut state = st.borrow_mut();
+            let Some(path) = state.recent.get(index as usize).cloned() else { return };
+            if state.pending.is_none() && !open(&app, &mut state, Path::new(&path)) {
+                let recent = state.recent.iter().filter(|p| **p != path).cloned().collect();
+                set_recent(&app, &mut state, recent);
             }
         });
     });
@@ -1092,7 +1181,11 @@ fn main() -> Result<(), slint::PlatformError> {
     selector.select()?;
 
     let app = AppWindow::new()?;
-    let state = Rc::new(RefCell::new(State::new(Settings::load())));
+    let mut state = State::new(Settings::load());
+    state.config = madsister::settings::config_dir();
+    state.recent = read_config(&state, "recent.json").map_or_else(Vec::new, |json| parse_paths(&json));
+    show_recent(&app, &state);
+    let state = Rc::new(RefCell::new(state));
     {
         let settings = &state.borrow().settings;
         let font = app.global::<ChartFont>();
@@ -1111,10 +1204,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
     wire(&app, &state);
 
-    let recent = Rc::new(VecModel::<SharedString>::default());
-    app.set_recent(recent.clone().into());
     let weak = app.as_weak();
-    let dropped_into = recent.clone();
     let drop_state = state.clone();
     app.window().on_winit_window_event(move |_, event| {
         let Some(app) = weak.upgrade() else { return EventResult::Propagate };
@@ -1129,26 +1219,8 @@ fn main() -> Result<(), slint::PlatformError> {
             }
             return EventResult::Propagate;
         }
-        if open(&app, &mut state, path) {
-            let path = SharedString::from(path.display().to_string());
-            if let Some(i) = dropped_into.iter().position(|p| p == path) {
-                dropped_into.remove(i);
-            }
-            dropped_into.insert(0, path);
-        }
+        open(&app, &mut state, path);
         EventResult::Propagate
-    });
-
-    let (weak, recent_state) = (app.as_weak(), state.clone());
-    app.on_open_recent(move |path| {
-        if let Some(app) = weak.upgrade() {
-            open(&app, &mut recent_state.borrow_mut(), Path::new(path.as_str()));
-        }
-    });
-    // Deferred: macOS native menus break if their structure changes while an item's activation is being handled.
-    app.on_clear_recent(move || {
-        let recent = recent.clone();
-        slint::Timer::single_shot(std::time::Duration::ZERO, move || recent.set_vec(Vec::new()));
     });
 
     let ticker = slint::Timer::default();
