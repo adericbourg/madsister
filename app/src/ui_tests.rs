@@ -227,6 +227,19 @@ fn the_start_screen_creates_an_editable_grid_of_the_chosen_meter() {
 }
 
 #[test]
+fn the_start_screens_panels_are_as_wide_as_each_other() {
+    // Given the start screen, in a window narrower than both panels at full width
+    let (app, _state) = start_screen();
+    app.window().set_size(slint::LogicalSize::new(800.0, 1800.0));
+
+    // Then the new grid and the importer panels share one width, within the window
+    let panel = |t| ElementHandle::find_by_element_type_name(&app, t).next().unwrap();
+    let (grid, importer) = (panel("NewGrid"), panel("Importer"));
+    assert_eq!(grid.size().width, importer.size().width);
+    assert!(importer.absolute_position().x + importer.size().width <= 800.0);
+}
+
+#[test]
 fn the_importer_refuses_a_url_that_isnt_http() {
     // Given a file URL in the URL tab
     let (app, _state) = start_screen();
