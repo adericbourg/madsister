@@ -71,6 +71,7 @@ global Ink {
     out property <color> focus: dark ? #93c5fd : #1d4ed8;
     out property <color> editing: dark ? #4a3f12 : #fef9c3;
     out property <color> selection: dark ? #1e3a5f : #dbeafe;
+    out property <color> playing: dark ? #4ade80 : #116329;
 }
 
 /// A right-click menu item (editor.rs `MenuAction`).
@@ -101,6 +102,9 @@ export global Grid {
     in property <string> draft-text;
     in property <bool> draft-select-all;
     in property <string> draft-error;
+    /// The bar being played (F-PB-1), -1 for none.
+    in property <int> playing-section: -1;
+    in property <int> playing-bar;
     /// The selected bars of a section, -1 for none.
     in property <int> selection-section: -1;
     in property <int> selection-from;
@@ -276,6 +280,13 @@ component Bar inherits Rectangle {
     min-height: 3 * Size.rem;
     background: Grid.selection-section == section && index >= Grid.selection-from && index <= Grid.selection-to
         ? Ink.selection : transparent;
+    property <bool> is-playing: Grid.playing-section == section && Grid.playing-bar == index;
+    // The view follows the playback, only moving when the bar would leave it.
+    changed is-playing => {
+        if (self.is-playing) {
+            Grid.reveal(self.absolute-position.y, self.height);
+        }
+    }
     // Holds the slots, so it sees the pointer over any of them: edit mode frames the hovered bar.
     hover := TouchArea {
         mouse-cursor: Grid.is-editable ? pointer : default;
@@ -326,6 +337,12 @@ component Bar inherits Rectangle {
         x: parent.width - 2px;
         width: 2px;
         background: Ink.ink;
+    }
+    // The bar being played: a thick line under it, unlike the focus ring and the selection.
+    if is-playing: Rectangle {
+        y: parent.height - 6px;
+        height: 6px;
+        background: Ink.playing;
     }
     // Edit mode affordance: lighter than the cursor's ring.
     if Grid.is-editable && hover.has-hover: Rectangle {

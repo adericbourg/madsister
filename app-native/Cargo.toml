@@ -5,6 +5,7 @@ edition = "2024"
 license = "GPL-3.0-only"
 
 [dependencies]
+cpal = "0.18"
 dirs = "6"
 krilla = { version = "0.8.2", default-features = false, features = ["simple-text"] }
 serde = { version = "1.0.229", features = ["derive"] }

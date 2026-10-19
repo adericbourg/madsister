@@ -1,6 +1,9 @@
 import { ScrollView, Palette, Button } from "std-widgets.slint";
 import { Sheet, ChartView, Size, Grid } from "sheet.slint";
 import { Panels, PanelsView, MetaChoice } from "panels.slint";
+import { Transport, Player } from "transport.slint";
+
+export { Player } from "transport.slint";
 
 export { PanelsView, MetaChoice } from "panels.slint";
 
@@ -63,6 +66,8 @@ export component AppWindow inherits Window {
         grid-scope.focus();
     }
 
+    changed width => { transport.is-wide = self.width - sidebar.width > 40rem; }
+
     MenuBar {
         Menu {
             title: @tr("File");
@@ -89,6 +94,11 @@ export component AppWindow inherits Window {
     HorizontalLayout {
         visible: has-song;
     VerticalLayout {
+        transport := Transport {
+            padding-left: Size.rem;
+            padding-right: Size.rem;
+            padding-top: 0.5 * Size.rem;
+        }
         Text {
             text: notice;
             color: Palette.foreground;

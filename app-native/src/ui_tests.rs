@@ -13,7 +13,7 @@ fn window() -> (AppWindow, Rc<RefCell<State>>) {
     app.window().set_size(slint::LogicalSize::new(1000.0, 1800.0));
     app.show().unwrap();
     let song = empty_song(Meter { beats: 4, unit: 4, extra: Default::default() }, None);
-    let state = Rc::new(RefCell::new(State { settings: Settings::parse(&serde_json::Value::Null), editor: Some(Editor::new(song)), shown: None, errors: Errors::default(), pending: None }));
+    let state = Rc::new(RefCell::new(State { settings: Settings::parse(&serde_json::Value::Null), editor: Some(Editor::new(song)), shown: None, errors: Errors::default(), pending: None, player: Ok(None) }));
     wire(&app, &state);
     refresh(&app, &mut state.borrow_mut());
     focus_grid_when_idle(&app, &state.borrow());

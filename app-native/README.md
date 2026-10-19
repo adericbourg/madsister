@@ -17,6 +17,8 @@ cargo clippy --all-targets -- -D warnings
   `DISPLAY`), the app runs on native Wayland, without drops. Switch back to native Wayland once winit supports drag &
   drop there (`main.rs`, the `with_x11` builder).
 - File drops come from winit's `WindowEvent::DroppedFile`: Slint's own `DropArea` only takes drops from inside the app.
+- Audio is decoded by ffmpeg (already the engine's prerequisite on every platform) at the output's rate, and played with
+  cpal. The output stream runs while paused, writing silence: PipeWire's ALSA layer refuses to pause one.
 - Native menus (muda on macOS and Windows) must not change structure while an item's activation is handled: such
   changes are deferred to the next event loop turn.
 
@@ -28,7 +30,7 @@ Product brief §5, checked against `app/` on the same songs. Removed when `app/`
       empty grid (F-IN-6), mode (F-IN-7)
 - [ ] Grid editor: F-ED-1 to F-ED-11
 - [ ] Display styles: F-DS-1, F-DS-2
-- [ ] Playback: F-PB-1 to F-PB-4
+- [x] Playback: F-PB-1 to F-PB-4
 - [ ] Exports: PDF (F-EX-1), ChordPro (F-EX-2), MusicXML (F-EX-3), MIDI (F-EX-4)
 - [ ] App shell: F-UI-1 to F-UI-8
 - [ ] `madsister print`

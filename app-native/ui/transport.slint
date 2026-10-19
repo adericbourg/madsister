@@ -1,0 +1,102 @@
+// The transport above the chart (F-PB-1, F-ED-8): playback, and the low-confidence chords to review.
+
+import { Button, Slider, GroupBox, Palette } from "std-widgets.slint";
+
+export global Player {
+    /// The song has an audio file: the Playback box shows.
+    in property <bool> has-audio;
+    in property <bool> is-ready;
+    in property <bool> is-playing;
+    in property <float> time;
+    in property <float> duration;
+    /// "01:23/04:20".
+    in property <string> time-text;
+    in property <string> error;
+    /// Some chord has an engine confidence: the Review box shows.
+    in property <bool> has-review;
+    in property <int> flagged;
+    callback toggle();
+    callback seek(float);
+    /// To the next (true) or previous low-confidence chord.
+    callback review(bool);
+}
+
+component Playback inherits GroupBox {
+    title: @tr("Playback");
+    horizontal-stretch: 1;
+    HorizontalLayout {
+        alignment: stretch;
+        spacing: 8px;
+        Button {
+            text: Player.is-playing ? @tr("Pause") : @tr("Play");
+            enabled: Player.is-ready;
+            clicked => { Player.toggle(); }
+        }
+        Slider {
+            horizontal-stretch: 1;
+            minimum: 0;
+            maximum: max(Player.duration, 0.1);
+            enabled: Player.is-ready;
+            accessible-label: @tr("Seek");
+            // Follows the playback; a drag sets it, which breaks a plain binding.
+            property <float> time: Player.time;
+            changed time => { self.value = self.time; }
+            changed(value) => { Player.seek(value); }
+        }
+        Text {
+            text: Player.time-text;
+            color: Palette.foreground;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component Review inherits GroupBox {
+    title: @tr("Review");
+    horizontal-stretch: 1;
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            horizontal-stretch: 1;
+            text: Player.flagged == 0 ? @tr("No chords to review") : Player.flagged == 1 ? @tr("1 chord to review") : Player.flagged + " " + @tr("chords to review");
+            color: Palette.foreground;
+            vertical-alignment: center;
+            accessible-role: text;
+        }
+        Button {
+            horizontal-stretch: 0;
+            text: "‹";
+            enabled: Player.flagged > 0;
+            accessible-label: @tr("Previous chord to review");
+            clicked => { Player.review(false); }
+        }
+        Button {
+            horizontal-stretch: 0;
+            text: "›";
+            enabled: Player.flagged > 0;
+            accessible-label: @tr("Next chord to review");
+            clicked => { Player.review(true); }
+        }
+    }
+}
+
+/// Side by side when there's room for both, one above the other otherwise.
+export component Transport inherits VerticalLayout {
+    vertical-stretch: 0;
+    /// Set by the window when it's resized: a binding on the width would loop through the layout this picks.
+    in-out property <bool> is-wide: true;
+    spacing: 6px;
+    if is-wide && (Player.has-audio || Player.has-review): HorizontalLayout {
+        spacing: 12px;
+        if Player.has-audio: Playback { }
+        if Player.has-review: Review { }
+    }
+    if !is-wide && Player.has-audio: Playback { }
+    if !is-wide && Player.has-review: Review { }
+    if Player.has-audio && Player.error != "": Text {
+        text: Player.error;
+        color: Palette.color-scheme == ColorScheme.dark ? #f97066 : #b42318;
+        wrap: word-wrap;
+        accessible-role: text;
+    }
+}

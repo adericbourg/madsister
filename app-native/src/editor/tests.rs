@@ -456,3 +456,24 @@ mod panels {
         assert_eq!(bar(&ed, 0, 0), chords(&[("A:min", 1)]));
     }
 }
+
+#[test]
+fn review_moves_to_the_next_doubtful_bar_and_gives_its_time() {
+    // Given a doubtful chord in bar 2 of an aligned song
+    let song = parse_song(
+        r#"{ "version": 1, "meta": { "title": "t", "meter": { "beats": 4, "unit": 4 } }, "sections": [{ "id": "a", "label": "A", "bars": [
+            { "startSec": 0, "chords": [{ "chord": "C:maj", "beats": 4 }] },
+            { "startSec": 2.5, "chords": [{ "chord": "G:maj", "beats": 4, "confidence": 0.2 }] }
+        ] }] }"#,
+    )
+    .unwrap();
+    let mut ed = Editor::new(song);
+
+    // When reviewing forward, Then the cursor is on bar 2 and the audio goes to 2.5 s
+    assert_eq!(ed.review(Step::Forward, &settings()), Some(2.5));
+    assert_eq!(ed.cursor(), at(0, 1, 0));
+
+    // When the chord is confirmed by retyping it, Then there's nothing left to review
+    type_keys(&mut ed, "G\n");
+    assert_eq!(ed.review(Step::Forward, &settings()), None);
+}
