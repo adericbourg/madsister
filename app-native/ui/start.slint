@@ -21,6 +21,15 @@ export global Import {
     in property <int> pct;
     in property <string> failure;
     in property <string> stderr;
+    /// A packaged app's first-launch engine install: the importer shows once it's done.
+    in property <bool> needs-setup;
+    in property <bool> is-setting-up;
+    in property <string> setup-status;
+    /// -1 while installing, which reports no percent.
+    in property <int> setup-pct;
+    in property <string> setup-failure;
+    in property <string> setup-stderr;
+    callback retry-setup();
     callback pick-file();
     callback run();
     callback stop();
@@ -74,9 +83,73 @@ component NewGrid inherits GroupBox {
     }
 }
 
+/// An engine failure, and its output on demand; the children go between the two (a Retry button).
+component Failure inherits VerticalLayout {
+    in property <string> message;
+    in property <string> stderr;
+    property <bool> show-output;
+    spacing: 4px;
+    Text {
+        text: message;
+        color: Palette.color-scheme == ColorScheme.dark ? #f97066 : #b42318;
+        wrap: word-wrap;
+        accessible-role: text;
+    }
+    @children
+    if stderr != "": Button {
+        text: show-output ? @tr("Hide engine output") : @tr("Engine output");
+        clicked => { show-output = !show-output; }
+    }
+    if show-output && stderr != "": ScrollView {
+        height: 12rem;
+        content-height: output.preferred-height;
+        output := Text {
+            width: parent.visible-width;
+            text: stderr;
+            font-family: "monospace";
+            color: Palette.foreground;
+            wrap: word-wrap;
+        }
+    }
+}
+
+/// A packaged app's first launch (M6-2): installs the engine, which the importer then uses.
+component EngineSetup inherits GroupBox {
+    title: @tr("Import audio");
+    VerticalLayout {
+        spacing: 8px;
+        alignment: start;
+        Text {
+            text: @tr("First launch: madsister installs its transcription engine (Python, its libraries and the models, several hundred MB to download, once). This takes a few minutes; you can edit songs meanwhile.");
+            color: Palette.foreground;
+            wrap: word-wrap;
+        }
+        Text {
+            text: Import.setup-status;
+            color: Palette.foreground;
+            accessible-role: text;
+        }
+        if Import.is-setting-up: ProgressIndicator {
+            indeterminate: Import.setup-pct < 0;
+            progress: Import.setup-pct / 100;
+            accessible-label: @tr("Engine setup");
+        }
+        if Import.setup-failure != "": Failure {
+            message: @tr("The engine setup failed: {}", Import.setup-failure);
+            stderr: Import.setup-stderr;
+            HorizontalLayout {
+                alignment: start;
+                Button {
+                    text: @tr("Retry");
+                    clicked => { Import.retry-setup(); }
+                }
+            }
+        }
+    }
+}
+
 component Importer inherits GroupBox {
     title: @tr("Import audio");
-    property <bool> show-output;
     VerticalLayout {
         spacing: 8px;
         alignment: start;
@@ -179,29 +252,9 @@ component Importer inherits GroupBox {
             progress: Import.pct / 100;
             accessible-label: Import.status;
         }
-        if Import.failure != "": VerticalLayout {
-            spacing: 4px;
-            Text {
-                text: Import.failure;
-                color: Palette.color-scheme == ColorScheme.dark ? #f97066 : #b42318;
-                wrap: word-wrap;
-                accessible-role: text;
-            }
-            if Import.stderr != "": Button {
-                text: show-output ? @tr("Hide engine output") : @tr("Engine output");
-                clicked => { show-output = !show-output; }
-            }
-            if show-output && Import.stderr != "": ScrollView {
-                height: 12rem;
-                content-height: output.preferred-height;
-                output := Text {
-                    width: parent.visible-width;
-                    text: Import.stderr;
-                    font-family: "monospace";
-                    color: Palette.foreground;
-                    wrap: word-wrap;
-                }
-            }
+        if Import.failure != "": Failure {
+            message: Import.failure;
+            stderr: Import.stderr;
         }
     }
 }
@@ -218,7 +271,10 @@ export component StartScreen inherits ScrollView {
             width: 18rem;
             create(beats, unit, nashville) => { root.create-grid(beats, unit, nashville); }
         }
-        Importer {
+        if Import.needs-setup: EngineSetup {
+            width: 30rem;
+        }
+        if !Import.needs-setup: Importer {
             width: 30rem;
         }
     }

@@ -263,6 +263,49 @@ impl Importer {
     }
 }
 
+/// A packaged app's first-launch engine install (M6-2), which the importer waits for. One for the whole window: a second
+/// setup would race the first on the same env.
+#[derive(Debug, Default)]
+pub struct EngineSetup {
+    pub is_needed: bool,
+    /// The running setup's stage and percent.
+    pub progress: Option<(String, u8)>,
+    pub failure: Option<Failure>,
+}
+
+impl EngineSetup {
+    /// Starts the setup unless one runs: true when the caller must start its job.
+    pub fn run(&mut self) -> bool {
+        if self.progress.is_some() {
+            return false;
+        }
+        self.failure = None;
+        self.progress = Some(("install".into(), 0));
+        true
+    }
+
+    /// An event of the setup's job (an `Error` too when it couldn't start).
+    pub fn event(&mut self, event: EngineEvent) {
+        self.progress = None;
+        match event {
+            EngineEvent::Progress { stage, pct, .. } => self.progress = Some((stage, pct)),
+            EngineEvent::Result { .. } => self.is_needed = false,
+            EngineEvent::Error { message, stderr } => self.failure = Some(Failure { message, stderr }),
+            EngineEvent::Cancelled => self.failure = Some(fail("The setup was cancelled.")),
+        }
+    }
+
+    /// What the status line says.
+    pub fn status(&self) -> &str {
+        match self.progress.as_ref().map(|(stage, _)| stage.as_str()) {
+            Some("install") => "Installing Python and the engine's libraries…",
+            Some("setup") => "Downloading the models…",
+            Some(stage) => stage,
+            None => "",
+        }
+    }
+}
+
 /// "Recording 2026-10-19T12-30-05.wav" for a time in seconds since 1970 (UTC), as the TypeScript app named them.
 pub fn recording_name(unix_sec: u64) -> String {
     let (days, secs) = ((unix_sec / 86_400) as i64, unix_sec % 86_400);

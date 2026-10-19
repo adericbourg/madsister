@@ -194,3 +194,42 @@ fn recording_name_writes_the_utc_date_and_time() {
     assert_eq!(recording_name(1_792_412_205), "Recording 2026-10-19T12-16-45.wav");
     assert_eq!(recording_name(951_782_400), "Recording 2000-02-29T00-00-00.wav");
 }
+
+#[test]
+fn the_engine_setup_shows_its_stages_then_is_done() {
+    // Given a first launch
+    let mut setup = EngineSetup { is_needed: true, ..Default::default() };
+
+    // When it starts, Then it installs first, and a second run while it runs starts nothing
+    assert!(setup.run());
+    assert_eq!(setup.status(), "Installing Python and the engine's libraries…");
+    assert!(!setup.run());
+
+    // When the models download, Then
+    setup.event(progress("setup", 50, None));
+    assert_eq!((setup.status(), setup.progress.as_ref().map(|p| p.1)), ("Downloading the models…", Some(50)));
+
+    // When it ends, Then the engine is ready
+    setup.event(result("/models"));
+    assert!(!setup.is_needed && setup.progress.is_none() && setup.failure.is_none());
+}
+
+#[test]
+fn a_failed_engine_setup_keeps_the_engine_output_until_retried() {
+    // Given a running setup
+    let mut setup = EngineSetup { is_needed: true, ..Default::default() };
+    setup.run();
+
+    // When it fails, Then the message and output are kept, and nothing runs
+    setup.event(EngineEvent::Error { message: "no network".into(), stderr: "uv: dns error".into() });
+    assert_eq!(setup.failure, Some(Failure { message: "no network".into(), stderr: "uv: dns error".into() }));
+    assert!(setup.is_needed && setup.progress.is_none() && setup.status().is_empty());
+
+    // When retrying, Then it runs again without the failure
+    assert!(setup.run());
+    assert_eq!(setup.failure, None);
+
+    // When it's cancelled (the app closes), Then it says so
+    setup.event(EngineEvent::Cancelled);
+    assert_eq!(setup.failure.map(|f| f.message), Some("The setup was cancelled.".into()));
+}

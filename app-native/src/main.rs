@@ -8,13 +8,13 @@ use slint::{SharedString, VecModel};
 
 use madsister::audio::{FileCheck, Player as AudioPlayer, Status, audio_path, check_file, located_sha256, relative_audio_path};
 use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField, Outcome};
-use madsister::engine::{EngineEvent, Jobs};
+use madsister::engine::{EngineEvent, Jobs, Packaged};
 use madsister::export::chordpro::to_chord_pro;
 use madsister::export::midi::to_midi;
 use madsister::export::musicxml::to_music_xml;
 use madsister::export::sheet::to_sheet;
 use madsister::files::{parse_paths, push_recent, shortest_unique_paths, write_atomic};
-use madsister::importer::{ForcedMeter, Importer, Next, Request, Source, recording_name};
+use madsister::importer::{EngineSetup, ForcedMeter, Importer, Next, Request, Source, recording_name};
 use madsister::keymap::{count_flagged, has_confidence};
 use madsister::model::playback::bar_at_time;
 use madsister::keymap::{KeyInput, SHORTCUTS};
@@ -44,6 +44,11 @@ struct State {
     /// What the open confirmation dialog would do.
     pending: Option<Pending>,
     jobs: Jobs,
+    /// The packaged engine; None in a dev build and when `MADSISTER_ENGINE` overrides it.
+    engine: Option<Packaged>,
+    setup: EngineSetup,
+    /// The setup job's events, read by the ticker.
+    setup_events: (std::sync::mpsc::Sender<EngineEvent>, std::sync::mpsc::Receiver<EngineEvent>),
     last_tab_id: u32,
     /// Saves the songs that have a file 2 s after the last edit; restarted by every refresh while one has changes.
     autosave: slint::Timer,
@@ -64,6 +69,9 @@ impl State {
             shown: None,
             pending: None,
             jobs: Jobs::default(),
+            engine: None,
+            setup: EngineSetup::default(),
+            setup_events: std::sync::mpsc::channel(),
             last_tab_id: 0,
             autosave: slint::Timer::default(),
             config: None,
@@ -299,21 +307,37 @@ fn sources_dir() -> std::path::PathBuf {
     dirs::data_local_dir().unwrap_or_default().join("dev.dericbourg.madsister").join("sources")
 }
 
-// shortcut: no packaged engine yet (step 12), so every feature counts as installed, as in dev.
-fn engine_has(_feature: &str) -> bool {
-    true
+/// A feature ("Detect sections", "Accurate") can run: always in dev or with `MADSISTER_ENGINE`, else once installed.
+fn engine_has(engine: Option<&Packaged>, feature: &str) -> bool {
+    engine.is_none_or(|p| p.has(feature))
+}
+
+/// Starts the first-launch engine setup unless it runs; its events go to the ticker.
+fn run_setup(state: &mut State) {
+    let Some(packaged) = &state.engine else { return };
+    if !state.setup.run() {
+        return;
+    }
+    let argv = packaged.setup_command(&[]);
+    let events = state.setup_events.0.clone();
+    if let Err(e) = state.jobs.spawn(&argv, false, move |event| _ = events.send(event)) {
+        let message = format!("can't start the engine setup ({}): {e}", argv[0]);
+        state.setup.event(EngineEvent::Error { message, stderr: String::new() });
+    }
 }
 
 /// Starts an engine job; its events go to the ticker.
 fn start_job(state: &State, request: Request) -> Result<u32, String> {
-    let mut argv = madsister::engine::engine_command(std::env::var("MADSISTER_ENGINE").ok(), None);
+    let mut argv = madsister::engine::engine_command(std::env::var("MADSISTER_ENGINE").ok(), state.engine.as_ref());
     if let Some(hint) = madsister::engine::missing_dev_engine(&argv) {
         return Err(hint);
     }
     let has_stdin = matches!(request, Request::Record { .. });
     let path = |p: &Path| p.display().to_string();
     match request {
-        Request::Setup(_) => return Err("the engine isn't packaged".into()),
+        Request::Setup(features) => {
+            argv = state.engine.as_ref().ok_or("the engine isn't packaged")?.setup_command(&features);
+        }
         Request::Transcribe { audio, out, meter, sections, mode } => {
             argv.extend(madsister::engine::transcribe_args(path(&audio), path(&out), meter, sections, mode));
         }
@@ -368,13 +392,35 @@ fn show_import(app: &AppWindow, state: &State) {
     ui.set_pct(importer.job.as_ref().map_or(0, |j| i32::from(j.pct)));
     ui.set_failure(importer.failure.as_ref().map(|f| f.message.as_str()).unwrap_or_default().into());
     ui.set_stderr(importer.failure.as_ref().map(|f| f.stderr.as_str()).unwrap_or_default().into());
+    ui.set_sections_installed(engine_has(state.engine.as_ref(), "sections"));
+    ui.set_accurate_installed(engine_has(state.engine.as_ref(), "separate"));
+    let setup = &state.setup;
+    ui.set_needs_setup(setup.is_needed);
+    ui.set_setup_status(setup.status().into());
+    ui.set_is_setting_up(setup.progress.is_some());
+    ui.set_setup_pct(match &setup.progress {
+        Some((stage, _)) if stage == "install" => -1,
+        Some((_, pct)) => i32::from(*pct),
+        None => 0,
+    });
+    ui.set_setup_failure(setup.failure.as_ref().map(|f| f.message.as_str()).unwrap_or_default().into());
+    ui.set_setup_stderr(setup.failure.as_ref().map(|f| f.stderr.as_str()).unwrap_or_default().into());
 }
 
 /// Reads the engine's events that arrived since the last tick.
 fn drain_engine_events(app: &AppWindow, state: &mut State) {
     while let Ok(event) = state.tab().engine_events.1.try_recv() {
-        let next = state.tab_mut().importer.event(event, engine_has, Path::exists);
+        let tab = &mut state.tabs[state.active];
+        let next = tab.importer.event(event, |f| engine_has(state.engine.as_ref(), f), Path::exists);
         follow(app, state, next);
+    }
+    let mut has_setup_events = false;
+    while let Ok(event) = state.setup_events.1.try_recv() {
+        state.setup.event(event);
+        has_setup_events = true;
+    }
+    if has_setup_events {
+        show_import(app, state);
     }
 }
 
@@ -409,7 +455,8 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
         let Some(app) = weak.upgrade() else { return };
         let ui = app.global::<Import>();
         let mut state = st.borrow_mut();
-        let importer = &mut state.tab_mut().importer;
+        let state = &mut *state; // borrows the tab and the engine apart
+        let importer = &mut state.tabs[state.active].importer;
         importer.source = match ui.get_source() {
             1 => Source::Url,
             2 => Source::Record,
@@ -425,8 +472,9 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
         importer.detect_sections = ui.get_detect_sections();
         importer.accurate = ui.get_accurate();
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-        let next = importer.run(&sources_dir(), &recording_name(now), engine_has, Path::exists);
-        follow(&app, &mut state, next);
+        let has = |f: &str| engine_has(state.engine.as_ref(), f);
+        let next = importer.run(&sources_dir(), &recording_name(now), has, Path::exists);
+        follow(&app, state, next);
     });
     let (weak, st) = (app.as_weak(), state.clone());
     import.on_cancel(move || {
@@ -437,6 +485,13 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
         if let Some(app) = weak.upgrade() {
             show_import(&app, &state);
         }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    import.on_retry_setup(move || {
+        let Some(app) = weak.upgrade() else { return };
+        let mut state = st.borrow_mut();
+        run_setup(&mut state);
+        show_import(&app, &state);
     });
     let st = state.clone();
     import.on_stop(move || {
@@ -1016,8 +1071,9 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
                 refresh(&app, &mut state);
             }
             Some(Pending::Overwrite(_)) if is_yes => {
-                let next = state.tab_mut().importer.transcribe_confirmed(engine_has);
-                follow(&app, &mut state, next);
+                let state = &mut *state; // borrows the tab and the engine apart
+                let next = state.tabs[state.active].importer.transcribe_confirmed(|f| engine_has(state.engine.as_ref(), f));
+                follow(&app, state, next);
             }
             Some(Pending::CloseTab(index)) if is_yes => close_tab_now(&app, &mut state, index),
             Some(Pending::OtherAudio(file, sha256)) if is_yes => {
@@ -1470,6 +1526,12 @@ fn main() -> Result<(), slint::PlatformError> {
     app.set_is_mac(cfg!(target_os = "macos"));
     app.set_version(env!("CARGO_PKG_VERSION").into());
     let mut state = State::new(Settings::load());
+    state.engine = madsister::engine::packaged_engine();
+    // At launch rather than on the start screen: it downloads for minutes, songs can be edited meanwhile.
+    state.setup.is_needed = state.engine.as_ref().is_some_and(Packaged::needs_setup);
+    if state.setup.is_needed {
+        run_setup(&mut state);
+    }
     state.config = madsister::settings::config_dir();
     state.recent = read_config(&state, "recent.json").map_or_else(Vec::new, |json| parse_paths(&json));
     show_recent(&app, &state);
