@@ -19,6 +19,45 @@ export global Player {
     callback seek(float);
     /// To the next (true) or previous low-confidence chord.
     callback review(bool);
+    /// Why the audio file is missing or changed; empty when it's fine.
+    in property <string> audio-notice;
+    callback locate-audio();
+    callback show-song-file();
+}
+
+/// app.css's --warning: frames and tints the audio notice.
+component AudioNotice inherits Rectangle {
+    property <color> warning: Palette.color-scheme == ColorScheme.dark ? #fdb022 : #b54708;
+    background: Palette.background.mix(self.warning, 88%);
+    border-color: self.warning;
+    border-width: 1px;
+    border-radius: 8px;
+    accessible-role: groupbox;
+    accessible-label: @tr("Audio file");
+    VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+        Text {
+            text: Player.audio-notice;
+            color: Palette.foreground;
+            wrap: word-wrap;
+            accessible-role: text;
+        }
+        HorizontalLayout {
+            alignment: start;
+            spacing: 8px;
+            Button {
+                text: @tr("Locate audio…");
+                primary: true;
+                clicked => { Player.locate-audio(); }
+            }
+            // The notice needs the song's file: there's always one to show.
+            Button {
+                text: @tr("Show song file");
+                clicked => { Player.show-song-file(); }
+            }
+        }
+    }
 }
 
 component Playback inherits GroupBox {
@@ -86,6 +125,7 @@ export component Transport inherits VerticalLayout {
     /// Set by the window when it's resized: a binding on the width would loop through the layout this picks.
     in-out property <bool> is-wide: true;
     spacing: 6px;
+    if Player.audio-notice != "": AudioNotice { }
     if is-wide && (Player.has-audio || Player.has-review): HorizontalLayout {
         spacing: 12px;
         if Player.has-audio: Playback { }
