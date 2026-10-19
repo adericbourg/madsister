@@ -1,12 +1,18 @@
-import "../fonts/PetalumaScript.ttf";
+import { ScrollView, Palette } from "std-widgets.slint";
+import { Sheet, ChartView, Size } from "sheet.slint";
+export { ChartFont } from "sheet.slint";
+
+export { ChartView, SectionView, RowView, BarView, SlotView } from "sheet.slint";
 
 export component AppWindow inherits Window {
-    title: "madsister";
+    title: chart.title == "" ? "madsister" : chart.title + " — madsister";
     preferred-width: 1280px;
     preferred-height: 800px;
+    background: Palette.color-scheme == ColorScheme.dark ? #1c1c1f : #f4f4f6;
 
     in property <[string]> recent;
-    in property <string> dropped;
+    in property <ChartView> chart;
+    in property <bool> has-song;
     callback open-recent(string);
     callback clear-recent();
 
@@ -28,9 +34,28 @@ export component AppWindow inherits Window {
         }
     }
 
-    Text {
-        text: root.dropped == "" ? @tr("Drop an audio file here") : root.dropped;
-        font-family: "Petaluma Script";
-        font-size: 24px;
+    if !has-song: Text {
+        text: @tr("Drop a song file (.madsister.json) here");
+        color: Palette.foreground;
+    }
+
+    if has-song: ScrollView {
+        content-width: self.visible-width;
+        content-height: page.preferred-height;
+        page := VerticalLayout {
+            width: parent.visible-width;
+            padding: Size.rem;
+            alignment: start;
+            HorizontalLayout {
+                alignment: center;
+                Sheet {
+                    // grid.css: max-width 60rem plus its 1.5rem side padding.
+                    preferred-width: 63 * Size.rem;
+                    max-width: 63 * Size.rem;
+                    min-width: 0;
+                    chart: chart;
+                }
+            }
+        }
     }
 }

@@ -1,0 +1,305 @@
+// The chord sheet (F-ED-1, F-ED-2, F-ED-8): a paper chart, black ink on white, boxed rehearsal marks for sections.
+// Sizes follow grid.css, Size.rem = 16px.
+
+import { Palette } from "std-widgets.slint";
+import "../fonts/PatrickHand-Regular.ttf";
+import "../fonts/Kalam-Regular.ttf";
+import "../fonts/Kalam-Bold.ttf";
+import "../fonts/PetalumaScript.ttf";
+import "../fonts/PetalumaText.ttf";
+import "../fonts/DejaVuSerif.ttf";
+import "../fonts/DejaVuSerif-Bold.ttf";
+
+export struct SlotView {
+    text: string,
+    /// What a screen reader says: section, bar, beat and the chord spelled out.
+    spoken: string,
+    beats: int,
+    low-confidence: bool,
+}
+
+export struct BarView {
+    /// A per-bar meter override ("2/4"), or empty.
+    meter: string,
+    slots: [SlotView],
+}
+
+export struct RowView {
+    bars: [BarView],
+}
+
+export struct SectionView {
+    label: string,
+    /// Shown as "x2" above 1.
+    repeat: int,
+    rows: [RowView],
+}
+
+export struct ChartView {
+    title: string,
+    artist: string,
+    /// The key as displayed ("F#m"), or empty.
+    key: string,
+    /// "♩ = 120", or empty.
+    tempo: string,
+    bars-per-row: int,
+    sections: [SectionView],
+}
+
+// grid.css's rem: the browser's 16px, not the platform's default font size Slint's rem follows.
+global Size {
+    out property <length> rem: 16px;
+}
+
+// The chart font, and the stroke that thickens bold text in a font without a bold face, as browsers fake bold.
+global ChartFont {
+    in-out property <string> family;
+    in-out property <bool> has-bold;
+    out property <length> bold-stroke: has-bold ? 0 : 0.6px;
+}
+
+// The sheet's colours; a dark sheet one step lighter than the dark chrome, as grid.css.
+global Ink {
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    out property <color> ink: dark ? #e6e6e6 : #000;
+    out property <color> paper: dark ? #26262a : #fff;
+    out property <color> muted: dark ? #a3a3a3 : #555;
+    out property <color> hairline: dark ? #8a8a8a : #767676;
+    out property <color> doubt: dark ? #fb923c : #a64200;
+}
+
+/// A dotted line: `vertical` for the hairline between slots, else under a doubtful chord.
+component Dots inherits Rectangle {
+    in property <bool> vertical;
+    in property <color> dot-color;
+    in property <length> dot;
+    in property <length> step: 2 * dot;
+    for i in floor((vertical ? self.height : self.width) / step): Rectangle {
+        x: vertical ? 0 : i * step;
+        y: vertical ? i * step : 0;
+        width: dot;
+        height: dot;
+        background: dot-color;
+    }
+}
+
+component Slot inherits Rectangle {
+    in property <SlotView> slot;
+    accessible-role: text;
+    accessible-label: slot.spoken;
+    label := Text {
+        x: 0.5 * Size.rem;
+        width: parent.width - Size.rem;
+        text: slot.text;
+        font-family: ChartFont.family;
+        font-size: 1.4 * Size.rem;
+        font-weight: 600;
+        stroke: self.color;
+        stroke-width: ChartFont.bold-stroke;
+        color: slot.low-confidence ? Ink.doubt : Ink.ink;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    if slot.low-confidence: Dots {
+        x: label.x;
+        y: label.y + label.height / 2 + 0.8 * Size.rem;
+        width: min(label.preferred-width, label.width);
+        height: 2px;
+        dot: 2px;
+        dot-color: Ink.doubt;
+    }
+}
+
+component Bar inherits Rectangle {
+    in property <BarView> bar;
+    min-height: 3 * Size.rem;
+    HorizontalLayout {
+        if bar.meter != "": Text {
+            // A per-bar meter override (F-ED-11), at the start of the bar like a time signature.
+            text: bar.meter;
+            font-family: ChartFont.family;
+            font-size: 0.9 * Size.rem;
+            font-weight: 700;
+            stroke: self.color;
+            stroke-width: ChartFont.bold-stroke;
+            color: Ink.ink;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+            min-width: self.preferred-width + 0.4 * Size.rem;
+        }
+        for slot[i] in bar.slots: Rectangle {
+            // Width shared by beats, whatever the chord's length.
+            horizontal-stretch: slot.beats;
+            min-width: 0;
+            preferred-width: 0;
+            Slot {
+                slot: slot;
+            }
+            if i > 0: Dots {
+                x: 0;
+                width: 1px;
+                vertical: true;
+                dot: 1px;
+                step: 3px;
+                dot-color: Ink.hairline;
+            }
+        }
+    }
+    // The bar line closing it.
+    Rectangle {
+        x: parent.width - 2px;
+        width: 2px;
+        background: Ink.ink;
+    }
+}
+
+component Section inherits VerticalLayout {
+    in property <SectionView> section;
+    in property <int> bars-per-row;
+    spacing: 0.5 * Size.rem;
+    accessible-role: groupbox;
+    accessible-label: section.repeat > 1 ? section.label + ", " + section.repeat + " times" : section.label;
+    HorizontalLayout {
+        alignment: start;
+        spacing: 0.5 * Size.rem;
+        Rectangle {
+            border-width: 2px;
+            border-color: Ink.ink;
+            HorizontalLayout {
+                padding-left: 0.4 * Size.rem;
+                padding-right: 0.4 * Size.rem;
+                padding-top: 0.05 * Size.rem;
+                padding-bottom: 0.05 * Size.rem;
+                Text {
+                    text: section.label;
+                    font-family: ChartFont.family;
+                    font-size: Size.rem;
+                    font-weight: 700;
+                    stroke: self.color;
+                    stroke-width: ChartFont.bold-stroke;
+                    color: Ink.ink;
+                }
+            }
+        }
+        if section.repeat > 1: Text {
+            text: "x" + section.repeat;
+            font-family: ChartFont.family;
+            font-size: Size.rem;
+            font-weight: 700;
+            stroke: self.color;
+            stroke-width: ChartFont.bold-stroke;
+            color: Ink.ink;
+            vertical-alignment: center;
+        }
+    }
+    for row in section.rows: Rectangle {
+        min-height: 3 * Size.rem;
+        // The row's opening bar line; each bar draws its closing one.
+        Rectangle {
+            x: 0;
+            width: 2px;
+            background: Ink.ink;
+        }
+        for bar[i] in row.bars: Bar {
+            x: i * parent.width / bars-per-row;
+            width: parent.width / bars-per-row;
+            bar: bar;
+        }
+    }
+    if section.rows.length == 0: Rectangle {
+        min-height: 3 * Size.rem;
+        Rectangle {
+            x: 0;
+            width: 2px;
+            background: Ink.ink;
+        }
+        Rectangle {
+            x: parent.width - 2px;
+            width: 2px;
+            background: Ink.ink;
+        }
+        Text {
+            x: 0.5 * Size.rem;
+            text: @tr("No bars yet");
+            font-family: ChartFont.family;
+            font-size: Size.rem;
+            font-italic: true;
+            color: Ink.muted;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export { Size, ChartFont }
+
+export component Sheet inherits Rectangle {
+    in property <ChartView> chart;
+    /// The chart font's family.
+    background: Ink.paper;
+    border-radius: 8px;
+    drop-shadow-blur: 3px;
+    drop-shadow-offset-y: 1px;
+    drop-shadow-color: #00000026;
+    accessible-role: table;
+    accessible-label: chart.title + " chord chart";
+    VerticalLayout {
+        padding-top: 2 * Size.rem;
+        padding-bottom: 2 * Size.rem;
+        padding-left: 1.5 * Size.rem;
+        padding-right: 1.5 * Size.rem;
+        spacing: 1.75 * Size.rem;
+        VerticalLayout {
+            Text {
+                text: chart.title;
+                font-family: ChartFont.family;
+                font-size: 2 * Size.rem;
+                font-weight: 600;
+                stroke: self.color;
+                stroke-width: ChartFont.bold-stroke;
+                color: Ink.ink;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+            if chart.artist != "": Text {
+                text: chart.artist;
+                font-family: ChartFont.family;
+                font-size: Size.rem;
+                color: Ink.ink;
+                horizontal-alignment: center;
+            }
+            if chart.key != "" || chart.tempo != "": VerticalLayout {
+                padding-top: Size.rem;
+                if chart.key != "": HorizontalLayout {
+                    alignment: start;
+                    spacing: 0.3 * Size.rem;
+                    Text {
+                        text: @tr("Key");
+                        font-family: ChartFont.family;
+                        font-size: Size.rem;
+                        color: Ink.ink;
+                    }
+                    Text {
+                        text: chart.key;
+                        font-family: ChartFont.family;
+                        font-size: Size.rem;
+                        font-weight: 700;
+                        stroke: self.color;
+                        stroke-width: ChartFont.bold-stroke;
+                        color: Ink.ink;
+                    }
+                }
+                // Engraving convention: the tempo marking sits right above the first bar.
+                if chart.tempo != "": Text {
+                    text: chart.tempo;
+                    font-family: ChartFont.family;
+                    font-size: Size.rem;
+                    color: Ink.ink;
+                }
+            }
+        }
+        for section in chart.sections: Section {
+            section: section;
+            bars-per-row: chart.bars-per-row;
+        }
+    }
+}

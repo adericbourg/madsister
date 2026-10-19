@@ -1,14 +1,36 @@
+use std::path::Path;
 use std::rc::Rc;
 
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit::event::WindowEvent};
 use slint::{Model, SharedString, VecModel};
 
+use madsister::model::song::parse_song;
+use madsister::settings::Settings;
+
+mod view;
+
 slint::include_modules!();
+
+/// Shows the song file at `path` on the sheet; false when it can't be opened.
+fn open(app: &AppWindow, settings: &Settings, path: &Path) -> bool {
+    match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|text| parse_song(&text)) {
+        Ok(song) => {
+            app.set_chart(view::chart_view(&song, settings));
+            app.set_has_song(true);
+            true
+        }
+        // shortcut: errors go to stderr until the app shell (step 11) shows them.
+        Err(e) => {
+            eprintln!("can't open {}: {e}", path.display());
+            false
+        }
+    }
+}
 
 fn main() -> Result<(), slint::PlatformError> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if let Some(("print", rest)) = args.split_first().map(|(command, rest)| (command.as_str(), rest)) {
-        std::process::exit(madsister::print::run(rest, madsister::settings::Settings::load()));
+        std::process::exit(madsister::print::run(rest, Settings::load()));
     }
 
     // The winit backend gives access to OS file drops (F-IN-1), which Slint's own drag & drop doesn't receive yet.
@@ -26,19 +48,26 @@ fn main() -> Result<(), slint::PlatformError> {
     };
     selector.select()?;
 
+    let settings = Rc::new(Settings::load());
     let app = AppWindow::new()?;
+    let font = app.global::<ChartFont>();
+    font.set_family(settings.font.family().into());
+    font.set_has_bold(settings.font.has_bold());
+    if let Some(path) = args.first() {
+        open(&app, &settings, Path::new(path));
+    }
+
     let recent = Rc::new(VecModel::<SharedString>::default());
     app.set_recent(recent.clone().into());
-
     let weak = app.as_weak();
     let dropped_into = recent.clone();
+    let drop_settings = settings.clone();
     app.window().on_winit_window_event(move |_, event| {
-        if let WindowEvent::DroppedFile(path) = event {
+        if let WindowEvent::DroppedFile(path) = event
+            && let Some(app) = weak.upgrade()
+            && open(&app, &drop_settings, path)
+        {
             let path = SharedString::from(path.display().to_string());
-            eprintln!("dropped {path}");
-            if let Some(app) = weak.upgrade() {
-                app.set_dropped(path.clone());
-            }
             if let Some(i) = dropped_into.iter().position(|p| p == path) {
                 dropped_into.remove(i);
             }
@@ -47,7 +76,12 @@ fn main() -> Result<(), slint::PlatformError> {
         EventResult::Propagate
     });
 
-    app.on_open_recent(|path| eprintln!("open recent {path}"));
+    let weak = app.as_weak();
+    app.on_open_recent(move |path| {
+        if let Some(app) = weak.upgrade() {
+            open(&app, &settings, Path::new(path.as_str()));
+        }
+    });
     // Deferred: macOS native menus break if their structure changes while an item's activation is being handled.
     app.on_clear_recent(move || {
         let recent = recent.clone();

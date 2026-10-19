@@ -32,6 +32,22 @@ impl ChartFont {
         }
     }
 
+    /// The family name the UI draws it with.
+    pub fn family(self) -> &'static str {
+        match self {
+            ChartFont::Kalam => "Kalam",
+            ChartFont::PatrickHand => "Patrick Hand",
+            ChartFont::PetalumaScript => "Petaluma Script",
+            ChartFont::PetalumaText => "Petaluma Text",
+            ChartFont::Serif => "DejaVu Serif",
+        }
+    }
+
+    /// Whether it has its own bold face; the UI thickens the others, as browsers do.
+    pub fn has_bold(self) -> bool {
+        matches!(self, ChartFont::Kalam | ChartFont::Serif)
+    }
+
     pub fn from_id(id: &str) -> Option<ChartFont> {
         ChartFont::ALL.into_iter().find(|font| font.id() == id)
     }
