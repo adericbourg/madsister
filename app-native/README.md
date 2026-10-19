@@ -5,6 +5,7 @@ replaces `app/`. The chord sheet keeps its look; everything around it uses Slint
 
 ```sh
 cargo run            # the app
+cargo run -- print FILE...   # PDFs without a window; options in src/print.rs (USAGE)
 cargo test
 cargo clippy --all-targets -- -D warnings
 ```

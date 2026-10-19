@@ -1,16 +1,17 @@
 //! The printed chart (spec F-EX-1) as spelled text, for `pdf.rs` to lay out and draw: the GUI and `madsister print`
 //! share it.
 
-use crate::model::display::{DisplayStyle, display_chord, display_key};
-use crate::model::nashville::{MinorConvention, display_nashville, tonic_pc};
+use crate::model::display::{display_chord, display_key};
+use crate::model::nashville::{display_nashville, tonic_pc};
 use crate::model::song::{Notation, Song, whole};
+use crate::settings::{ChartFont, Settings};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sheet {
     pub title: String,
     pub artist: Option<String>,
     pub facts: Vec<String>,
-    pub font: String,
+    pub font: ChartFont,
     pub compact: bool,
     pub bars_per_row: usize,
     pub sections: Vec<SheetSection>,
@@ -35,15 +36,7 @@ pub struct SheetSlot {
     pub beats: u32,
 }
 
-pub struct SheetOptions {
-    pub style: DisplayStyle,
-    pub minor_convention: MinorConvention,
-    pub font: String,
-    pub compact_print: bool,
-    pub bars_per_row: usize,
-}
-
-pub fn to_sheet(song: &Song, options: &SheetOptions) -> Sheet {
+pub fn to_sheet(song: &Song, options: &Settings) -> Sheet {
     let meta = &song.meta;
     // As the grid shows it: Nashville degrees of the key's tonic, or chord names.
     let tonic = (meta.notation == Some(Notation::Nashville)).then(|| tonic_pc(meta.key.as_deref(), options.minor_convention));
@@ -58,7 +51,7 @@ pub fn to_sheet(song: &Song, options: &SheetOptions) -> Sheet {
         title: meta.title.clone(),
         artist: meta.artist.clone(),
         facts,
-        font: options.font.clone(),
+        font: options.font,
         compact: options.compact_print,
         bars_per_row: options.bars_per_row,
         sections: song
@@ -83,15 +76,16 @@ pub fn to_sheet(song: &Song, options: &SheetOptions) -> Sheet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::display::DisplayStyle;
     use crate::model::song::parse_song;
 
-    fn options() -> SheetOptions {
-        SheetOptions {
+    fn options() -> Settings {
+        Settings {
             style: DisplayStyle::Intl,
-            minor_convention: MinorConvention::Relative,
-            font: "kalam".into(),
+            font: ChartFont::Kalam,
             compact_print: true,
             bars_per_row: 4,
+            ..Settings::parse(&serde_json::Value::Null)
         }
     }
 
@@ -123,7 +117,7 @@ mod tests {
                 title: "Song 1".into(),
                 artist: Some("The Fixtures".into()),
                 facts: vec!["Key D".into(), "♩ = 120".into()],
-                font: "kalam".into(),
+                font: ChartFont::Kalam,
                 compact: true,
                 bars_per_row: 4,
                 sections: vec![
