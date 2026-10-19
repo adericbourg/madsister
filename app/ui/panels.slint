@@ -1,6 +1,7 @@
 // The per-song panels (F-UI-4): Song and Transpose, plus Section, Bar, Bar lines and Tempo in edit mode.
 
-import { GroupBox, LineEdit, ComboBox, SpinBox, Button, Palette, ScrollView } from "std-widgets.slint";
+import { LineEdit, ComboBox, SpinBox, Button, Palette, ScrollView } from "std-widgets.slint";
+import { Frame } from "frame.slint";
 
 /// The panels' values, from the editor (main.rs `refresh`).
 export struct PanelsView {
@@ -35,7 +36,7 @@ global Reveal {
 }
 
 /// A panel; `index` is its place in the sidebar, as in Rail's buttons.
-component Panel inherits GroupBox {
+component Panel inherits Frame {
     in property <int> index;
     /// Asks the panels to scroll to this y.
     callback reveal(length);

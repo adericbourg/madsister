@@ -1,6 +1,7 @@
 // The transport above the chart (F-PB-1, F-ED-8): playback, and the low-confidence chords to review.
 
-import { Button, Slider, GroupBox, Palette } from "std-widgets.slint";
+import { Button, Slider, Palette } from "std-widgets.slint";
+import { Frame } from "frame.slint";
 
 export global Player {
     /// The song has an audio file: the Playback box shows.
@@ -60,7 +61,7 @@ component AudioNotice inherits Rectangle {
     }
 }
 
-component Playback inherits GroupBox {
+component Playback inherits Frame {
     title: @tr("Playback");
     horizontal-stretch: 1;
     HorizontalLayout {
@@ -90,7 +91,7 @@ component Playback inherits GroupBox {
     }
 }
 
-component Review inherits GroupBox {
+component Review inherits Frame {
     title: @tr("Review");
     horizontal-stretch: 1;
     HorizontalLayout {

@@ -1,0 +1,23 @@
+// app.css's fieldset: the titled card around the sidebar's panels and the transport's boxes.
+
+import { GroupBox, Palette } from "std-widgets.slint";
+
+export component Frame inherits Rectangle {
+    in property <string> title;
+    in property <bool> enabled: true;
+    property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    // app.css's --surface-2 and --border.
+    background: dark ? #2a2a2f : #fff;
+    border-color: dark ? #3a3a41 : #d4d4dc;
+    border-width: 1px;
+    border-radius: 8px;
+    HorizontalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        GroupBox {
+            title: root.title;
+            enabled: root.enabled;
+            @children
+        }
+    }
+}
