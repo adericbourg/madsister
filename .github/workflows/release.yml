@@ -3,7 +3,7 @@ name: release
 # Every night, if main got a commit in the last 25 hours, publishes a snapshot pre-release `v<last tag or 0.0.0>-snapshot.<run number>` (only the latest is kept);
 # running it by hand (Actions > release > Run workflow, on main) with a patch/minor/major bump publishes the release
 # `vX.Y.Z` that is kept; the tag is created by the publication itself. With the `snapshot` bump, a manual run publishes
-# a snapshot on demand, the same as the nightly one. It doesn't wait for the `app`/`engine` workflows: the clean-install
+# a snapshot on demand, the same as the nightly one. It doesn't wait for the `app-native`/`engine` workflows: the clean-install
 # check below gates the publication, and the next nightly snapshot replaces a bad one.
 # A release is the package `madsister`, a snapshot the package `madsister-snapshot` (own binary, files and data dir: both
 # can be installed together). The `apt` job then republishes the signed apt repository on GitHub Pages: its only suite
@@ -40,6 +40,7 @@ env:
   UV_VERSION: 0.12.21 # the uv bundled as the app's sidecar, also used to build the madmom wheel
   FFMPEG_BUILD: autobuild-2026-10-04-20-51/ffmpeg-n8.1.3-14-g330caae0c1-win64-gpl-8.1.zip # bundled in the Windows installer
   FFMPEG_SHA256: e0152c72dbc560bcf5bf8bb8ce6cb5b7ff2240379dc706240c65d5c1157dd037
+  PACKAGER_VERSION: 0.11.8 # cargo-packager, which builds the deb, AppImage, dmg and installer
 
 jobs:
   version:
@@ -97,32 +98,21 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12
-      - uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
       - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag upstream
         with:
           version: ${{ env.UV_VERSION }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app/src-tauri
-      # Tauri's packages (https://v2.tauri.app/start/prerequisites/#linux), patchelf for the AppImage, and the GStreamer
-      # plugins the AppImage bundles (bundleMediaFramework).
+          workspaces: app-native
+      # Slint's winit backend: fonts and keyboard layouts; cpal: ALSA (as in app-native.yml).
       # Plain apt-get: cache-apt-pkgs-action swallowed a mirror 404 and cached an empty package set.
-      - run: >-
-          sudo apt-get update && sudo apt-get install -y
-          libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-          gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
-      - uses: actions/cache@v6 # the AppImage tools (linuxdeploy, AppRun, its plugins) tauri downloads otherwise
+      - run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libasound2-dev
+      - run: cargo install cargo-packager --locked --version "$PACKAGER_VERSION"
+      - uses: actions/cache@v6 # the AppImage tools (linuxdeploy, AppRun, its plugins) cargo-packager downloads otherwise
         with:
-          path: ~/.cache/tauri
-          key: tauri-tools-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
+          path: ~/.cache/.cargo-packager
+          key: cargo-packager-tools-${{ runner.os }}-${{ env.PACKAGER_VERSION }}
       - id: madmom
         run: echo "rev=$(sed -n 's/^madmom = .*rev = "\([0-9a-f]*\)".*/\1/p' engine/pyproject.toml)" >> "$GITHUB_OUTPUT"
       - id: madmom-wheel
@@ -144,28 +134,31 @@ jobs:
           PACKAGE: ${{ needs.version.outputs.package }}
         run: |
           triple=$(rustc -vV | sed -n 's/^host: //p')
-          mkdir -p app/src-tauri/binaries
+          mkdir -p app-native/binaries
           curl -fsSL "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.tar.gz" |
-            tar -xzO "uv-$triple/uv" > "app/src-tauri/binaries/$PACKAGE-uv-$triple"
-          chmod +x "app/src-tauri/binaries/$PACKAGE-uv-$triple"
-      - run: pnpm install --frozen-lockfile
-        working-directory: app
+            tar -xzO "uv-$triple/uv" > "app-native/binaries/$PACKAGE-uv-$triple"
+          chmod +x "app-native/binaries/$PACKAGE-uv-$triple"
       - name: Build the deb and the AppImage
-        working-directory: app
+        working-directory: app-native
         env:
           VERSION: ${{ needs.version.outputs.version }}
           PACKAGE: ${{ needs.version.outputs.package }}
-        # The package name is the product name (deb, binary, resources, desktop file), the identifier names the data dir.
-        run: >-
-          pnpm tauri build --bundles deb,appimage --config src-tauri/tauri.bundle.conf.json
-          --config "{\"productName\":\"$PACKAGE\",\"mainBinaryName\":\"$PACKAGE\",\"identifier\":\"dev.dericbourg.$PACKAGE\",\"version\":\"$VERSION\",\"bundle\":{\"externalBin\":[\"binaries/$PACKAGE-uv\"],\"resources\":{\"../../engine/wheels/\":\"engine/wheels/\"}}}"
+          APPIMAGE_EXTRACT_AND_RUN: 1 # linuxdeploy is an AppImage too, and the runner may have no FUSE to mount it
+        # The version is the crate's (the app stamps the engine env with it); the binary is named after the package (deb,
+        # resources, desktop file, data dir: see release-config.py).
+        run: |
+          perl -0pi -e 's/^version = ".*?"/version = "$ENV{VERSION}"/m' Cargo.toml
+          cargo build --release
+          [ "$PACKAGE" = madsister ] || cp target/release/madsister "target/release/$PACKAGE"
+          cargo packager -c "$(uv run --no-project --python 3.11 release-config.py "$PACKAGE" "$VERSION")" -f deb,appimage
+          mv "target/release/${PACKAGE}_${VERSION}_x86_64.AppImage" "target/release/${PACKAGE}_${VERSION}_amd64.AppImage" # the deb's arch name, as before
       - uses: actions/upload-artifact@v7
         with:
           name: linux
           if-no-files-found: error
           path: |
-            app/src-tauri/target/release/bundle/deb/*.deb
-            app/src-tauri/target/release/bundle/appimage/*.AppImage
+            app-native/target/release/*.deb
+            app-native/target/release/*.AppImage
 
   # M6 "done when" on Linux: the deb installs on a clean system and its engine sets up and transcribes, with no compiler.
   linux-clean-install:
@@ -178,14 +171,20 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: linux
-      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ./deb/*.deb
+      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ./*.deb
+      - name: The deb's dependencies bring every library the app links to
+        env:
+          PACKAGE: ${{ needs.version.outputs.package }}
+        run: |
+          ldd "/usr/bin/$PACKAGE"
+          ! ldd "/usr/bin/$PACKAGE" | grep 'not found'
       - name: Set up the engine as a user, then transcribe a synthetic C major clip
         env:
           VERSION: ${{ needs.version.outputs.version }}
           PACKAGE: ${{ needs.version.outputs.package }}
         run: |
           useradd --create-home user
-          cp app/src-tauri/setup-engine.py /tmp/ # readable by the user
+          cp app-native/setup-engine.py /tmp/ # readable by the user
           project=$(dirname "$(dpkg -L "$PACKAGE" | grep '/engine/pyproject.toml$')")
           su user -c "sh -eu" <<EOF
           cd
@@ -208,21 +207,14 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12
-      - uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
       - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag upstream
         with:
           version: ${{ env.UV_VERSION }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app/src-tauri
+          workspaces: app-native
+      - run: cargo install cargo-packager --locked --version "$PACKAGER_VERSION"
       - id: madmom
         run: echo "rev=$(sed -n 's/^madmom = .*rev = "\([0-9a-f]*\)".*/\1/p' engine/pyproject.toml)" >> "$GITHUB_OUTPUT"
       - id: madmom-wheel
@@ -244,26 +236,26 @@ jobs:
           PACKAGE: ${{ needs.version.outputs.package }}
         run: |
           triple=$(rustc -vV | sed -n 's/^host: //p')
-          mkdir -p app/src-tauri/binaries
+          mkdir -p app-native/binaries
           curl -fsSL "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.tar.gz" |
-            tar -xzO "uv-$triple/uv" > "app/src-tauri/binaries/$PACKAGE-uv-$triple"
-          chmod +x "app/src-tauri/binaries/$PACKAGE-uv-$triple"
-      - run: pnpm install --frozen-lockfile
-        working-directory: app
+            tar -xzO "uv-$triple/uv" > "app-native/binaries/$PACKAGE-uv-$triple"
+          chmod +x "app-native/binaries/$PACKAGE-uv-$triple"
       - name: Build the dmg
-        working-directory: app
+        working-directory: app-native
         env:
           VERSION: ${{ needs.version.outputs.version }}
           PACKAGE: ${{ needs.version.outputs.package }}
-        # Same overrides as on Linux; signingIdentity "-" is the ad-hoc signature Apple silicon requires to run the app.
-        run: >-
-          pnpm tauri build --bundles dmg --config src-tauri/tauri.bundle.conf.json
-          --config "{\"productName\":\"$PACKAGE\",\"mainBinaryName\":\"$PACKAGE\",\"identifier\":\"dev.dericbourg.$PACKAGE\",\"version\":\"$VERSION\",\"bundle\":{\"externalBin\":[\"binaries/$PACKAGE-uv\"],\"resources\":{\"../../engine/wheels/\":\"engine/wheels/\"},\"macOS\":{\"signingIdentity\":\"-\"}}}"
+        # Same as on Linux; Cargo.toml asks for the ad-hoc signature Apple silicon requires to run the app.
+        run: |
+          perl -0pi -e 's/^version = ".*?"/version = "$ENV{VERSION}"/m' Cargo.toml
+          cargo build --release
+          [ "$PACKAGE" = madsister ] || cp target/release/madsister "target/release/$PACKAGE"
+          cargo packager -c "$(uv run --no-project --python 3.11 release-config.py "$PACKAGE" "$VERSION")" -f dmg
       - uses: actions/upload-artifact@v7
         with:
           name: macos
           if-no-files-found: error
-          path: app/src-tauri/target/release/bundle/dmg/*.dmg
+          path: app-native/target/release/*.dmg
 
   # The macOS twin of linux-clean-install: the engine sets up from the installed .app and transcribes, with ffmpeg as the only prerequisite.
   macos-clean-install:
@@ -285,7 +277,7 @@ jobs:
           app="$RUNNER_TEMP/dmg/$PACKAGE.app"
           env=$RUNNER_TEMP/engine-env
           start=$(date +%s)
-          "$app/Contents/MacOS/$PACKAGE-uv" run --no-project --managed-python --python 3.11 python -I app/src-tauri/setup-engine.py "$app/Contents/MacOS/$PACKAGE-uv" "$app/Contents/Resources/engine" "$env" "$VERSION"
+          "$app/Contents/MacOS/$PACKAGE-uv" run --no-project --managed-python --python 3.11 python -I app-native/setup-engine.py "$app/Contents/MacOS/$PACKAGE-uv" "$app/Contents/Resources/engine" "$env" "$VERSION"
           echo "setup: $(($(date +%s) - start)) s, env: $(du -sh "$env" | cut -f1)"
           ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
           start=$(date +%s)
@@ -305,21 +297,14 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12
-      - uses: actions/setup-node@v7
-        with:
-          node-version: lts/*
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
       - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag upstream
         with:
           version: ${{ env.UV_VERSION }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app/src-tauri
+          workspaces: app-native
+      - run: cargo install cargo-packager --locked --version "$PACKAGER_VERSION"
       - id: madmom
         run: echo "rev=$(sed -n 's/^madmom = .*rev = "\([0-9a-f]*\)".*/\1/p' engine/pyproject.toml)" >> "$GITHUB_OUTPUT"
       - id: madmom-wheel
@@ -342,28 +327,28 @@ jobs:
         # ffmpeg ships to users inside the installer: a dated BtbN build, checked against the sha256 recorded here.
         run: |
           triple=$(rustc -vV | sed -n 's/^host: //p')
-          mkdir -p app/src-tauri/binaries
+          mkdir -p app-native/binaries
           curl -fsSLo "$RUNNER_TEMP/uv.zip" "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.zip"
-          unzip -p "$RUNNER_TEMP/uv.zip" uv.exe > "app/src-tauri/binaries/$PACKAGE-uv-$triple.exe"
+          unzip -p "$RUNNER_TEMP/uv.zip" uv.exe > "app-native/binaries/$PACKAGE-uv-$triple.exe"
           curl -fsSLo "$RUNNER_TEMP/ffmpeg.zip" "https://github.com/BtbN/FFmpeg-Builds/releases/download/$FFMPEG_BUILD"
           echo "$FFMPEG_SHA256  $RUNNER_TEMP/ffmpeg.zip" | sha256sum -c -
-          unzip -p "$RUNNER_TEMP/ffmpeg.zip" '*/bin/ffmpeg.exe' > "app/src-tauri/binaries/ffmpeg-$triple.exe"
-      - run: pnpm install --frozen-lockfile
-        working-directory: app
+          unzip -p "$RUNNER_TEMP/ffmpeg.zip" '*/bin/ffmpeg.exe' > "app-native/binaries/ffmpeg-$triple.exe"
       - name: Build the installer
-        working-directory: app
+        working-directory: app-native
         env:
           VERSION: ${{ needs.version.outputs.version }}
           PACKAGE: ${{ needs.version.outputs.package }}
-        # Same overrides as on Linux, plus the ffmpeg sidecar.
-        run: >-
-          pnpm tauri build --bundles nsis --config src-tauri/tauri.bundle.conf.json
-          --config "{\"productName\":\"$PACKAGE\",\"mainBinaryName\":\"$PACKAGE\",\"identifier\":\"dev.dericbourg.$PACKAGE\",\"version\":\"$VERSION\",\"bundle\":{\"externalBin\":[\"binaries/$PACKAGE-uv\",\"binaries/ffmpeg\"],\"resources\":{\"../../engine/wheels/\":\"engine/wheels/\"}}}"
+        # Same as on Linux, plus the ffmpeg sidecar. NSIS's default install mode is per user, into %LOCALAPPDATA%\<product>.
+        run: |
+          perl -0pi -e 's/^version = ".*?"/version = "$ENV{VERSION}"/m' Cargo.toml
+          cargo build --release
+          [ "$PACKAGE" = madsister ] || cp target/release/madsister.exe "target/release/$PACKAGE.exe"
+          cargo packager -c "$(uv run --no-project --python 3.11 release-config.py "$PACKAGE" "$VERSION" binaries/ffmpeg)" -f nsis
       - uses: actions/upload-artifact@v7
         with:
           name: windows
           if-no-files-found: error
-          path: app/src-tauri/target/release/bundle/nsis/*.exe
+          path: app-native/target/release/*-setup.exe
 
   # The Windows twin of linux-clean-install: the installer's engine sets up and transcribes with the bundled ffmpeg only.
   windows-clean-install:
@@ -389,7 +374,7 @@ jobs:
           export PATH="$(cygpath -u "$app"):$PATH" # as the app does for the engine: the bundled ffmpeg (cygpath: C: would split PATH)
           env=$LOCALAPPDATA/dev.dericbourg.$PACKAGE/engine-env
           start=$(date +%s)
-          "$app/$PACKAGE-uv.exe" run --no-project --managed-python --python 3.11 python -I app/src-tauri/setup-engine.py "$app/$PACKAGE-uv.exe" "$app/engine" "$env" "$VERSION"
+          "$app/$PACKAGE-uv.exe" run --no-project --managed-python --python 3.11 python -I app-native/setup-engine.py "$app/$PACKAGE-uv.exe" "$app/engine" "$env" "$VERSION"
           echo "setup: $(($(date +%s) - start)) s, env: $(du -sh "$env" | cut -f1)"
           ffmpeg -loglevel error -f lavfi -i "aevalsrc='0.3*(sin(2*PI*261.63*t)+sin(2*PI*329.63*t)+sin(2*PI*392*t))*exp(-6*mod(t,0.5))':s=44100:d=12" c.wav
           start=$(date +%s)
@@ -440,10 +425,10 @@ jobs:
           The first launch downloads the engine (Python, its libraries and the models), once."
           if [ "$RELEASE" = true ]; then
             # Creates the tag on this commit (a tag pushed with the workflow's token wouldn't trigger anything anyway).
-            gh release create "v$VERSION" dist/*/* dist/*.dmg dist/*.exe --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
+            gh release create "v$VERSION" dist/*.deb dist/*.AppImage dist/*.dmg dist/*.exe --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
           else
             tag=v$VERSION
-            gh release create "$tag" dist/*/* dist/*.dmg dist/*.exe --prerelease --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
+            gh release create "$tag" dist/*.deb dist/*.AppImage dist/*.dmg dist/*.exe --prerelease --target "$GITHUB_SHA" --title "madsister $VERSION" --notes "$notes"
             # Only the latest snapshot is kept: the previous ones go once this one is published.
             gh release list --limit 100 --json tagName --jq '.[].tagName | select(contains("-snapshot."))' |
               while read -r old; do
