@@ -1020,3 +1020,32 @@ fn the_transport_spans_the_charts_width_with_the_sidebar_collapsed() {
         sheet.absolute_position().x + sheet.size().width
     );
 }
+
+#[test]
+fn the_sidebar_sits_by_the_rail_and_keeps_its_place_between_view_and_edit() {
+    // Given a window too short for the edit panels, in view mode
+    let (app, _state) = window();
+    app.window().set_size(slint::LogicalSize::new(1000.0, 700.0));
+    app.invoke_app_action(AppAction::EditMode);
+    run_deferred();
+    assert!(!app.global::<Grid>().get_is_editable());
+    let title = || {
+        let e = field(&app, "Title");
+        (e.absolute_position().x, e.size().width)
+    };
+    let in_view = title();
+
+    // When switching to edit mode, so the panels scroll
+    app.invoke_app_action(AppAction::EditMode);
+    run_deferred();
+    assert!(app.global::<Grid>().get_is_editable());
+
+    // Then the fields stay put, and the panels clear the overlaid 14px scrollbar
+    assert_eq!(in_view, title());
+    let song = ElementHandle::find_by_element_type_name(&app, "Panel").next().unwrap();
+    assert!(song.absolute_position().x + song.size().width <= 1000.0 - 14.0);
+
+    // And the first panel is the rail's 4px away from the collapse button
+    let toggle = find(&app, "Hide parameters").unwrap();
+    assert_eq!(song.absolute_position().x - (toggle.absolute_position().x + toggle.size().width), 4.0);
+}

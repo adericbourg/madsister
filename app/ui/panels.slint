@@ -169,10 +169,16 @@ export component Panels inherits ScrollView {
     // The Bar panel only exists in edit mode, so it's reached by a counter it watches.
     property <int> beats-focus-requests;
 
+    // Else the content's preferred width sets it, and edit mode's wider panels shift them.
+    content-width: self.visible-width;
     content-height: panels.preferred-height;
     panels := VerticalLayout {
         width: parent.visible-width;
         padding: 8px;
+        // The rail's padding already parts it from the collapse button.
+        padding-left: 0;
+        // The scrollbar is drawn over the content: its 14px stay free, scrolling or not.
+        padding-right: 14px;
         spacing: 8px;
         Panel {
             index: 0;
