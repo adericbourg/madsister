@@ -9,6 +9,7 @@ use slint::{Model, SharedString, VecModel};
 use madsister::audio::{FileCheck, Player as AudioPlayer, Status, audio_path, check_file, relative_audio_path};
 use madsister::editor::{DraftKind, Editor, MOD_LABEL, MenuAction, MetaField, Outcome};
 use madsister::engine::{EngineEvent, Jobs};
+use madsister::files::write_atomic;
 use madsister::importer::{ForcedMeter, Importer, Next, Request, Source, recording_name};
 use madsister::keymap::{count_flagged, has_confidence};
 use madsister::model::playback::bar_at_time;
@@ -16,7 +17,7 @@ use madsister::keymap::{KeyInput, SHORTCUTS};
 use madsister::model::commands::{BarRef, SlotRef, Step};
 use madsister::model::song::{Meter, Notation, empty_song};
 use madsister::model::transpose::Spelling;
-use madsister::model::song::parse_song;
+use madsister::model::song::{parse_song, serialize_song};
 use madsister::settings::Settings;
 
 mod view;
@@ -38,11 +39,22 @@ struct State {
     pending: Option<Pending>,
     jobs: Jobs,
     last_tab_id: u32,
+    /// Saves the songs that have a file 2 s after the last edit; restarted by every refresh while one has changes.
+    autosave: slint::Timer,
 }
 
 impl State {
     fn new(settings: Settings) -> State {
-        State { settings, tabs: vec![Tab::new(0)], active: 0, shown: None, pending: None, jobs: Jobs::default(), last_tab_id: 0 }
+        State {
+            settings,
+            tabs: vec![Tab::new(0)],
+            active: 0,
+            shown: None,
+            pending: None,
+            jobs: Jobs::default(),
+            last_tab_id: 0,
+            autosave: slint::Timer::default(),
+        }
     }
 
     /// Adds a start screen tab at the end; returns its index.
@@ -77,6 +89,8 @@ struct Tab {
     audio: AudioFile,
     /// The panels' last field errors.
     errors: Errors,
+    /// Why the last save failed.
+    error: String,
     /// The song's audio, when it has one; or why it can't play. Each tab keeps its own, paused when another tab is shown.
     player: Result<Option<AudioPlayer>, String>,
     importer: Importer,
@@ -94,6 +108,7 @@ impl Tab {
             path: None,
             audio: AudioFile::default(),
             errors: Errors::default(),
+            error: String::new(),
             player: Ok(None),
             importer: Importer::default(),
             engine_events: std::sync::mpsc::channel(),
@@ -189,7 +204,12 @@ fn refresh(app: &AppWindow, state: &mut State) {
     app.set_tabs(Rc::new(VecModel::from(tabs)).into());
     app.set_active_tab(state.active as i32);
     let tab = &state.tabs[state.active];
+    app.set_error(tab.error.as_str().into());
     app.set_has_song(tab.editor.is_some());
+    // shortcut: a new song without a file isn't autosaved (no recovery file); add one if users lose work.
+    if tab.is_dirty() && tab.path.is_some() {
+        state.autosave.restart();
+    }
     let Some(editor) = &tab.editor else { return };
     if state.shown.as_ref() != Some(editor.song()) {
         app.set_chart(view::chart_view(editor.song(), &state.settings));
@@ -533,7 +553,54 @@ fn load(app: &AppWindow, state: &mut State, editor: Editor, path: Option<PathBuf
     tab.path = path;
     tab.audio = AudioFile::default();
     tab.errors = Errors::default();
+    tab.error.clear();
     show_tab(app, state);
+}
+
+/// Writes the tab's song to `path` (F-ED-10), which becomes its file.
+fn save_to(tab: &mut Tab, path: PathBuf) {
+    let Some(editor) = &mut tab.editor else { return };
+    let mut song = editor.song().clone();
+    // The audio path is relative to the song file: a copy in another folder needs it rebased.
+    if let (Some(old), Some(audio)) = (tab.path.as_deref(), song.audio.as_mut())
+        && old != path
+    {
+        audio.path = relative_audio_path(&path, &audio_path(old, &audio.path));
+    }
+    match write_atomic(&path, &serialize_song(&song)) {
+        Ok(()) => {
+            if song != *editor.song() {
+                editor.history.apply(song.clone());
+            }
+            tab.saved = Some(song);
+            tab.path = Some(path);
+            tab.error.clear();
+        }
+        Err(e) => tab.error = format!("Can't save {}: {e}", path.display()),
+    }
+}
+
+/// Asks where to save the active tab's song, then saves it there.
+fn save_as(app: &AppWindow, state: &Rc<RefCell<State>>) {
+    let (id, title) = {
+        let state = state.borrow();
+        let Some(editor) = &state.tab().editor else { return };
+        (state.tab().id, editor.song().meta.title.clone())
+    };
+    // shortcut: "json" rather than "madsister.json", macOS dialogs don't handle multi-dot extensions (as in the Tauri app).
+    let dialog = rfd::AsyncFileDialog::new().set_file_name(format!("{title}.madsister.json")).add_filter("madsister song", &["json"]);
+    let (weak, st) = (app.as_weak(), state.clone());
+    let picking = slint::spawn_local(async move {
+        let Some(file) = dialog.save_file().await else { return };
+        let Some(app) = weak.upgrade() else { return };
+        let mut state = st.borrow_mut();
+        let Some(tab) = state.tab_by_id(id) else { return };
+        save_to(tab, file.path().to_path_buf());
+        refresh(&app, &mut state);
+    });
+    if let Err(e) = picking {
+        eprintln!("can't open the file dialog: {e}");
+    }
 }
 
 /// Makes the tab at `index` the active one; the one it hides stops playing.
@@ -834,9 +901,35 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
                     let active = state.active;
                     close_tab(&app, &mut state, active);
                 }
+                FileAction::Save => match state.tab().path.clone() {
+                    Some(path) => {
+                        save_to(state.tab_mut(), path);
+                        refresh(&app, &mut state);
+                    }
+                    None => {
+                        drop(state);
+                        save_as(&app, &st);
+                    }
+                },
+                FileAction::SaveAs => {
+                    drop(state);
+                    save_as(&app, &st);
+                }
             }
         });
     });
+    let (weak, st) = (app.as_weak(), Rc::downgrade(state));
+    state.borrow().autosave.start(slint::TimerMode::SingleShot, std::time::Duration::from_secs(2), move || {
+        let (Some(app), Some(st)) = (weak.upgrade(), st.upgrade()) else { return };
+        let mut state = st.borrow_mut();
+        for tab in state.tabs.iter_mut().filter(|tab| tab.is_dirty()) {
+            if let Some(path) = tab.path.clone() {
+                save_to(tab, path);
+            }
+        }
+        refresh(&app, &mut state);
+    });
+    state.borrow().autosave.stop();
     let (weak, st) = (app.as_weak(), state.clone());
     app.window().on_close_requested(move || {
         let Some(app) = weak.upgrade() else { return slint::CloseRequestResponse::HideWindow };

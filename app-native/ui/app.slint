@@ -24,7 +24,7 @@ export struct TabView {
 }
 
 /// What a File menu item asks for.
-export enum FileAction { new-tab, close-tab }
+export enum FileAction { new-tab, close-tab, save, save-as }
 
 /// One tab per open song (F-UI-7); the close buttons sit next to the tabs, not inside them.
 component TabBar inherits Rectangle {
@@ -102,6 +102,8 @@ export component AppWindow inherits Window {
     callback file-action(FileAction);
     in property <ChartView> chart;
     in property <bool> has-song;
+    /// The active tab's last save or open error.
+    in property <string> error;
     /// The editor's last notice ("Not possible here"), announced politely.
     in property <string> notice;
     in property <bool> is-help-open;
@@ -174,6 +176,18 @@ export component AppWindow inherits Window {
                 enabled: has-song;
                 activated => { root.file-action(FileAction.close-tab); }
             }
+            MenuItem {
+                title: @tr("Save");
+                shortcut: @keys(Control + S);
+                enabled: has-song;
+                activated => { root.file-action(FileAction.save); }
+            }
+            MenuItem {
+                title: @tr("Save as…");
+                shortcut: @keys(Control + Shift + S);
+                enabled: has-song;
+                activated => { root.file-action(FileAction.save-as); }
+            }
         }
     }
 
@@ -185,6 +199,15 @@ export component AppWindow inherits Window {
             active: active-tab;
             selected(i) => { root.tab-selected(i); }
             closed(i) => { root.tab-closed(i); }
+        }
+        Text {
+            text: error;
+            color: Palette.color-scheme == ColorScheme.dark ? #ff8a80 : #b3261e;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            accessible-role: text;
+            height: error == "" ? 0 : self.preferred-height + 0.5 * Size.rem;
         }
         Rectangle {
             start-screen := StartScreen {
