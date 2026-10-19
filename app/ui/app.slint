@@ -460,6 +460,7 @@ export component AppWindow inherits Window {
                 height: error == "" ? 0 : self.preferred-height + 0.5 * Size.rem;
             }
             Rectangle {
+                vertical-stretch: 1;
                 start-screen := StartScreen {
                     visible: !has-song;
                 }
