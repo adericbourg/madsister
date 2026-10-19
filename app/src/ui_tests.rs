@@ -1049,3 +1049,19 @@ fn the_sidebar_sits_by_the_rail_and_keeps_its_place_between_view_and_edit() {
     let toggle = find(&app, "Hide parameters").unwrap();
     assert_eq!(song.absolute_position().x - (toggle.absolute_position().x + toggle.size().width), 4.0);
 }
+
+#[test]
+fn every_panel_fits_its_card() {
+    // Given the sidebar in edit mode, with every panel shown
+    let (app, _state) = window();
+
+    // Then each panel's box stays within its card's 12px side padding
+    let right = |e: &ElementHandle| e.absolute_position().x + e.size().width;
+    for card in ElementHandle::find_by_element_type_name(&app, "Panel") {
+        // The transport's boxes are GroupBoxes too: the panel's own one starts at its top.
+        let content = ElementHandle::find_by_element_type_name(&app, "GroupBox")
+            .find(|b| b.absolute_position().y == card.absolute_position().y)
+            .unwrap();
+        assert!(right(&content) <= right(&card) - 12.0, "{:?} spills out of its card", content.accessible_label());
+    }
+}

@@ -243,7 +243,8 @@ export component Panels inherits ScrollView {
                 HorizontalLayout {
                     spacing: 6px;
                     Button {
-                        text: @tr("−1 semitone");
+                        text: "−1";
+                        accessible-label: @tr("−1 semitone");
                         clicked => { root.transpose(-1, is-flat); }
                     }
                     Text {
@@ -255,7 +256,8 @@ export component Panels inherits ScrollView {
                         accessible-role: text;
                     }
                     Button {
-                        text: @tr("+1 semitone");
+                        text: "+1";
+                        accessible-label: @tr("+1 semitone");
                         clicked => { root.transpose(1, is-flat); }
                     }
                 }
@@ -323,26 +325,28 @@ export component Panels inherits ScrollView {
             reveal(y) => { root.reveal(y); }
             title: @tr("Bar");
             enabled: view.has-bar;
-            HorizontalLayout {
+            VerticalLayout {
                 spacing: 6px;
                 Text {
                     text: @tr("Beats in this bar");
                     color: Palette.foreground;
-                    vertical-alignment: center;
                 }
-                SpinBox {
-                    property <int> requests: beats-focus-requests;
-                    changed requests => { self.focus(); }
-                    value: view.bar-beats;
-                    minimum: 1;
-                    maximum: 32;
-                    accessible-label: @tr("Beats in this bar");
-                    edited(n) => { root.bar-beats-set(n); }
-                }
-                Text {
-                    text: "/" + view.bar-unit;
-                    color: Palette.foreground;
-                    vertical-alignment: center;
+                HorizontalLayout {
+                    spacing: 6px;
+                    SpinBox {
+                        property <int> requests: beats-focus-requests;
+                        changed requests => { self.focus(); }
+                        value: view.bar-beats;
+                        minimum: 1;
+                        maximum: 32;
+                        accessible-label: @tr("Beats in this bar");
+                        edited(n) => { root.bar-beats-set(n); }
+                    }
+                    Text {
+                        text: "/" + view.bar-unit;
+                        color: Palette.foreground;
+                        vertical-alignment: center;
+                    }
                 }
             }
         }
