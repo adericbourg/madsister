@@ -24,7 +24,7 @@ export struct TabView {
 }
 
 /// What a File menu item asks for.
-export enum FileAction { new-tab, close-tab, save, save-as }
+export enum FileAction { new-tab, open, clear-recent, close-tab, save, save-as }
 
 /// One tab per open song (F-UI-7); the close buttons sit next to the tabs, not inside them.
 component TabBar inherits Rectangle {
@@ -94,6 +94,7 @@ export component AppWindow inherits Window {
     background: Palette.color-scheme == ColorScheme.dark ? #1c1c1f : #f4f4f6;
     forward-focus: grid-scope;
 
+    /// The recent files' labels, most recent first.
     in property <[string]> recent;
     in property <[TabView]> tabs;
     in property <int> active-tab;
@@ -108,8 +109,8 @@ export component AppWindow inherits Window {
     in property <string> notice;
     in property <bool> is-help-open;
     in property <[Shortcut]> shortcuts;
-    callback open-recent(string);
-    callback clear-recent();
+    /// The recent file at this index.
+    callback open-recent(int);
     /// A key on the grid; true when the editor took it.
     callback grid-key(KeyEvent) -> bool;
     callback close-help();
@@ -157,16 +158,22 @@ export component AppWindow inherits Window {
                 shortcut: @keys(Control + N);
                 activated => { root.file-action(FileAction.new-tab); }
             }
+            MenuItem {
+                title: @tr("Open…");
+                shortcut: @keys(Control + O);
+                activated => { root.file-action(FileAction.open); }
+            }
             Menu {
                 title: @tr("Open recent");
-                for path in root.recent: MenuItem {
-                    title: path;
-                    activated => { root.open-recent(path); }
+                enabled: recent.length > 0;
+                for label[i] in root.recent: MenuItem {
+                    title: label;
+                    activated => { root.open-recent(i); }
                 }
                 MenuSeparator { }
                 MenuItem {
                     title: @tr("Clear recent");
-                    activated => { root.clear-recent(); }
+                    activated => { root.file-action(FileAction.clear-recent); }
                 }
             }
             MenuSeparator { }

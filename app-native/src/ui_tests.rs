@@ -1,6 +1,7 @@
 //! The window driven like a user would: key events and clicks on a headless Slint backend.
 
 use i_slint_backend_testing::ElementHandle;
+use slint::Model;
 use slint::platform::{Key, PointerEventButton, WindowEvent};
 
 use super::*;
@@ -489,4 +490,68 @@ fn a_failed_save_as_keeps_the_audio_path_of_the_song_file() {
     assert!(tab.error.starts_with("Can't save"));
     assert_eq!(tab.editor.as_ref().unwrap().song().audio.as_ref().unwrap().path, "a.mp3");
     assert_eq!(tab.path, Some(dir.join("song.madsister.json")));
+}
+
+#[test]
+fn opened_files_are_listed_as_recent_and_saved_in_the_config_folder() {
+    // Given two song files of the same name in two folders, and a config folder
+    let (app, state) = start_screen();
+    let dir = temp_dir("recent");
+    state.borrow_mut().config = Some(dir.join("config"));
+    let (a, b) = (dir.join("a"), dir.join("b"));
+    std::fs::create_dir_all(&a).unwrap();
+    std::fs::create_dir_all(&b).unwrap();
+    let (first, second) = (song_file(&a, "Blues"), song_file(&b, "Blues"));
+
+    // When opening both
+    assert!(open(&app, &mut state.borrow_mut(), &first));
+    assert_eq!(app.get_recent().iter().collect::<Vec<_>>(), ["Blues.madsister.json"]);
+    assert!(open(&app, &mut state.borrow_mut(), &second));
+
+    // Then the menu tells them apart, most recent first, and recent.json lists them as the Tauri app wrote it
+    assert_eq!(app.get_recent().iter().collect::<Vec<_>>(), ["b/Blues.madsister.json", "a/Blues.madsister.json"]);
+    let saved = std::fs::read_to_string(dir.join("config").join("recent.json")).unwrap();
+    assert_eq!(saved, serde_json::to_string(&[second.display().to_string(), first.display().to_string()]).unwrap());
+
+    // When the second file is gone, closed and reopened from Open recent
+    with_ctrl(&app, "w");
+    run_deferred();
+    std::fs::remove_file(&second).unwrap();
+    app.invoke_open_recent(0);
+    run_deferred();
+
+    // Then the error is shown and it leaves the recent files
+    assert!(app.get_error().starts_with(&format!("Can't open {}", second.display())));
+    assert_eq!(app.get_recent().iter().collect::<Vec<_>>(), ["Blues.madsister.json"]);
+
+    // When opening the first one from Open recent, Then it comes to the front and the error goes
+    app.invoke_open_recent(0);
+    run_deferred();
+    assert_eq!((tab_labels(&app), app.get_error()), (vec!["Blues".to_string()], "".into()));
+
+    // When clearing the recent files, Then the list is empty, on disk too
+    app.invoke_file_action(FileAction::ClearRecent);
+    run_deferred();
+    let saved = std::fs::read_to_string(dir.join("config").join("recent.json")).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!((app.get_recent().row_count(), saved.as_str()), (0, "[]"));
+}
+
+#[test]
+fn opening_an_invalid_song_file_says_why_and_keeps_the_open_song() {
+    // Given an open song, and a file that isn't one
+    let (app, state) = window();
+    let dir = temp_dir("invalid");
+    let bad = dir.join("bad.madsister.json");
+    std::fs::write(&bad, r#"{"version": 1}"#).unwrap();
+
+    // When opening it
+    let opened = open(&app, &mut state.borrow_mut(), &bad);
+
+    // Then the error is shown in the window and the song stays
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(!opened);
+    assert!(app.get_error().contains("meta"));
+    assert_eq!(tab_labels(&app), ["Untitled"]);
+    assert!(app.get_has_song());
 }

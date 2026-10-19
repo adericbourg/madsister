@@ -1,7 +1,39 @@
-//! The app's files (spec F-ED-10): songs written without risking the previous version.
+//! The app's files (spec F-ED-10): songs written without risking the previous version, and the recent files list
+//! (`recent.json` in the config folder, as the Tauri app kept it).
 
 use std::io::Write;
 use std::path::Path;
+
+use serde_json::Value;
+
+/// `path` first, without duplicates, at most 10.
+pub fn push_recent(list: &[String], path: &str) -> Vec<String> {
+    std::iter::once(path).chain(list.iter().map(String::as_str).filter(|p| *p != path)).take(10).map(String::from).collect()
+}
+
+/// The strings of a JSON array, as `recent.json` holds them; nothing when it's anything else.
+pub fn parse_paths(json: &Value) -> Vec<String> {
+    json.as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect()
+}
+
+/// The shortest trailing part of each path (`blues.json`, then `a/blues.json`...) that tells it apart from the others.
+pub fn shortest_unique_paths(paths: &[String]) -> Vec<String> {
+    let segments: Vec<Vec<&str>> = paths.iter().map(|p| p.split(['/', '\\']).collect()).collect();
+    let tail = |parts: &[&str], depth: usize| parts[parts.len() - depth.min(parts.len())..].join("/");
+    segments
+        .iter()
+        .enumerate()
+        .map(|(i, parts)| {
+            let mut depth = 1;
+            while depth < parts.len()
+                && segments.iter().enumerate().any(|(j, other)| j != i && tail(other, depth) == tail(parts, depth))
+            {
+                depth += 1;
+            }
+            tail(parts, depth)
+        })
+        .collect()
+}
 
 /// Writes `contents` to a temporary file next to `path`, then renames it over `path`: a crash or a full disk midway
 /// leaves the previous file whole.
@@ -20,6 +52,43 @@ pub fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn push_recent_moves_the_path_to_the_front_without_duplicates_and_keeps_ten() {
+        // Given a full list of 10 paths
+        let list: Vec<String> = (0..10).map(|i| format!("/{i}")).collect();
+
+        // When pushing a path already in the list, then a new one
+        let moved = push_recent(&list, "/5");
+        let pushed = push_recent(&moved, "/new");
+
+        // Then the path moves to the front, and the oldest one drops off
+        assert_eq!(moved, ["/5", "/0", "/1", "/2", "/3", "/4", "/6", "/7", "/8", "/9"]);
+        assert_eq!(pushed, ["/new", "/5", "/0", "/1", "/2", "/3", "/4", "/6", "/7", "/8"]);
+    }
+
+    #[test]
+    fn shortest_unique_paths_keeps_just_the_file_name_unless_several_paths_share_it() {
+        // Given paths, two of which share a file name (one under the same parent name as well)
+        let paths = ["/a/blues.json", "/b/blues.json", "/x/c/rock.json", "/y/c/blues.json", "/solo.json"].map(String::from);
+
+        // When / Then each one keeps only as many trailing parts as needed to be unique
+        assert_eq!(shortest_unique_paths(&paths), ["a/blues.json", "b/blues.json", "rock.json", "c/blues.json", "solo.json"]);
+    }
+
+    #[test]
+    fn shortest_unique_paths_handles_windows_separators_and_a_path_inside_another() {
+        // Given / When / Then
+        let paths = ["C:\\music\\blues.json", "blues.json"].map(String::from);
+        assert_eq!(shortest_unique_paths(&paths), ["music/blues.json", "blues.json"]);
+    }
+
+    #[test]
+    fn parse_paths_keeps_the_strings_of_an_array() {
+        // Given / When / Then
+        assert_eq!(parse_paths(&serde_json::json!(["/a.json", 1, "/b.json"])), ["/a.json", "/b.json"]);
+        assert!(parse_paths(&serde_json::json!({ "paths": [] })).is_empty());
+    }
 
     #[test]
     fn write_atomic_replaces_the_file_and_leaves_no_temporary_file() {
