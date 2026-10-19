@@ -15,12 +15,19 @@ fn ffmpeg() -> PathBuf {
     bundled.filter(|path| path.exists()).unwrap_or_else(|| "ffmpeg".into())
 }
 
-/// The file's samples, interleaved, at `rate` Hz and `channels` channels.
+/// Decoding stops there: a song file names its audio, so a huge or crafted one mustn't exhaust the memory.
+const MAX_SECONDS: u32 = 30 * 60;
+
+/// The file's samples, interleaved, at `rate` Hz and `channels` channels; at most `MAX_SECONDS` of them.
 pub fn decode(path: &Path, rate: u32, channels: u16) -> Result<Vec<f32>, String> {
+    // A song file can come from someone else: ffmpeg only opens local files, never a URL or a concat/playlist input.
+    let mut input = std::ffi::OsString::from("file:");
+    input.push(path);
     let mut command = Command::new(ffmpeg());
     command
-        .args(["-nostdin", "-loglevel", "error", "-i"])
-        .arg(path)
+        .args(["-nostdin", "-loglevel", "error", "-protocol_whitelist", "file", "-i"])
+        .arg(input)
+        .args(["-t", &MAX_SECONDS.to_string()])
         .args(["-f", "f32le", "-acodec", "pcm_f32le", "-ac", &channels.to_string(), "-ar", &rate.to_string(), "-"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -44,8 +51,8 @@ pub enum Status {
 }
 
 struct Shared {
-    // shortcut: the whole song decoded in memory (~115 MB for 5 minutes at 48 kHz stereo); decode in chunks while
-    // playing if long recordings become common.
+    // shortcut: the whole song decoded in memory (~115 MB for 5 minutes at 48 kHz stereo, at most MAX_SECONDS); decode
+    // in chunks while playing if long recordings become common.
     samples: Vec<f32>,
     /// The next frame to play.
     frame: usize,
@@ -205,6 +212,21 @@ mod tests {
         // Then it has half a second of stereo frames at 48 kHz (give or take the resampler's edges)
         let frames = samples.len() / 2;
         assert!((frames as i64 - 24_000).abs() < 100, "{frames} frames");
+    }
+
+    #[test]
+    fn decode_only_opens_local_files() {
+        // Given a playable WAV reached through ffmpeg's concat protocol, which a bare ffmpeg would decode
+        let wav = std::env::temp_dir().join(format!("madsister-concat-{}.wav", std::process::id()));
+        std::fs::write(&wav, silent_wav(0.1)).unwrap();
+        let concat = format!("concat:{}", wav.display());
+
+        // When decoding it
+        let decoded = decode(Path::new(&concat), 48_000, 2);
+        std::fs::remove_file(&wav).unwrap();
+
+        // Then it is read as a local file named "concat:…", which doesn't exist
+        assert!(decoded.is_err());
     }
 
     #[test]
