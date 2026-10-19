@@ -33,8 +33,9 @@ pub enum EngineEvent {
     Cancelled,
 }
 
-/// The engine installed by `setup-engine.py` in a packaged app (`tauri build`): `uv` is a sidecar next to the app's
+/// The engine installed by `setup-engine.py` in a packaged app (`cargo packager`): `uv` is a sidecar next to the app's
 /// binary, the `engine/` project a resource, the env lives in the app data dir.
+#[derive(Debug, PartialEq)]
 pub struct Packaged {
     pub uv: PathBuf,
     pub project: PathBuf,
@@ -47,7 +48,36 @@ const SETUP_SCRIPT: &str = include_str!("../setup-engine.py");
 /// What `setup-engine.py` installs on demand: `sections` (all-in-one), `separate` (Demucs, accurate mode).
 pub const FEATURES: [&str; 2] = ["sections", "separate"];
 
+/// The packaged engine; None in a dev build and when `MADSISTER_ENGINE` overrides it.
+pub fn packaged_engine() -> Option<Packaged> {
+    if cfg!(debug_assertions) || std::env::var_os("MADSISTER_ENGINE").is_some() {
+        return None;
+    }
+    Packaged::beside(&std::env::current_exe().ok()?, &dirs::data_local_dir()?, env!("CARGO_PKG_VERSION"))
+}
+
 impl Packaged {
+    /// The engine of the package that installed `exe`, laid out as cargo-packager does. Everything is named after the
+    /// binary, so that madsister and madsister-snapshot can be installed together: the sidecar `<binary>-uv`, the
+    /// resources (`/usr/lib/<binary>` in a deb or an AppImage), the env (`dev.dericbourg.<binary>` in `data_local`).
+    pub fn beside(exe: &Path, data_local: &Path, version: &str) -> Option<Packaged> {
+        let name = exe.file_stem()?.to_str()?;
+        let dir = exe.parent()?;
+        let resources = if cfg!(target_os = "macos") {
+            dir.parent()?.join("Resources") // Contents/MacOS → Contents/Resources
+        } else if cfg!(windows) {
+            dir.to_path_buf()
+        } else {
+            dir.parent()?.join("lib").join(name) // usr/bin → usr/lib/<binary>
+        };
+        Some(Packaged {
+            uv: exe.with_file_name(format!("{name}-uv{}", std::env::consts::EXE_SUFFIX)),
+            project: resources.join("engine"),
+            env: data_local.join(format!("dev.dericbourg.{name}")).join("engine-env"),
+            version: version.into(),
+        })
+    }
+
     /// No env yet, or one set up by another app version.
     pub fn needs_setup(&self) -> bool {
         std::fs::read_to_string(self.env.join(".madsister-version")).ok()
@@ -358,6 +388,27 @@ mod tests {
             env: root.join("env"),
             version: version.into(),
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn beside_finds_the_sidecar_and_resources_of_a_deb_or_appimage_and_a_data_dir_per_binary() {
+        // Given the binary of a snapshot package
+        let exe = Path::new("/usr/bin/madsister-snapshot");
+
+        // When
+        let packaged = Packaged::beside(exe, Path::new("/home/u/.local/share"), "1.2.3-snapshot.4");
+
+        // Then everything is named after the binary
+        assert_eq!(
+            packaged,
+            Some(Packaged {
+                uv: "/usr/bin/madsister-snapshot-uv".into(),
+                project: "/usr/lib/madsister-snapshot/engine".into(),
+                env: "/home/u/.local/share/dev.dericbourg.madsister-snapshot/engine-env".into(),
+                version: "1.2.3-snapshot.4".into(),
+            })
+        );
     }
 
     #[test]

@@ -240,6 +240,77 @@ fn the_importer_refuses_a_url_that_isnt_http() {
     assert!(!import.get_is_running());
 }
 
+/// Reads the engine's events until `is_done`, for 10 s at most.
+fn wait_for(app: &AppWindow, state: &Rc<RefCell<State>>, is_done: impl Fn(&State) -> bool) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !is_done(&state.borrow()) {
+        assert!(std::time::Instant::now() < deadline, "no engine event in 10 s");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        drain_engine_events(app, &mut state.borrow_mut());
+    }
+}
+
+#[cfg(unix)] // the fake uv is a shell script
+#[test]
+fn a_first_launch_sets_the_engine_up_shows_its_failure_and_retries_then_shows_the_importer() {
+    // Given a packaged engine whose uv fails once (no network), then sets the engine up
+    let root = std::env::temp_dir().join(format!("madsister-ui-setup-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let fake_uv = r#"#!/bin/sh
+if [ ! -e "$0.failed" ]; then
+  touch "$0.failed"
+  echo '{"type":"error","message":"no network"}'
+  echo 'uv: dns error' >&2
+  exit 1
+fi
+echo '{"type":"progress","stage":"setup","pct":50}'
+echo '{"type":"result","path":"/models"}'
+"#;
+    std::fs::write(root.join("uv"), fake_uv).unwrap();
+    std::fs::set_permissions(root.join("uv"), std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let (app, state) = start_screen();
+    {
+        let mut state = state.borrow_mut();
+        let engine = Packaged { uv: root.join("uv"), project: root.join("engine"), env: root.join("env"), version: "1.0.0".into() };
+        state.setup.is_needed = engine.needs_setup();
+        state.engine = Some(engine);
+    }
+
+    // When the app starts the setup
+    run_setup(&mut state.borrow_mut());
+    show_import(&app, &state.borrow());
+
+    // Then the setup replaces the importer, installing with an indeterminate progress bar
+    let import = app.global::<Import>();
+    assert!(import.get_needs_setup() && import.get_is_setting_up() && import.get_setup_pct() == -1);
+    assert_eq!(import.get_setup_status(), "Installing Python and the engine's libraries…");
+    assert!(find(&app, "Engine setup").is_some());
+    assert!(find(&app, "Import audio…").is_none());
+
+    // When it fails, Then its message and the engine output show, with Retry
+    wait_for(&app, &state, |s| s.setup.progress.is_none());
+    assert_eq!(import.get_setup_failure(), "no network");
+    assert_eq!(import.get_setup_stderr(), "uv: dns error");
+    assert!(find(&app, "Engine setup").is_none());
+    click(&app, &find(&app, "Engine output").unwrap());
+    assert!(ElementHandle::find_by_element_type_name(&app, "Text").any(|t| t.accessible_label().as_deref() == Some("uv: dns error")));
+
+    // When a second tab opens, Then it shows the same setup
+    app.invoke_app_action(AppAction::NewTab);
+    run_deferred();
+    assert_eq!(state.borrow().tabs.len(), 2);
+    assert!(find(&app, "Retry").is_some());
+
+    // When retrying, Then the setup runs again to its end and the importer shows
+    click(&app, &find(&app, "Retry").unwrap());
+    assert!(import.get_is_setting_up() && import.get_setup_failure().is_empty());
+    wait_for(&app, &state, |s| !s.setup.is_needed);
+    assert!(!import.get_needs_setup());
+    assert!(find(&app, "Import audio…").is_some());
+    std::fs::remove_dir_all(&root).unwrap();
+}
+
 #[test]
 fn a_song_whose_audio_file_is_missing_says_so_until_it_is_located() {
     // Given a song file whose audio file isn't there, with a field this version doesn't know in its audio
