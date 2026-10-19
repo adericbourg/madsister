@@ -70,6 +70,14 @@ component TabBar inherits Rectangle {
             border-top-right-radius: 6px;
             border-width: i == active && keys.has-focus ? 2px : 0;
             border-color: Palette.accent-background;
+            // The active tab carries the accent on its top edge and its title (F-UI-1).
+            if i == active: Rectangle {
+                y: 0;
+                height: 3px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+                background: Palette.accent-background;
+            }
             HorizontalLayout {
                 padding-left: 0.75 * Size.rem;
                 padding-right: 0.25 * Size.rem;
@@ -81,7 +89,8 @@ component TabBar inherits Rectangle {
                     max-width: 14 * Size.rem;
                     overflow: elide;
                     vertical-alignment: center;
-                    color: Palette.foreground;
+                    color: i == active ? Palette.accent-background : Palette.foreground;
+                    font-weight: i == active ? 600 : 400;
                     accessible-role: tab;
                     accessible-label: item.is-dirty ? @tr("{} (unsaved changes)", item.title) : item.title;
                     accessible-item-selected: i == active;
