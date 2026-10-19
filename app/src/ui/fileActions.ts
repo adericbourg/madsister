@@ -90,16 +90,13 @@ export const exportSong = async (
   song: Song,
   name: string,
   extension: string,
-  render: (song: Song) => string | Uint8Array,
+  render: (song: Song) => string | Uint8Array | Promise<Uint8Array>,
 ): Promise<void> => {
   const path = await save({ defaultPath: `${song.meta.title}.${extension}`, filters: [{ name, extensions: [extension] }] });
   if (path === null) return;
-  const content = render(song);
+  const content = await render(song);
   await (typeof content === "string" ? writeTextFile(path, content) : writeFile(path, content));
 };
-
-/** On macOS, Tauri replaces window.print with its webview print command (needs core:webview:allow-print). */
-export const printSong = (): void => window.print();
 
 export const setWindowTitle = (title: string): Promise<void> => getCurrentWindow().setTitle(title);
 

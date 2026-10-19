@@ -1,4 +1,4 @@
-import { FilePlus, FolderOpen, Printer, Save, Settings } from "lucide-react";
+import { FileDown, FilePlus, FolderOpen, Save, Settings } from "lucide-react";
 
 type Props = {
   hasSong: boolean;
@@ -6,13 +6,13 @@ type Props = {
   onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
-  onPrint: () => void;
+  onExportPdf: () => void;
   onToggleMode: () => void;
   onPreferences: () => void;
 };
 
 /** The most frequent actions (F-UI-6); the rest is in the native menu. */
-export const Ribbon = ({ hasSong, isEditing, onNew, onOpen, onSave, onPrint, onToggleMode, onPreferences }: Props) => (
+export const Ribbon = ({ hasSong, isEditing, onNew, onOpen, onSave, onExportPdf, onToggleMode, onPreferences }: Props) => (
   <nav aria-label="File" className="ribbon">
     <button type="button" onClick={onNew}>
       <FilePlus size={16} /> New
@@ -23,8 +23,8 @@ export const Ribbon = ({ hasSong, isEditing, onNew, onOpen, onSave, onPrint, onT
     <button type="button" className="primary" disabled={!hasSong} onClick={onSave}>
       <Save size={16} /> Save
     </button>
-    <button type="button" disabled={!hasSong} onClick={onPrint}>
-      <Printer size={16} /> Print…
+    <button type="button" disabled={!hasSong} onClick={onExportPdf}>
+      <FileDown size={16} /> Export PDF…
     </button>
     <span className="ribbon-end">
       {hasSong && (

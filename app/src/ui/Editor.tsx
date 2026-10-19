@@ -21,7 +21,6 @@ import { usePlayer } from "./usePlayer";
 type Props = {
   history: ReturnType<typeof useHistory>;
   barsPerRow: 2 | 4 | 8;
-  compactPrint?: boolean;
   style: DisplayStyle;
   minorConvention: MinorConvention;
   lowConfidenceThreshold: number;
@@ -42,7 +41,7 @@ type Draft = { kind: "chord" | "label"; text: string; select: "all" | "end"; err
 const minutes = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
 /** Keyboard-first editing of the chart (spec F-ED-3..7): cursor, bar selection, clipboard, inline input and help. */
-export const Editor = ({ history, barsPerRow, compactPrint, style, minorConvention, lowConfidenceThreshold, panel, audioPath, mode = "edit", isActive = true, onShowPanels }: Props) => {
+export const Editor = ({ history, barsPerRow, style, minorConvention, lowConfidenceThreshold, panel, audioPath, mode = "edit", isActive = true, onShowPanels }: Props) => {
   const id = useId();
   const { song } = history;
   const isEditable = mode === "edit";
@@ -459,7 +458,6 @@ export const Editor = ({ history, barsPerRow, compactPrint, style, minorConventi
       <Grid
         song={song}
         barsPerRow={barsPerRow}
-        compactPrint={compactPrint}
         style={style}
         tonic={tonic}
         cursor={cursor}

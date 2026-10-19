@@ -378,7 +378,7 @@ test("App_whenUsingPreferencesAndTheToolbar_restylesTransposesEditsMetadataAndPe
   expect(firstSlot().textContent).toBe("Do7M");
   expect(JSON.parse(files["/config/settings.json"]).style).toBe("latin");
 
-  // When switching back to French, ticking Compact print and picking Kalam, Then the settings are saved and the app root carries the classes
+  // When switching back to French, ticking Compact print and picking Kalam, Then the settings are saved and the app root carries the font class
   await editPreferences(async () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "Chord style" }), "fr");
     // Then the review threshold is offered, though the grid went through no chord recognition
@@ -388,11 +388,11 @@ test("App_whenUsingPreferencesAndTheToolbar_restylesTransposesEditsMetadataAndPe
     await user.selectOptions(screen.getByRole("combobox", { name: "Font" }), "kalam");
   });
   expect(JSON.parse(files["/config/settings.json"])).toMatchObject({ style: "fr", compactPrint: true, font: "kalam", reopenTabs: false });
-  expect(screen.getByRole("main").className).toBe("compact-print font-kalam");
+  expect(screen.getByRole("main").className).toBe("font-kalam");
   for (const font of ["serif", "petaluma-text", "petaluma-script"]) {
     await editPreferences(() => user.selectOptions(screen.getByRole("combobox", { name: "Font" }), font));
     expect(JSON.parse(files["/config/settings.json"]).font).toBe(font);
-    expect(screen.getByRole("main").className).toBe(`compact-print font-${font}`);
+    expect(screen.getByRole("main").className).toBe(`font-${font}`);
   }
 
   // When transposing up twice with flats, then undoing once
@@ -462,20 +462,24 @@ test("App_whenTheSongHasRecognizedChords_reviewsThemAgainstThePersistedThreshold
 
 });
 
-test("App_whenPrintingOrExporting_printsFromTheRibbonAndTheMenuAndWritesChordProMusicXmlAndMidi", async () => {
-  // Given the app
+test("App_whenExporting_writesPdfFromTheRibbonAndTheMenuAndChordProMusicXmlAndMidi", async () => {
+  // Given the app, with Rust rendering a sheet to PDF bytes
   const user = userEvent.setup();
-  const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
+  vi.mocked(invoke).mockImplementation(async (command) => (command === "render_pdf" ? new Uint8Array([37, 80, 68, 70]).buffer : null));
   render(<App />);
   await createGrid(user);
 
-  // When clicking Print on the ribbon, then in the menu
-  await user.click(screen.getByRole("button", { name: "Print…" }));
-  await clickMenu("File", "Print…");
+  // When exporting a PDF from the ribbon, then from the menu
+  vi.mocked(save).mockResolvedValueOnce("/out/a.pdf").mockResolvedValueOnce("/out/b.pdf");
+  await user.click(screen.getByRole("button", { name: "Export PDF…" }));
+  await clickMenu("File", "Export PDF…");
 
-  // Then the chart is printed twice
-  expect(print).toHaveBeenCalledTimes(2);
-  print.mockRestore();
+  // Then the dialog proposes a .pdf named after the title, Rust gets the spelled chart, and its bytes are written twice
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ defaultPath: "Untitled.pdf" }));
+  expect(invoke).toHaveBeenCalledWith("render_pdf", { sheet: expect.objectContaining({ title: "Untitled", font: "petaluma-script", compact: false }) });
+  await vi.waitFor(() => expect(vi.mocked(writeFile).mock.calls.map(([path]) => path)).toEqual(["/out/a.pdf", "/out/b.pdf"]));
+  expect(String.fromCharCode(...(vi.mocked(writeFile).mock.calls[0][1] as Uint8Array))).toBe("%PDF");
+  vi.mocked(writeFile).mockClear();
 
   // When exporting ChordPro to a picked path
   vi.mocked(save).mockResolvedValueOnce("/out/untitled.cho");

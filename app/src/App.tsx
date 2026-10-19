@@ -2,7 +2,7 @@ import { Menu } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import type { Song } from "./model/song";
-import { confirmDiscard, pickOpenPath, printSong, pushRecent, readConfigJson, readSong, setWindowTitle, writeConfigJson } from "./ui/fileActions";
+import { confirmDiscard, pickOpenPath, pushRecent, readConfigJson, readSong, setWindowTitle, writeConfigJson } from "./ui/fileActions";
 import { parseSettings, type Settings } from "./ui/Toolbar";
 import { About } from "./ui/About";
 import { Preferences } from "./ui/Preferences";
@@ -158,7 +158,7 @@ function App() {
       chordpro: () => tab?.exportAs("chordpro"),
       musicxml: () => tab?.exportAs("musicxml"),
       midi: () => tab?.exportAs("midi"),
-      print: printSong,
+      print: () => tab?.exportPdf(),
       undo: () => (isInText ? document.execCommand("undo") : tab?.undo()),
       redo: () => (isInText ? document.execCommand("redo") : tab?.redo()),
       "edit-mode": () => tab?.toggleMode(),
@@ -192,14 +192,14 @@ function App() {
   }, [menuKey]);
 
   return (
-    <main className={[settings.compactPrint && "compact-print", `font-${settings.font}`].filter(Boolean).join(" ")}>
+    <main className={`font-${settings.font}`}>
       <Ribbon
         hasSong={active.hasSong}
         isEditing={active.isEditing}
         onNew={() => addTab(null)}
         onOpen={() => openSong()}
         onSave={() => void handles.current[activeId]?.save()}
-        onPrint={printSong}
+        onExportPdf={() => handles.current[activeId]?.exportPdf()}
         onToggleMode={() => handles.current[activeId]?.toggleMode()}
         onPreferences={() => preferences.current?.showModal()}
       />

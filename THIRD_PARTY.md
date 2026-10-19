@@ -23,9 +23,10 @@ Several weights are CC BY-NC-SA, so the whole application is for **non-commercia
 | FFmpeg | Decoding (called as an external program on `PATH`; bundled in the Windows installer only: BtbN's GPL `ffmpeg.exe` build, pinned by `FFMPEG_BUILD` in `.github/workflows/release.yml`, source: FFmpeg commit `330caae0c1` and https://github.com/BtbN/FFmpeg-Builds) | LGPL-2.1+ (GPL-2+ for some builds, the bundled one included) | — | https://ffmpeg.org |
 | uv (Astral) | Bundled in the release packages (`madsister-uv`, `madsister-snapshot-uv`): installs Python and the engine on first launch | MIT OR Apache-2.0 | — | https://github.com/astral-sh/uv |
 | GStreamer (base, good, libav plugins), WebKitGTK and their libraries | Bundled in the Linux AppImage only (the deb depends on the distribution's packages) | LGPL-2.1+ (libav plugin: LGPL, FFmpeg inside) | — | https://gstreamer.freedesktop.org, https://webkitgtk.org |
-| Patrick Hand (Patrick Wagesreiter) | Chart font, via `@fontsource/patrick-hand` | — | SIL OFL 1.1 | https://github.com/google/fonts/tree/main/ofl/patrickhand |
-| Kalam (Indian Type Foundry) | Chart font, via `@fontsource/kalam` | — | SIL OFL 1.1 | https://github.com/google/fonts/tree/main/ofl/kalam |
-| Petaluma Script, Petaluma Text (Steinberg Media Technologies) | Chart fonts, vendored in `app/src/fonts/` | — | SIL OFL 1.1 (`Petaluma-OFL.txt`) | https://github.com/steinbergmedia/petaluma |
+| Patrick Hand (Patrick Wagesreiter) | Chart font, via `@fontsource/patrick-hand`; a TTF copy in `app/src-tauri/fonts/` for PDFs | — | SIL OFL 1.1 | https://github.com/google/fonts/tree/main/ofl/patrickhand |
+| Kalam (Indian Type Foundry) | Chart font, via `@fontsource/kalam`; TTF copies in `app/src-tauri/fonts/` for PDFs | — | SIL OFL 1.1 | https://github.com/google/fonts/tree/main/ofl/kalam |
+| Petaluma Script, Petaluma Text (Steinberg Media Technologies) | Chart fonts, vendored in `app/src/fonts/` (TTF copies in `app/src-tauri/fonts/` for PDFs) | — | SIL OFL 1.1 (`Petaluma-OFL.txt`) | https://github.com/steinbergmedia/petaluma |
+| DejaVu Serif, Bold | "Serif" chart font in PDFs, and their fallback for characters a chart font lacks; vendored in `app/src-tauri/fonts/` | — | Bitstream Vera license, DejaVu changes public domain (`DejaVu-LICENSE.txt`) | https://dejavu-fonts.github.io |
 | Lucide | Interface icons, via `lucide-react` (bundled in the app) | ISC (icons from Feather: MIT) | — | https://github.com/lucide-icons/lucide |
 | pytest | Tests only (`dev` group), not shipped | MIT | — | https://github.com/pytest-dev/pytest |
 | GuitarSet (Xi et al., ISMIR 2018) | Proxy bench data (`bench/`), downloaded by `bench/fetch_guitarset.py`; not shipped | — | CC BY 4.0 (data) | https://zenodo.org/records/3371780 |

@@ -10,7 +10,6 @@
     "core:window:allow-set-title",
     "core:window:allow-close",
     "core:window:allow-destroy",
-    "core:webview:allow-print",
     "dialog:allow-open",
     "dialog:allow-save",
     "dialog:allow-confirm",

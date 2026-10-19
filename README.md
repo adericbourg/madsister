@@ -20,7 +20,7 @@ runs on your machine; nothing is sent anywhere.
 - Playback of the source audio with a cursor on the grid.
 - Several songs open in tabs, reopened at the next launch; dark mode follows the system.
 - Transposition, French (C7M), international (Cmaj7) or Latin (Sol7M) chord names, Nashville numbers.
-- Print (with a compact two-column layout), export to ChordPro, MusicXML and MIDI; charts are saved as plain JSON files
+- PDF to print (with a compact two-column layout), export to ChordPro, MusicXML and MIDI; charts are saved as plain JSON files
   (`*.madsister.json`).
 
 ## Quick start
@@ -31,14 +31,14 @@ runs on your machine; nothing is sent anywhere.
 2. A transcribed song opens read-only: flip the **View / Edit** switch in the toolbar to edit it.
 3. Correct the chords: move with the arrow keys, type a chord, <kbd>Enter</kbd>.
 4. Review the highlighted chords with <kbd>F8</kbd>, using playback (<kbd>Space</kbd>) to check by ear.
-5. Print (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd>) or export.
+5. Export a PDF to print (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd>) or another format.
 6. Save (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>S</kbd>).
 
 Chord names, chart font, bars per row and the review threshold are in **Preferences**.
 
 ## Print many charts
 
-`madsister print` writes each chart to a PDF (A4) next to it, as the app prints it, e.g. after an update that improves
+`madsister print` writes each chart to a PDF (A4) next to it, as the app exports it, e.g. after an update that improves
 the layout:
 
 ```sh
@@ -49,7 +49,7 @@ madsister print --compact --font kalam --bars-per-row 8 --out-dir ~/pdf song.mad
 - Options left out use the app's preferences: `--style fr|intl|latin`, `--font kalam|patrick-hand|petaluma-script|petaluma-text|serif`,
   `--bars-per-row 2|4|8`, `--compact` or `--no-compact`.
 - It exits with 1 if a chart failed, after printing the others.
-- Linux and macOS (not Windows yet). It opens a hidden window, so it needs a desktop session. On macOS, the command is inside the app:
+- It opens a hidden window, so it needs a desktop session. On macOS, the command is inside the app:
   `/Applications/madsister.app/Contents/MacOS/madsister print …`.
 
 ## Install (Debian, Ubuntu)

@@ -70,7 +70,7 @@ export const SHORTCUTS: readonly [keys: string, what: string][] = [
   ["Mod+E", "Switch between view (read-only) and edit mode"],
   ["Mod+N / Mod+O", "New song / open a file"],
   ["Mod+S / Mod+Shift+S", "Save / save as"],
-  ["Mod+P", "Print"],
+  ["Mod+P", "Export a PDF to print"],
   ["?", "Show this help"],
 ];
 

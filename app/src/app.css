@@ -334,7 +334,7 @@ dialog.preferences input:not([type="checkbox"]) {
   margin: 0.5rem 1rem;
 }
 
-/* Stays in view while the chart scrolls; hidden when printing via .toolbar. */
+/* Stays in view while the chart scrolls. */
 .content .transport {
   position: sticky;
   top: 0;
@@ -652,23 +652,4 @@ aside button {
 
 .importer button[type="submit"] {
   padding: 0.1rem 1.5rem;
-}
-
-/* Same specificity as the nav/aside rules above, so the print hiding lives here, after them. */
-@media print {
-  nav,
-  .tabbar,
-  aside,
-  .audio-notice,
-  .editor-notice {
-    display: none;
-  }
-
-  main,
-  .workspace,
-  .content {
-    display: block;
-    height: auto;
-    overflow: visible;
-  }
 }

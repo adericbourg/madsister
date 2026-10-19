@@ -244,7 +244,8 @@ Rules:
 
 ### 5.5 Print & export
 - **F-EX-1** Print / export PDF: A4, one page when possible, sections + bars grid, title/artist/key/tempo header.
-  Implemented as a print stylesheet on the UI (no PDF library).
+  The frontend spells the chart (`toSheet`); Rust lays it out and writes the PDF with krilla, for the app and `madsister print`
+  alike. The app saves the PDF; printing it is the PDF viewer's job.
 - **F-EX-2** Export **ChordPro** (`.cho`) using `{start_of_grid}` / `{end_of_grid}` sections (ChordPro 6 grid syntax),
   compatible with OSS apps (ChordPro reference implementation, OnSong-style readers). VERIFY grid support in target apps.
 - **F-EX-3** Export **MusicXML** with `<harmony>` elements and empty or slash measures. Opens in MuseScore.
@@ -267,8 +268,8 @@ The chart grid (§5.2, `grid.css`) keeps its look. These requirements cover the 
   state is remembered.
 - **F-UI-5** Native menu, following platform conventions. On macOS, the app menu holds About, Settings… and Quit. On Linux and
   Windows: File, Edit, View, Settings > Preferences…, Help > About. File holds New tab, Open…, Open recent ▸, Close tab, Save,
-  Save as…, Export ▸, Print…. Edit holds Undo/Redo plus the clipboard items. View holds Edit mode and Show sidebar.
-- **F-UI-6** A ribbon below the menu: New, Open, Save, Print on the left, and the View/Edit switch and Preferences on the right.
+  Save as…, Export ▸, Export PDF…. Edit holds Undo/Redo plus the clipboard items. View holds Edit mode and Show sidebar.
+- **F-UI-6** A ribbon below the menu: New, Open, Save, Export PDF on the left, and the View/Edit switch and Preferences on the right.
 - **F-UI-7** Several songs open at once, one tab each. The tab bar is shown as soon as one tab exists. New opens a tab on the
   start screen (new grid / import audio). Opening an already-open file focuses its tab. Closing a dirty tab, or the window with
   dirty tabs, asks for confirmation. Only the active tab plays.

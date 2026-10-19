@@ -1,8 +1,10 @@
+import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useId, useImperativeHandle, useState, type Ref } from "react";
 import { toChordPro } from "../model/export/chordpro";
 import { toMidi } from "../model/export/midi";
 import { toMusicXml } from "../model/export/musicxml";
+import { toSheet } from "../model/export/sheet";
 import { emptySong, type Notation, type Song } from "../model/song";
 import { Editor } from "./Editor";
 import { EngineSetup } from "./EngineSetup";
@@ -30,6 +32,7 @@ export type TabHandle = {
   save: () => Promise<void>;
   saveAs: () => Promise<void>;
   exportAs: (format: keyof typeof EXPORTS) => void;
+  exportPdf: () => void;
   undo: () => void;
   redo: () => void;
   toggleMode: () => void;
@@ -120,6 +123,10 @@ export const SongTab = ({ ref, isActive, initial, settings, onSettingsChange, on
       const [name, extension, convert] = EXPORTS[format];
       exportSong(song, name, extension, convert).catch(fail);
     },
+    exportPdf: () => {
+      const render = async (s: Song) => new Uint8Array(await invoke<ArrayBuffer>("render_pdf", { sheet: toSheet(s, settings) }));
+      exportSong(song, "PDF", "pdf", render).catch(fail);
+    },
     // Read-only in view mode, like the grid.
     undo: () => mode === "edit" && history.undo(),
     redo: () => mode === "edit" && history.redo(),
@@ -189,7 +196,6 @@ export const SongTab = ({ ref, isActive, initial, settings, onSettingsChange, on
                 mode={mode}
                 isActive={isActive}
                 barsPerRow={settings.barsPerRow}
-                compactPrint={settings.compactPrint}
                 style={settings.style}
                 minorConvention={settings.minorConvention}
                 lowConfidenceThreshold={settings.lowConfidenceThreshold}

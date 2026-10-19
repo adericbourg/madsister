@@ -1,11 +1,12 @@
 pub mod engine;
+mod pdf;
 mod print;
 
 use engine::{EngineEvent, Jobs, Packaged};
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use tauri::ipc::{Channel, Response};
-use tauri::{AppHandle, Manager, RunEvent, State, Webview};
+use tauri::{AppHandle, Manager, RunEvent, State};
 
 /// The packaged engine; None in dev (`tauri dev`) and when `MADSISTER_ENGINE` overrides it.
 struct Engine(Option<Packaged>);
@@ -202,9 +203,15 @@ fn print_read(batch: State<PrintBatch>, index: usize) -> Result<String, String> 
     std::fs::read_to_string(song).map_err(|e| format!("can't read it: {e}"))
 }
 
-/// Prints the page to the PDF of the batch's song `index`; returns its path. Off the main thread, which prints.
+/// The GUI's "Export PDF…": the frontend saves the bytes where the save dialog says.
 #[tauri::command(async)]
-fn print_pdf(webview: Webview, batch: State<PrintBatch>, index: usize) -> Result<String, String> {
+fn render_pdf(sheet: pdf::Sheet) -> Result<Response, String> {
+    pdf::render(&sheet).map(Response::new)
+}
+
+/// Writes the PDF of the batch's song `index`; returns its path.
+#[tauri::command(async)]
+fn print_pdf(batch: State<PrintBatch>, index: usize, sheet: pdf::Sheet) -> Result<String, String> {
     let pdf = &batch
         .0
         .as_ref()
@@ -214,10 +221,11 @@ fn print_pdf(webview: Webview, batch: State<PrintBatch>, index: usize) -> Result
         .ok_or("no such song")?
         .pdf;
     let pdf = std::path::absolute(pdf).map_err(|e| e.to_string())?;
+    let bytes = pdf::render(&sheet)?;
     if let Some(dir) = pdf.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("can't create {}: {e}", dir.display()))?;
     }
-    print::to_pdf(&webview, &pdf)?;
+    std::fs::write(&pdf, bytes).map_err(|e| format!("can't write it: {e}"))?;
     Ok(pdf.display().to_string())
 }
 
@@ -274,6 +282,7 @@ pub fn run() {
             print_plan,
             print_read,
             print_pdf,
+            render_pdf,
             print_log,
             print_finish
         ])

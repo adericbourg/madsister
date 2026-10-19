@@ -2,7 +2,6 @@ import { useEffect, useRef, type KeyboardEventHandler, type MouseEvent, type Rea
 import type { BarRef, SlotRef } from "../model/commands";
 import { displayKey, type DisplayStyle } from "../model/display";
 import type { Song } from "../model/song";
-import { COMPACT, FULL, printPages } from "./printPages";
 import { SectionBlock, type MenuTarget, type Selection } from "./SectionBlock";
 import "./grid.css";
 
@@ -21,8 +20,6 @@ type Props = {
   isEditable?: boolean;
   /** Rendered in the cursor cell instead of its chord (inline input). */
   editor?: ReactNode;
-  /** Prints the chart as two-column pages instead of one-column ones. */
-  compactPrint?: boolean;
   onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
   onCellClick?: (ref: SlotRef) => void;
   /** Click on a bar's own time signature. */
@@ -34,7 +31,7 @@ type Props = {
   onContextMenu?: (target: MenuTarget, e: MouseEvent) => void;
 };
 
-export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, compactPrint = false, onKeyDown, onCellClick, onMeterClick, onMetaClick, onSectionClick, onContextMenu }: Props) => {
+export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, lowConfidenceThreshold = 0.5, selection, isEditable = false, editor, onKeyDown, onCellClick, onMeterClick, onMetaClick, onSectionClick, onContextMenu }: Props) => {
   const { title, artist, key, tempoBpm } = song.meta;
   // Roving tabindex: without a cursor, the first slot is the grid's single tab stop.
   const tabStop = cursor ?? { section: 0, bar: 0, slot: 0 };
@@ -84,34 +81,6 @@ export const Grid = ({ song, barsPerRow, style, tonic, cursor, playing = null, l
             onSectionClick={onSectionClick}
             onContextMenu={onContextMenu}
           />
-        ))}
-      </div>
-      <div className="print-pages" aria-hidden="true">
-        {printPages(song.sections, barsPerRow, compactPrint ? COMPACT : FULL).map((page, p, pages) => (
-          <div key={p} className="print-page">
-            <p className="page-number">
-              {p + 1} / {pages.length}
-            </p>
-            {page.map((column, c) => (
-              <div key={c}>
-                {column.map(({ section, from, to }) => (
-                  <SectionBlock
-                    key={`${section}-${from}`}
-                    section={{ ...song.sections[section], bars: song.sections[section].bars.slice(from, to) }}
-                    index={section}
-                    barsPerRow={barsPerRow}
-                    style={style}
-                    tonic={tonic}
-                    tabStop={{ section: -1, bar: 0, slot: 0 }}
-                    playing={null}
-                    lowConfidenceThreshold={0}
-                    selection={undefined}
-                    editor={undefined}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
         ))}
       </div>
     </article>

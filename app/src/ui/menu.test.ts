@@ -29,7 +29,7 @@ describe("menuItems", () => {
   it("disables what needs a song, and the exports of a key-less Nashville song", () => {
     // Given no song, Then the song actions are disabled and View's items unchecked
     const file = sub(menu({ hasSong: false }), "File");
-    for (const text of ["Close tab", "Save", "Save as…", "Print…", "Export"]) expect(file.find((n) => n.text === text)!.enabled).toBe(false);
+    for (const text of ["Close tab", "Save", "Save as…", "Export PDF…", "Export"]) expect(file.find((n) => n.text === text)!.enabled).toBe(false);
     expect(file.find((n) => n.text === "Open…")!.enabled).toBe(true);
     expect(sub(menu({ hasSong: false }), "View").every((n) => n.enabled === false && n.checked === false)).toBe(true);
 

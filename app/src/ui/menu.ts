@@ -49,7 +49,7 @@ export const menuItems = ({ isMac, hasSong, isExportLocked, isEditing, isSidebar
         enabled: canExport,
         items: [item("chordpro", "ChordPro…", undefined, canExport), item("musicxml", "MusicXML…", undefined, canExport), item("midi", "MIDI…", undefined, canExport)],
       },
-      item("print", "Print…", "CmdOrCtrl+P", hasSong),
+      item("print", "Export PDF…", "CmdOrCtrl+P", hasSong),
       ...(isMac ? [] : [separator, quit]),
     ],
   };
