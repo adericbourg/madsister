@@ -861,6 +861,9 @@ fn show_tab(app: &AppWindow, state: &mut State) {
     refresh(app, state);
     show_import(app, state);
     tick(app, state);
+    if state.tab().editor.is_none() && !is_asking(app, state) {
+        app.invoke_focus_shell();
+    }
     focus_grid_when_idle(app, state);
 }
 
@@ -1127,16 +1130,32 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
 /// Connects the tab bar, the File menu and the window's close button (F-UI-7).
 fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, st) = (app.as_weak(), state.clone());
+    // The tabs stay as they are while a question is open: its answer applies to the tab it was asked for. A screen
+    // reader can still reach the tab bar under it.
+    let select = |app: &AppWindow, state: &mut State, index: usize| {
+        if !is_asking(app, state) {
+            activate(state, index);
+            show_tab(app, state);
+        }
+    };
     app.on_tab_selected(move |index| {
+        if let Some(app) = weak.upgrade() {
+            select(&app, &mut st.borrow_mut(), index as usize);
+        }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_tab_cycled(move |step| {
         let Some(app) = weak.upgrade() else { return };
         let mut state = st.borrow_mut();
-        activate(&mut state, index as usize);
-        show_tab(&app, &mut state);
+        let index = (state.active as i32 + step).rem_euclid(state.tabs.len() as i32);
+        select(&app, &mut state, index as usize);
     });
     let (weak, st) = (app.as_weak(), state.clone());
     app.on_tab_closed(move |index| {
-        if let Some(app) = weak.upgrade() {
-            close_tab(&app, &mut st.borrow_mut(), index as usize);
+        let Some(app) = weak.upgrade() else { return };
+        let mut state = st.borrow_mut();
+        if !is_asking(&app, &state) {
+            close_tab(&app, &mut state, index as usize);
         }
     });
     let (weak, st) = (app.as_weak(), state.clone());
@@ -1475,6 +1494,10 @@ fn main() -> Result<(), slint::PlatformError> {
         let Some(app) = weak.upgrade() else { return EventResult::Propagate };
         let WindowEvent::DroppedFile(path) = event else { return EventResult::Propagate };
         let mut state = drop_state.borrow_mut();
+        // As for the tab bar: the tabs stay as they are while a question is open.
+        if is_asking(&app, &state) {
+            return EventResult::Propagate;
+        }
         let is_song = path.to_string_lossy().ends_with(".json");
         // On the start screen, an audio file is for the importer (F-IN-1); a song file opens.
         if !is_song && state.tab().editor.is_none() {

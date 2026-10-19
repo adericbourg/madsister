@@ -41,9 +41,25 @@ component TabBar inherits Rectangle {
     in property <int> active;
     callback selected(int);
     callback closed(int);
+    /// The arrow keys: the next tab (1) or the previous one (-1).
+    callback cycled(int);
     background: Palette.color-scheme == ColorScheme.dark ? #141416 : #e6e6ea;
     accessible-role: tab-list;
     accessible-label: @tr("Songs");
+    keys := FocusScope {
+        key-pressed(event) => {
+            if (event.modifiers.control || event.modifiers.meta || event.modifiers.alt) {
+                return reject;
+            }
+            if (event.text == Key.RightArrow || event.text == Key.LeftArrow) {
+                root.cycled(event.text == Key.RightArrow ? 1 : -1);
+                // Showing the tab gives the grid the keyboard: the tab bar keeps it.
+                self.focus();
+                return accept;
+            }
+            reject
+        }
+    }
     HorizontalLayout {
         alignment: start;
         padding-left: 0.5 * Size.rem;
@@ -52,6 +68,8 @@ component TabBar inherits Rectangle {
             background: i == active ? Palette.background : transparent;
             border-top-left-radius: 6px;
             border-top-right-radius: 6px;
+            border-width: i == active && keys.has-focus ? 2px : 0;
+            border-color: Palette.accent-background;
             HorizontalLayout {
                 padding-left: 0.75 * Size.rem;
                 padding-right: 0.25 * Size.rem;
@@ -173,6 +191,8 @@ export component AppWindow inherits Window {
     in property <int> active-tab;
     callback tab-selected(int);
     callback tab-closed(int);
+    /// Ctrl+Tab, Ctrl+Shift+Tab, the tab bar's arrow keys: the next tab (1) or the previous one (-1).
+    callback tab-cycled(int);
     callback app-action(AppAction);
     /// The menus follow macOS conventions.
     in property <bool> is-mac;
@@ -237,6 +257,11 @@ export component AppWindow inherits Window {
 
     public function focus-grid() {
         grid-scope.focus();
+    }
+
+    /// The start screen has no grid: the keyboard waits here, for Ctrl+Tab.
+    public function focus-shell() {
+        shell.focus();
     }
 
     public function reveal-panel(index: int) {
@@ -390,92 +415,106 @@ export component AppWindow inherits Window {
     }
 
     callback create-grid <=> start-screen.create-grid;
-    VerticalLayout {
-        Ribbon {
-            has-song: has-song;
-            is-editing <=> root.is-editing;
-            action(action) => { root.app-action(action); }
-            export-pdf => { root.export(ExportFormat.pdf); }
-        }
-        // Tabs show up with the first song: a lone start screen has none.
-        if tabs.length > 1 || has-song: TabBar {
-            tabs: tabs;
-            active: active-tab;
-            selected(i) => { root.tab-selected(i); }
-            closed(i) => { root.tab-closed(i); }
-        }
-        Text {
-            text: error;
-            color: Palette.color-scheme == ColorScheme.dark ? #ff8a80 : #b3261e;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-            wrap: word-wrap;
-            accessible-role: text;
-            height: error == "" ? 0 : self.preferred-height + 0.5 * Size.rem;
-        }
-        Rectangle {
-            start-screen := StartScreen {
-                visible: !has-song;
+    // Ctrl+Tab switches tabs wherever the keyboard is, except in the dialogs (outside this scope). macOS reports Ctrl as meta.
+    shell := FocusScope {
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        capture-key-pressed(event) => {
+            if ((event.modifiers.control || event.modifiers.meta) && (event.text == Key.Tab || event.text == Key.Backtab)) {
+                root.tab-cycled(event.modifiers.shift || event.text == Key.Backtab ? -1 : 1);
+                return accept;
             }
+            reject
+        }
+        VerticalLayout {
+            Ribbon {
+                has-song: has-song;
+                is-editing <=> root.is-editing;
+                action(action) => { root.app-action(action); }
+                export-pdf => { root.export(ExportFormat.pdf); }
+            }
+            // Tabs show up with the first song: a lone start screen has none.
+            if tabs.length > 1 || has-song: TabBar {
+                tabs: tabs;
+                active: active-tab;
+                selected(i) => { root.tab-selected(i); }
+                closed(i) => { root.tab-closed(i); }
+                cycled(step) => { root.tab-cycled(step); }
+            }
+            Text {
+                text: error;
+                color: Palette.color-scheme == ColorScheme.dark ? #ff8a80 : #b3261e;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                wrap: word-wrap;
+                accessible-role: text;
+                height: error == "" ? 0 : self.preferred-height + 0.5 * Size.rem;
+            }
+            Rectangle {
+                start-screen := StartScreen {
+                    visible: !has-song;
+                }
 
-            HorizontalLayout {
-                visible: has-song;
-                VerticalLayout {
-                    transport := Transport {
-                        padding-left: Size.rem;
-                        padding-right: Size.rem;
-                        padding-top: 0.5 * Size.rem;
-                    }
-                    Text {
-                        text: notice;
-                        color: Palette.foreground;
-                        horizontal-alignment: center;
-                        accessible-role: text;
-                        height: notice == "" ? 0 : self.preferred-height + 0.5 * Size.rem;
-                        vertical-alignment: center;
-                    }
-                    grid-scope := FocusScope {
-                        key-pressed(event) => { root.grid-key(event) ? EventResult.accept : EventResult.reject }
-                        changed has-focus => { Grid.has-focus = self.has-focus; }
-                        scroll := ScrollView {
-                            content-width: self.visible-width;
-                            content-height: page.preferred-height;
-                            page := VerticalLayout {
-                                width: parent.visible-width;
-                                padding: Size.rem;
-                                alignment: start;
-                                HorizontalLayout {
-                                    alignment: center;
-                                    Sheet {
-                                        // grid.css: max-width 60rem plus its 1.5rem side padding.
-                                        preferred-width: 63 * Size.rem;
-                                        max-width: 63 * Size.rem;
-                                        min-width: 0;
-                                        chart: chart;
+                HorizontalLayout {
+                    visible: has-song;
+                    VerticalLayout {
+                        transport := Transport {
+                            padding-left: Size.rem;
+                            padding-right: Size.rem;
+                            padding-top: 0.5 * Size.rem;
+                        }
+                        Text {
+                            text: notice;
+                            color: Palette.foreground;
+                            horizontal-alignment: center;
+                            accessible-role: text;
+                            height: notice == "" ? 0 : self.preferred-height + 0.5 * Size.rem;
+                            vertical-alignment: center;
+                        }
+                        grid-scope := FocusScope {
+                            key-pressed(event) => { root.grid-key(event) ? EventResult.accept : EventResult.reject }
+                            changed has-focus => { Grid.has-focus = self.has-focus; }
+                            scroll := ScrollView {
+                                content-width: self.visible-width;
+                                content-height: page.preferred-height;
+                                page := VerticalLayout {
+                                    width: parent.visible-width;
+                                    padding: Size.rem;
+                                    alignment: start;
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        Sheet {
+                                            // grid.css: max-width 60rem plus its 1.5rem side padding.
+                                            preferred-width: 63 * Size.rem;
+                                            max-width: 63 * Size.rem;
+                                            min-width: 0;
+                                            chart: chart;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                rail := Rail {
-                    is-collapsed: !is-sidebar-shown;
-                    is-editable: Grid.is-editable;
-                    toggled => { root.app-action(AppAction.sidebar); }
-                    panel-shown(i) => { root.panel-shown(i); }
-                }
-                sidebar := Panels {
-                    width: is-sidebar-shown ? 20rem : 0;
-                    visible: is-sidebar-shown;
-                    view: panels;
-                    is-editable: Grid.is-editable;
-                    title-error: title-error;
-                    key-error: key-error;
-                    tempo-error: tempo-error;
-                    section-error: section-error;
+                    rail := Rail {
+                        is-collapsed: !is-sidebar-shown;
+                        is-editable: Grid.is-editable;
+                        toggled => { root.app-action(AppAction.sidebar); }
+                        panel-shown(i) => { root.panel-shown(i); }
+                    }
+                    sidebar := Panels {
+                        width: is-sidebar-shown ? 20rem : 0;
+                        visible: is-sidebar-shown;
+                        view: panels;
+                        is-editable: Grid.is-editable;
+                        title-error: title-error;
+                        key-error: key-error;
+                        tempo-error: tempo-error;
+                        section-error: section-error;
+                    }
                 }
             }
         }
+
     }
 
     if confirm-text != "": Rectangle {
