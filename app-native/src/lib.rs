@@ -2,6 +2,7 @@ pub mod audio;
 pub mod editor;
 pub mod engine;
 pub mod export;
+pub mod importer;
 pub mod keymap;
 pub mod model;
 pub mod pdf;
