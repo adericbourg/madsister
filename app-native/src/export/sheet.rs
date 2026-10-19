@@ -166,7 +166,10 @@ mod tests {
     #[test]
     fn to_sheet_writes_a_fractional_tempo_as_is() {
         // Given / When
-        let mut song = parse_song(r#"{ "version": 1, "meta": { "title": "T", "meter": { "beats": 4, "unit": 4 } }, "sections": [] }"#).unwrap();
+        let mut song = parse_song(
+            r#"{ "version": 1, "meta": { "title": "T", "meter": { "beats": 4, "unit": 4 } }, "sections": [{ "id": "a", "label": "A", "bars": [] }] }"#,
+        )
+        .unwrap();
         song.meta.tempo_bpm = Some(119.6);
 
         // Then
