@@ -816,3 +816,38 @@ fn about_opens_from_the_help_menu_and_closes() {
     click(&app, &find(&app, "Close").unwrap());
     assert_eq!(app.get_dialog(), Dialog::None);
 }
+
+#[test]
+fn the_sidebar_collapses_to_a_rail_remembered_in_the_settings() {
+    // Given a song in edit mode, and a config folder
+    let (app, state) = window();
+    let dir = temp_dir("sidebar");
+    state.borrow_mut().config = Some(dir.clone());
+    let is_collapsed_saved = || {
+        let saved: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("settings.json")).unwrap()).unwrap();
+        saved["isSidebarCollapsed"].as_bool().unwrap()
+    };
+
+    // When hiding the parameters
+    click(&app, &find(&app, "Hide parameters").unwrap());
+    run_deferred();
+
+    // Then the panels give way to the rail's buttons, every panel's in edit mode, and it's saved
+    assert!(!app.get_is_sidebar_shown() && is_collapsed_saved());
+    assert!(ElementHandle::find_by_accessible_label(&app, "Title").next().is_none());
+    assert!(find(&app, "Tempo").is_some() && find(&app, "Show parameters").is_some());
+    assert!(find(&app, "Show parameters").unwrap().size().width < 60.0, "the chart takes the room");
+
+    // When clicking the rail's Transpose button, Then the sidebar is back, saved too
+    click(&app, &find(&app, "Transpose").unwrap());
+    assert!(app.get_is_sidebar_shown() && !is_collapsed_saved());
+    assert!(find(&app, "+1 semitone").is_some());
+
+    // When View > Show sidebar unchecks it, then the chart's title is clicked, Then the sidebar expands on its field
+    app.invoke_app_action(AppAction::Sidebar);
+    run_deferred();
+    assert!(!app.get_is_sidebar_shown());
+    app.global::<Grid>().invoke_meta_clicked(MetaChoice::Title);
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(app.get_is_sidebar_shown());
+}

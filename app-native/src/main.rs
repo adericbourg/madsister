@@ -225,6 +225,7 @@ fn refresh(app: &AppWindow, state: &mut State) {
     app.set_error(tab.error.as_str().into());
     app.set_has_song(tab.editor.is_some());
     app.set_is_editing(tab.editor.as_ref().is_some_and(|e| e.is_editable));
+    app.set_is_sidebar_shown(tab.editor.is_some() && !state.settings.is_sidebar_collapsed);
     // The exports write real notes, which a key-less Nashville song (chords relative to C) doesn't have: same lock as transposing.
     app.set_is_export_locked(tab.editor.as_ref().is_some_and(Editor::is_transpose_locked));
     // shortcut: a new song without a file isn't autosaved (no recovery file); add one if users lose work.
@@ -778,6 +779,15 @@ fn save_settings(state: &mut State) {
     }
 }
 
+/// Expands or collapses the sidebar (F-UI-4), remembered in settings.json.
+fn set_sidebar_collapsed(app: &AppWindow, state: &mut State, is_collapsed: bool) {
+    if state.settings.is_sidebar_collapsed != is_collapsed {
+        state.settings.is_sidebar_collapsed = is_collapsed;
+        save_settings(state);
+    }
+    refresh(app, state);
+}
+
 /// Shows the settings: the chart font, and the chart rebuilt with the others at the next refresh.
 fn apply_settings(app: &AppWindow, state: &mut State) {
     let font = app.global::<ChartFont>();
@@ -1086,10 +1096,20 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
         });
     });
 
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_panel_shown(move |index| {
+        if let Some(app) = weak.upgrade() {
+            set_sidebar_collapsed(&app, &mut st.borrow_mut(), false);
+            app.invoke_reveal_panel(index);
+        }
+    });
+
+    // The chart's header and time signatures lead to their field in the panels, expanded first.
     let grid = app.global::<Grid>();
-    let weak = app.as_weak();
+    let (weak, st) = (app.as_weak(), state.clone());
     grid.on_meta_clicked(move |field| {
         if let Some(app) = weak.upgrade() {
+            set_sidebar_collapsed(&app, &mut st.borrow_mut(), false);
             app.invoke_focus_meta(field);
         }
     });
@@ -1098,6 +1118,7 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
         let at = SlotRef { section: section as usize, bar: bar as usize, slot: 0 };
         with_editor(&weak, &st, |editor, _| editor.select_bar(at));
         if let Some(app) = weak.upgrade() {
+            set_sidebar_collapsed(&app, &mut st.borrow_mut(), false);
             app.invoke_focus_bar_beats();
         }
     });
@@ -1190,6 +1211,10 @@ fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
                     app.set_dialog(Dialog::Preferences);
                 }
                 AppAction::About => app.set_dialog(Dialog::About),
+                AppAction::Sidebar => {
+                    let is_collapsed = !state.settings.is_sidebar_collapsed;
+                    set_sidebar_collapsed(&app, &mut state, is_collapsed);
+                }
                 AppAction::Minimize => app.window().set_minimized(true),
                 AppAction::Zoom => app.window().set_maximized(!app.window().is_maximized()),
             }
