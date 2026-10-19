@@ -2,7 +2,7 @@ name: app-native
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/rust-ui-rewrite] # the rewrite branch gets CI before it has a PR
     paths: ["app-native/**", ".github/workflows/app-native.yml"]
   pull_request:
     paths: ["app-native/**", ".github/workflows/app-native.yml"]
