@@ -66,6 +66,89 @@ global Ink {
     out property <color> muted: dark ? #a3a3a3 : #555;
     out property <color> hairline: dark ? #8a8a8a : #767676;
     out property <color> doubt: dark ? #fb923c : #a64200;
+    out property <color> focus: dark ? #93c5fd : #1d4ed8;
+    out property <color> editing: dark ? #4a3f12 : #fef9c3;
+    out property <color> selection: dark ? #1e3a5f : #dbeafe;
+}
+
+/// The editor's state as the grid shows it, and what the grid reports back (editor.rs).
+export global Grid {
+    in property <int> cursor-section;
+    in property <int> cursor-bar;
+    in property <int> cursor-slot;
+    /// Keyboard focus is in the grid: the cursor slot gets its ring.
+    in-out property <bool> has-focus;
+    /// The inline input: none, a chord in the cursor slot, or the cursor section's name.
+    in property <bool> is-drafting-chord;
+    in property <bool> is-drafting-label;
+    in property <string> draft-text;
+    in property <bool> draft-select-all;
+    in property <string> draft-error;
+    /// The selected bars of a section, -1 for none.
+    in property <int> selection-section: -1;
+    in property <int> selection-from;
+    in property <int> selection-to;
+    callback slot-clicked(int, int, int);
+    callback section-clicked(int);
+    callback draft-edited(string);
+    /// A key in the inline input; true when the editor took it.
+    callback draft-key(KeyEvent) -> bool;
+    callback draft-blurred();
+    /// An inline input has the keyboard focus.
+    in-out property <bool> draft-focused;
+    /// The cursor slot's position in the sheet, to scroll it into view.
+    callback reveal(length, length);
+}
+
+/// The inline input, focused and selected as the draft says when it appears.
+component DraftInput inherits Rectangle {
+    in property <length> font-size;
+    background: Ink.editing;
+    border-width: 3px;
+    border-color: Ink.focus;
+    input := TextInput {
+        x: 0.5 * Size.rem;
+        width: parent.width - Size.rem;
+        text: Grid.draft-text;
+        font-family: ChartFont.family;
+        font-size: root.font-size;
+        font-weight: 600;
+        color: Ink.ink;
+        vertical-alignment: center;
+        single-line: true;
+        accessible-label: Grid.is-drafting-label ? @tr("Section name") : @tr("Chord");
+        init => {
+            self.focus();
+            if (Grid.draft-select-all) {
+                self.select-all();
+            } else {
+                self.set-selection-offsets(self.text.character-count, self.text.character-count);
+            }
+        }
+        edited => { Grid.draft-edited(self.text); }
+        key-pressed(event) => { Grid.draft-key(event) ? EventResult.accept : EventResult.reject }
+        changed has-focus => {
+            Grid.draft-focused = self.has-focus;
+            if (!self.has-focus) {
+                Grid.draft-blurred();
+            }
+        }
+    }
+    if Grid.draft-error != "": Rectangle {
+        x: 0;
+        y: parent.height;
+        width: error.preferred-width + Size.rem;
+        height: error.preferred-height + 0.5 * Size.rem;
+        background: Ink.paper;
+        border-width: 1px;
+        border-color: Ink.doubt;
+        error := Text {
+            text: Grid.draft-error;
+            font-size: 0.9 * Size.rem;
+            color: Ink.doubt;
+            accessible-role: text;
+        }
+    }
 }
 
 /// A dotted line: `vertical` for the hairline between slots, else under a doubtful chord.
@@ -85,8 +168,20 @@ component Dots inherits Rectangle {
 
 component Slot inherits Rectangle {
     in property <SlotView> slot;
+    in property <int> section;
+    in property <int> bar;
+    in property <int> index;
+    out property <bool> is-cursor: Grid.cursor-section == section && Grid.cursor-bar == bar && Grid.cursor-slot == index;
     accessible-role: text;
     accessible-label: slot.spoken;
+    changed is-cursor => {
+        if (self.is-cursor) {
+            Grid.reveal(self.absolute-position.y, self.height);
+        }
+    }
+    TouchArea {
+        clicked => { Grid.slot-clicked(section, bar, index); }
+    }
     label := Text {
         x: 0.5 * Size.rem;
         width: parent.width - Size.rem;
@@ -100,7 +195,14 @@ component Slot inherits Rectangle {
         vertical-alignment: center;
         overflow: elide;
     }
-    if slot.low-confidence: Dots {
+    if is-cursor && Grid.has-focus && !Grid.is-drafting-chord: Rectangle {
+        border-width: 3px;
+        border-color: Ink.focus;
+    }
+    if is-cursor && Grid.is-drafting-chord: DraftInput {
+        font-size: 1.4 * Size.rem;
+    }
+    if slot.low-confidence && !(is-cursor && Grid.is-drafting-chord): Dots {
         x: label.x;
         y: label.y + label.height / 2 + 0.8 * Size.rem;
         width: min(label.preferred-width, label.width);
@@ -112,7 +214,11 @@ component Slot inherits Rectangle {
 
 component Bar inherits Rectangle {
     in property <BarView> bar;
+    in property <int> section;
+    in property <int> index;
     min-height: 3 * Size.rem;
+    background: Grid.selection-section == section && index >= Grid.selection-from && index <= Grid.selection-to
+        ? Ink.selection : transparent;
     HorizontalLayout {
         if bar.meter != "": Text {
             // A per-bar meter override (F-ED-11), at the start of the bar like a time signature.
@@ -134,6 +240,9 @@ component Bar inherits Rectangle {
             preferred-width: 0;
             Slot {
                 slot: slot;
+                section: section;
+                bar: index;
+                index: i;
             }
             if i > 0: Dots {
                 x: 0;
@@ -155,7 +264,9 @@ component Bar inherits Rectangle {
 
 component Section inherits VerticalLayout {
     in property <SectionView> section;
+    in property <int> index;
     in property <int> bars-per-row;
+    property <bool> is-current: Grid.cursor-section == index;
     spacing: 0.5 * Size.rem;
     accessible-role: groupbox;
     accessible-label: section.repeat > 1 ? section.label + ", " + section.repeat + " times" : section.label;
@@ -165,6 +276,14 @@ component Section inherits VerticalLayout {
         Rectangle {
             border-width: 2px;
             border-color: Ink.ink;
+            background: is-current ? Ink.ink : transparent;
+            TouchArea {
+                clicked => { Grid.section-clicked(index); }
+            }
+            if is-current && Grid.is-drafting-label: DraftInput {
+                font-size: Size.rem;
+                min-width: 10 * Size.rem;
+            }
             HorizontalLayout {
                 padding-left: 0.4 * Size.rem;
                 padding-right: 0.4 * Size.rem;
@@ -177,7 +296,8 @@ component Section inherits VerticalLayout {
                     font-weight: 700;
                     stroke: self.color;
                     stroke-width: ChartFont.bold-stroke;
-                    color: Ink.ink;
+                    color: is-current ? Ink.paper : Ink.ink;
+                    opacity: is-current && Grid.is-drafting-label ? 0 : 1;
                 }
             }
         }
@@ -192,7 +312,7 @@ component Section inherits VerticalLayout {
             vertical-alignment: center;
         }
     }
-    for row in section.rows: Rectangle {
+    for row[r] in section.rows: Rectangle {
         min-height: 3 * Size.rem;
         // The row's opening bar line; each bar draws its closing one.
         Rectangle {
@@ -204,6 +324,8 @@ component Section inherits VerticalLayout {
             x: i * parent.width / bars-per-row;
             width: parent.width / bars-per-row;
             bar: bar;
+            section: index;
+            index: r * bars-per-row + i;
         }
     }
     if section.rows.length == 0: Rectangle {
@@ -217,6 +339,10 @@ component Section inherits VerticalLayout {
             x: parent.width - 2px;
             width: 2px;
             background: Ink.ink;
+        }
+        if is-current && Grid.has-focus: Rectangle {
+            border-width: 3px;
+            border-color: Ink.focus;
         }
         Text {
             x: 0.5 * Size.rem;
@@ -234,7 +360,6 @@ export { Size, ChartFont }
 
 export component Sheet inherits Rectangle {
     in property <ChartView> chart;
-    /// The chart font's family.
     background: Ink.paper;
     border-radius: 8px;
     drop-shadow-blur: 3px;
@@ -297,8 +422,9 @@ export component Sheet inherits Rectangle {
                 }
             }
         }
-        for section in chart.sections: Section {
+        for section[s] in chart.sections: Section {
             section: section;
+            index: s;
             bars-per-row: chart.bars-per-row;
         }
     }

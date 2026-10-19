@@ -2642,6 +2642,7 @@ name = "madsister"
 version = "0.1.0"
 dependencies = [
  "dirs",
+ "i-slint-backend-testing",
  "krilla",
  "libc",
  "serde",
