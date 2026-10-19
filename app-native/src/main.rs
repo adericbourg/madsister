@@ -26,25 +26,88 @@ mod ui_tests;
 
 slint::include_modules!();
 
-/// What the window shows: the settings, and the open song's editor.
+/// What the window shows: the settings, and the open songs' tabs.
 struct State {
     settings: Settings,
-    editor: Option<Editor>,
-    /// The open song's file; None for a new grid.
-    path: Option<PathBuf>,
-    audio: AudioFile,
+    /// Never empty: closing the last tab opens a start screen.
+    tabs: Vec<Tab>,
+    active: usize,
     /// The song the sheet was last built from: rebuilding it recreates every slot, the inline input included.
     shown: Option<madsister::model::song::Song>,
-    /// The panels' last field errors.
-    errors: Errors,
     /// What the open confirmation dialog would do.
     pending: Option<Pending>,
-    /// The song's audio, when it has one; or why it can't play.
+    jobs: Jobs,
+    last_tab_id: u32,
+}
+
+impl State {
+    fn new(settings: Settings) -> State {
+        State { settings, tabs: vec![Tab::new(0)], active: 0, shown: None, pending: None, jobs: Jobs::default(), last_tab_id: 0 }
+    }
+
+    /// Adds a start screen tab at the end; returns its index.
+    fn push_tab(&mut self) -> usize {
+        self.last_tab_id += 1;
+        self.tabs.push(Tab::new(self.last_tab_id));
+        self.tabs.len() - 1
+    }
+
+    /// The tab a dialog was opened for, if it's still open: tabs can change while it is shown.
+    fn tab_by_id(&mut self, id: u32) -> Option<&mut Tab> {
+        self.tabs.iter_mut().find(|tab| tab.id == id)
+    }
+
+    fn tab(&self) -> &Tab {
+        &self.tabs[self.active]
+    }
+
+    fn tab_mut(&mut self) -> &mut Tab {
+        &mut self.tabs[self.active]
+    }
+}
+
+/// One open song (F-UI-7), or the start screen until a grid is created or imported.
+struct Tab {
+    id: u32,
+    editor: Option<Editor>,
+    /// The song as last opened or saved: the tab has unsaved changes when the editor's differs.
+    saved: Option<madsister::model::song::Song>,
+    /// The song's file; None for a new grid.
+    path: Option<PathBuf>,
+    audio: AudioFile,
+    /// The panels' last field errors.
+    errors: Errors,
+    /// The song's audio, when it has one; or why it can't play. Each tab keeps its own, paused when another tab is shown.
     player: Result<Option<AudioPlayer>, String>,
     importer: Importer,
-    jobs: Jobs,
-    /// The running engine job's events, sent from its thread, read by the ticker.
+    /// The tab's engine job events, sent from its thread, read by the ticker while the tab is shown: a hidden tab's job
+    /// keeps running, its events wait here.
     engine_events: (std::sync::mpsc::Sender<EngineEvent>, std::sync::mpsc::Receiver<EngineEvent>),
+}
+
+impl Tab {
+    fn new(id: u32) -> Tab {
+        Tab {
+            id,
+            editor: None,
+            saved: None,
+            path: None,
+            audio: AudioFile::default(),
+            errors: Errors::default(),
+            player: Ok(None),
+            importer: Importer::default(),
+            engine_events: std::sync::mpsc::channel(),
+        }
+    }
+
+    fn is_dirty(&self) -> bool {
+        self.editor.as_ref().is_some_and(|e| self.saved.as_ref() != Some(e.song()))
+    }
+
+    /// An untouched start screen, which an opened song takes over.
+    fn is_idle(&self) -> bool {
+        self.editor.is_none() && !self.importer.is_running()
+    }
 }
 
 /// The checks of the song's audio file.
@@ -71,6 +134,10 @@ enum Pending {
     DeleteSection,
     /// The import would write over this song file.
     Overwrite(std::path::PathBuf),
+    /// Closing this tab drops its unsaved changes.
+    CloseTab(usize),
+    /// Closing the window drops unsaved changes.
+    CloseWindow,
 }
 
 /// Slint's key text as the keymap names it: special keys come as private-use characters.
@@ -107,15 +174,27 @@ fn key_input(event: &slint::language::KeyEvent) -> KeyInput<'_> {
     }
 }
 
-/// Shows the editor's state.
+/// Shows the tabs and the active tab's editor.
 fn refresh(app: &AppWindow, state: &mut State) {
     check_audio(state);
-    let Some(editor) = &state.editor else { return };
+    show_question(app, state);
+    let tabs: Vec<TabView> = state
+        .tabs
+        .iter()
+        .map(|tab| TabView {
+            title: tab.editor.as_ref().map_or("New tab", |e| e.song().meta.title.as_str()).into(),
+            is_dirty: tab.is_dirty(),
+        })
+        .collect();
+    app.set_tabs(Rc::new(VecModel::from(tabs)).into());
+    app.set_active_tab(state.active as i32);
+    let tab = &state.tabs[state.active];
+    app.set_has_song(tab.editor.is_some());
+    let Some(editor) = &tab.editor else { return };
     if state.shown.as_ref() != Some(editor.song()) {
         app.set_chart(view::chart_view(editor.song(), &state.settings));
         state.shown = Some(editor.song().clone());
     }
-    app.set_has_song(true);
     app.set_notice(editor.notice.as_str().into());
     app.set_is_help_open(editor.is_help_open);
     let grid = app.global::<Grid>();
@@ -138,8 +217,8 @@ fn refresh(app: &AppWindow, state: &mut State) {
     let player = app.global::<Player>();
     player.set_has_review(has_confidence(editor.song()));
     player.set_flagged(count_flagged(editor.song(), state.settings.low_confidence_threshold) as i32);
-    let name = audio_file(state).and_then(|f| f.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
-    let notice = match state.audio.check {
+    let name = audio_file(tab).and_then(|f| f.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
+    let notice = match tab.audio.check {
         Some(FileCheck::Missing) => {
             format!("Audio file not found next to the song: {name}.\nThe song can't be played until you locate it.")
         }
@@ -147,21 +226,22 @@ fn refresh(app: &AppWindow, state: &mut State) {
         None => String::new(),
     };
     player.set_audio_notice(notice.into());
-    app.set_title_error(state.errors.title.as_str().into());
-    app.set_key_error(state.errors.key.as_str().into());
-    app.set_tempo_error(state.errors.tempo.as_str().into());
-    app.set_section_error(state.errors.section.as_str().into());
-    show_question(app, state);
+    app.set_title_error(tab.errors.title.as_str().into());
+    app.set_key_error(tab.errors.key.as_str().into());
+    app.set_tempo_error(tab.errors.tempo.as_str().into());
+    app.set_section_error(tab.errors.section.as_str().into());
 }
 
 /// The confirmation dialog, when a question is pending.
 fn show_question(app: &AppWindow, state: &State) {
     let (question, action) = match &state.pending {
         Some(Pending::DeleteSection) => {
-            let label = state.editor.as_ref().map(|e| e.song().sections[e.cursor().section].label.as_str()).unwrap_or_default();
+            let editor = state.tab().editor.as_ref();
+            let label = editor.map(|e| e.song().sections[e.cursor().section].label.as_str()).unwrap_or_default();
             (format!("Delete the section \"{label}\" and its chords?"), "Delete")
         }
         Some(Pending::Overwrite(path)) => (format!("{} already exists. Overwrite it?", path.display()), "Overwrite"),
+        Some(Pending::CloseTab(_) | Pending::CloseWindow) => ("Discard unsaved changes?".into(), "Discard"),
         None => (String::new(), ""),
     };
     app.set_confirm_text(question.into());
@@ -199,7 +279,7 @@ fn start_job(state: &State, request: Request) -> Result<u32, String> {
             argv.extend(["record".into(), "--out".into(), path(&out)]);
         }
     }
-    let events = state.engine_events.0.clone();
+    let events = state.tab().engine_events.0.clone();
     state
         .jobs
         .spawn(&argv, has_stdin, move |event| _ = events.send(event))
@@ -212,12 +292,14 @@ fn follow(app: &AppWindow, state: &mut State, next: Next) {
         Next::Nothing => {}
         Next::Start(request) => {
             let started = start_job(state, request);
-            state.importer.started(started);
+            state.tab_mut().importer.started(started);
         }
         Next::ConfirmOverwrite(path) => state.pending = Some(Pending::Overwrite(path)),
-        Next::Open(path) => {
-            open(app, state, &path);
-        }
+        Next::Open(path) => match read_song(&path) {
+            Ok(song) => load(app, state, viewer(song), Some(path)),
+            // shortcut: errors go to stderr until the app shell (step 11) shows them.
+            Err(e) => eprintln!("can't open {}: {e}", path.display()),
+        },
     }
     show_import(app, state);
     show_question(app, state);
@@ -225,7 +307,7 @@ fn follow(app: &AppWindow, state: &mut State, next: Next) {
 
 /// Shows the importer's state.
 fn show_import(app: &AppWindow, state: &State) {
-    let importer = &state.importer;
+    let importer = &state.tab().importer;
     let ui = app.global::<Import>();
     let file_name = importer.audio_path.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned());
     ui.set_file_name(file_name.unwrap_or_default().into());
@@ -239,8 +321,8 @@ fn show_import(app: &AppWindow, state: &State) {
 
 /// Reads the engine's events that arrived since the last tick.
 fn drain_engine_events(app: &AppWindow, state: &mut State) {
-    while let Ok(event) = state.engine_events.1.try_recv() {
-        let next = state.importer.event(event, engine_has, Path::exists);
+    while let Ok(event) = state.tab().engine_events.1.try_recv() {
+        let next = state.tab_mut().importer.event(event, engine_has, Path::exists);
         follow(app, state, next);
     }
 }
@@ -252,26 +334,19 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
         let Some(app) = weak.upgrade() else { return };
         let meter = Meter { beats: beats as u32, unit: unit as u32, extra: Default::default() };
         let notation = is_nashville.then_some(Notation::Nashville);
-        let mut state = st.borrow_mut();
-        state.editor = Some(Editor::new(empty_song(meter, notation)));
-        state.path = None;
-        state.audio = AudioFile::default();
-        state.shown = None;
-        state.errors = Errors::default();
-        refresh(&app, &mut state);
-        tick(&app, &state);
-        focus_grid_when_idle(&app, &state);
+        load(&app, &mut st.borrow_mut(), Editor::new(empty_song(meter, notation)), None);
     });
     let import = app.global::<Import>();
     let (weak, st) = (app.as_weak(), state.clone());
     import.on_pick_file(move || {
         let (weak, st) = (weak.clone(), st.clone());
-        let dialog = audio_dialog();
+        let (dialog, id) = (audio_dialog(), st.borrow().tab().id);
         let picking = slint::spawn_local(async move {
             let Some(file) = dialog.pick_file().await else { return };
             let Some(app) = weak.upgrade() else { return };
             let mut state = st.borrow_mut();
-            state.importer.select_file(file.path());
+            let Some(tab) = state.tab_by_id(id) else { return };
+            tab.importer.select_file(file.path());
             show_import(&app, &state);
         });
         if let Err(e) = picking {
@@ -283,7 +358,7 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
         let Some(app) = weak.upgrade() else { return };
         let ui = app.global::<Import>();
         let mut state = st.borrow_mut();
-        let importer = &mut state.importer;
+        let importer = &mut state.tab_mut().importer;
         importer.source = match ui.get_source() {
             1 => Source::Url,
             2 => Source::Record,
@@ -305,7 +380,7 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, st) = (app.as_weak(), state.clone());
     import.on_cancel(move || {
         let state = st.borrow();
-        if let Some(id) = state.importer.job_id() {
+        if let Some(id) = state.tab().importer.job_id() {
             state.jobs.cancel(id);
         }
         if let Some(app) = weak.upgrade() {
@@ -315,7 +390,7 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let st = state.clone();
     import.on_stop(move || {
         let state = st.borrow();
-        if let Some(id) = state.importer.job_id() {
+        if let Some(id) = state.tab().importer.job_id() {
             state.jobs.stop(id);
         }
     });
@@ -323,7 +398,7 @@ fn wire_start(app: &AppWindow, state: &Rc<RefCell<State>>) {
 
 /// After an event from the grid: the keyboard goes back to it unless an input or a dialog holds it.
 fn focus_grid_when_idle(app: &AppWindow, state: &State) {
-    let is_idle = state.editor.as_ref().is_some_and(|e| e.draft.is_none() && !e.is_help_open) && state.pending.is_none();
+    let is_idle = state.tab().editor.as_ref().is_some_and(|e| e.draft.is_none() && !e.is_help_open) && state.pending.is_none();
     if is_idle {
         app.invoke_focus_grid();
     }
@@ -338,10 +413,10 @@ fn with_grid<R: Default>(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>
     result
 }
 
-/// The open song's audio file.
-fn audio_file(state: &State) -> Option<PathBuf> {
-    let audio = state.editor.as_ref()?.song().audio.as_ref()?;
-    Some(audio_path(state.path.as_deref()?, &audio.path))
+/// The tab's audio file.
+fn audio_file(tab: &Tab) -> Option<PathBuf> {
+    let audio = tab.editor.as_ref()?.song().audio.as_ref()?;
+    Some(audio_path(tab.path.as_deref()?, &audio.path))
 }
 
 /// The file's sha256, computed on its own thread: the song shows first.
@@ -353,31 +428,34 @@ fn hash_in_background(path: PathBuf) -> Receiver<Option<String>> {
 
 /// Checks the song's audio file when its reference changed (opened, located, undone); the player waits for the result.
 fn check_audio(state: &mut State) {
-    let audio = state.editor.as_ref().and_then(|e| e.song().audio.clone());
-    if state.audio.checked.as_ref() == Some(&audio) {
+    let tab = state.tab_mut();
+    let audio = tab.editor.as_ref().and_then(|e| e.song().audio.clone());
+    if tab.audio.checked.as_ref() == Some(&audio) {
         return;
     }
-    state.player = Ok(None);
-    state.audio.check = None;
-    state.audio.hashing = audio_file(state).map(hash_in_background);
-    state.audio.checked = Some(audio);
+    tab.player = Ok(None);
+    tab.audio.check = None;
+    tab.audio.hashing = audio_file(tab).map(hash_in_background);
+    tab.audio.checked = Some(audio);
 }
 
 /// Takes the audio file hashes that are ready: the check's result opens the player, a located file becomes the song's audio.
 fn poll_audio(app: &AppWindow, state: &mut State) {
-    if let Some(Ok(sha256)) = state.audio.hashing.as_ref().map(Receiver::try_recv) {
-        state.audio.hashing = None;
-        let expected = state.editor.as_ref().and_then(|e| e.song().audio.as_ref()).map(|a| a.sha256.clone()).unwrap_or_default();
-        state.audio.check = check_file(&expected, sha256.as_deref());
+    let tab = state.tab_mut();
+    if let Some(Ok(sha256)) = tab.audio.hashing.as_ref().map(Receiver::try_recv) {
+        tab.audio.hashing = None;
+        let expected = tab.editor.as_ref().and_then(|e| e.song().audio.as_ref()).map(|a| a.sha256.clone()).unwrap_or_default();
+        tab.audio.check = check_file(&expected, sha256.as_deref());
         // A missing file would only fail to load, repeating the notice.
-        if state.audio.check != Some(FileCheck::Missing) {
-            state.player = audio_file(state).map(|file| AudioPlayer::open(&file)).transpose();
+        if tab.audio.check != Some(FileCheck::Missing) {
+            tab.player = audio_file(tab).map(|file| AudioPlayer::open(&file)).transpose();
         }
         refresh(app, state);
     }
-    if let Some((file, Ok(sha256))) = state.audio.locating.as_ref().map(|(file, hashing)| (file.clone(), hashing.try_recv())) {
-        state.audio.locating = None;
-        let (Some(editor), Some(song_path)) = (state.editor.as_mut(), state.path.as_deref()) else { return };
+    let tab = state.tab_mut();
+    if let Some((file, Ok(sha256))) = tab.audio.locating.as_ref().map(|(file, hashing)| (file.clone(), hashing.try_recv())) {
+        tab.audio.locating = None;
+        let (Some(editor), Some(song_path)) = (tab.editor.as_mut(), tab.path.as_deref()) else { return };
         match sha256 {
             None => editor.notice = format!("Can't read {}", file.display()),
             Some(sha256) => {
@@ -402,9 +480,10 @@ fn minutes(sec: f64) -> String {
 
 /// Shows the player's state: the transport, and the bar being played (F-PB-1).
 fn tick(app: &AppWindow, state: &State) {
-    let Some(editor) = &state.editor else { return };
+    let tab = state.tab();
+    let Some(editor) = &tab.editor else { return };
     let ui = app.global::<Player>();
-    let (player, error) = match &state.player {
+    let (player, error) = match &tab.player {
         Ok(player) => (player.as_ref(), String::new()),
         Err(e) => (None, e.clone()),
     };
@@ -414,7 +493,7 @@ fn tick(app: &AppWindow, state: &State) {
         _ => error,
     };
     let (time, duration) = player.map_or((0.0, 0.0), |p| (p.time(), p.duration()));
-    ui.set_has_audio(editor.song().audio.is_some() && state.audio.check != Some(FileCheck::Missing));
+    ui.set_has_audio(editor.song().audio.is_some() && tab.audio.check != Some(FileCheck::Missing));
     ui.set_is_ready(status == Some(Status::Ready));
     ui.set_is_playing(player.is_some_and(AudioPlayer::is_playing));
     ui.set_time(time as f32);
@@ -428,27 +507,69 @@ fn tick(app: &AppWindow, state: &State) {
 }
 
 /// Plays from `sec`, or says why it can't.
-fn play_from(state: &mut State, sec: f64) {
-    let started = matches!(&state.player, Ok(Some(player)) if player.seek(sec) && (player.is_playing() || player.toggle()));
-    if !started && let Some(editor) = &mut state.editor {
+fn play_from(tab: &mut Tab, sec: f64) {
+    let started = matches!(&tab.player, Ok(Some(player)) if player.seek(sec) && (player.is_playing() || player.toggle()));
+    if !started && let Some(editor) = &mut tab.editor {
         editor.notice = "No audio to play".into();
     }
 }
 
-/// Opens the song file at `path`; false when it can't be opened.
+fn read_song(path: &Path) -> Result<madsister::model::song::Song, String> {
+    std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|text| parse_song(&text))
+}
+
+/// An editor for an opened song: opened files start in view mode, as in the Tauri app; a new grid starts in edit mode.
+fn viewer(song: madsister::model::song::Song) -> Editor {
+    let mut editor = Editor::new(song);
+    editor.is_editable = false;
+    editor
+}
+
+/// Puts the song in the active tab, as saved at `path`.
+fn load(app: &AppWindow, state: &mut State, editor: Editor, path: Option<PathBuf>) {
+    let tab = state.tab_mut();
+    tab.saved = Some(editor.song().clone());
+    tab.editor = Some(editor);
+    tab.path = path;
+    tab.audio = AudioFile::default();
+    tab.errors = Errors::default();
+    show_tab(app, state);
+}
+
+/// Makes the tab at `index` the active one; the one it hides stops playing.
+fn activate(state: &mut State, index: usize) {
+    if let Ok(Some(player)) = &state.tab().player
+        && player.is_playing()
+    {
+        player.toggle();
+    }
+    state.active = index;
+}
+
+/// Shows the active tab after it changed.
+fn show_tab(app: &AppWindow, state: &mut State) {
+    state.shown = None;
+    refresh(app, state);
+    show_import(app, state);
+    tick(app, state);
+    focus_grid_when_idle(app, state);
+}
+
+/// Opens the song file at `path` (F-UI-7): its tab when it's open already, else in the untouched start screen or a new
+/// tab. False when it can't be opened.
 fn open(app: &AppWindow, state: &mut State, path: &Path) -> bool {
-    match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|text| parse_song(&text)) {
+    if let Some(index) = state.tabs.iter().position(|tab| tab.path.as_deref() == Some(path)) {
+        activate(state, index);
+        show_tab(app, state);
+        return true;
+    }
+    match read_song(path) {
         Ok(song) => {
-            state.path = Some(path.to_path_buf());
-            state.audio = AudioFile::default();
-            // Opened files start in view mode, as in the Tauri app; a new grid starts in edit mode.
-            let mut editor = Editor::new(song);
-            editor.is_editable = false;
-            state.editor = Some(editor);
-            state.shown = None;
-            state.errors = Errors::default();
-            refresh(app, state);
-            focus_grid_when_idle(app, state);
+            if !state.tab().is_idle() {
+                let index = state.push_tab();
+                activate(state, index);
+            }
+            load(app, state, viewer(song), Some(path.to_path_buf()));
             true
         }
         // shortcut: errors go to stderr until the app shell (step 11) shows them.
@@ -459,12 +580,38 @@ fn open(app: &AppWindow, state: &mut State, path: &Path) -> bool {
     }
 }
 
+/// Closes the tab at `index`, asking first when it has unsaved changes.
+fn close_tab(app: &AppWindow, state: &mut State, index: usize) {
+    if state.tabs[index].is_dirty() {
+        state.pending = Some(Pending::CloseTab(index));
+        show_question(app, state);
+    } else {
+        close_tab_now(app, state, index);
+    }
+}
+
+fn close_tab_now(app: &AppWindow, state: &mut State, index: usize) {
+    let tab = state.tabs.remove(index);
+    if let Some(id) = tab.importer.job_id() {
+        state.jobs.cancel(id);
+    }
+    if state.tabs.is_empty() {
+        state.push_tab();
+    }
+    // The active tab stays in front; closing it shows the next one, or the last.
+    if index < state.active {
+        state.active -= 1;
+    }
+    state.active = state.active.min(state.tabs.len() - 1);
+    show_tab(app, state);
+}
+
 /// Runs `f` on the open editor with the settings, then shows the result.
 fn with_editor<R: Default>(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>>, f: impl FnOnce(&mut Editor, &Settings) -> R) -> R {
     let Some(app) = app.upgrade() else { return R::default() };
     let mut state = state.borrow_mut();
     let state = &mut *state;
-    let Some(editor) = &mut state.editor else { return R::default() };
+    let Some(editor) = &mut state.tabs[state.active].editor else { return R::default() };
     let result = f(editor, &state.settings);
     refresh(&app, state);
     result
@@ -474,7 +621,7 @@ fn with_editor<R: Default>(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<Stat
 fn with_state(app: &slint::Weak<AppWindow>, state: &Rc<RefCell<State>>, f: impl FnOnce(&mut State)) {
     let Some(app) = app.upgrade() else { return };
     let mut state = state.borrow_mut();
-    if state.editor.is_some() {
+    if state.tab().editor.is_some() {
         f(&mut state);
         refresh(&app, &mut state);
     }
@@ -491,12 +638,13 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
                 MetaChoice::Key => MetaField::Key,
                 MetaChoice::Tempo => MetaField::Tempo,
             };
-            let editor = state.editor.as_mut().expect("with_state checked it");
+            let tab = &mut state.tabs[state.active];
+            let editor = tab.editor.as_mut().expect("with_state checked it");
             let error = editor.set_meta(field, &text, &state.settings).err().unwrap_or_default();
             match field {
-                MetaField::Title => state.errors.title = error,
-                MetaField::Key => state.errors.key = error,
-                MetaField::Tempo => state.errors.tempo = error,
+                MetaField::Title => tab.errors.title = error,
+                MetaField::Key => tab.errors.key = error,
+                MetaField::Tempo => tab.errors.tempo = error,
                 MetaField::Artist => {}
             }
         });
@@ -516,8 +664,9 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, st) = (app.as_weak(), state.clone());
     app.on_section_renamed(move |text| {
         with_state(&weak, &st, |state| {
-            let editor = state.editor.as_mut().expect("with_state checked it");
-            state.errors.section = editor.rename_cursor_section(&text).err().unwrap_or_default();
+            let tab = state.tab_mut();
+            let editor = tab.editor.as_mut().expect("with_state checked it");
+            tab.errors.section = editor.rename_cursor_section(&text).err().unwrap_or_default();
         });
     });
     let (weak, st) = (app.as_weak(), state.clone());
@@ -532,7 +681,7 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, st) = (app.as_weak(), state.clone());
     app.on_section_deleted(move || {
         with_state(&weak, &st, |state| {
-            let editor = state.editor.as_mut().expect("with_state checked it");
+            let editor = state.tab_mut().editor.as_mut().expect("with_state checked it");
             if editor.cursor_section_has_chords() {
                 state.pending = Some(Pending::DeleteSection);
             } else {
@@ -546,14 +695,21 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
         let mut state = st.borrow_mut();
         match state.pending.take() {
             Some(Pending::DeleteSection) if is_yes => {
-                if let Some(editor) = state.editor.as_mut() {
+                if let Some(editor) = state.tab_mut().editor.as_mut() {
                     editor.delete_cursor_section();
                 }
                 refresh(&app, &mut state);
             }
             Some(Pending::Overwrite(_)) if is_yes => {
-                let next = state.importer.transcribe_confirmed(engine_has);
+                let next = state.tab_mut().importer.transcribe_confirmed(engine_has);
                 follow(&app, &mut state, next);
+            }
+            Some(Pending::CloseTab(index)) if is_yes => close_tab_now(&app, &mut state, index),
+            Some(Pending::CloseWindow) if is_yes => {
+                drop(state);
+                _ = app.hide();
+                _ = slint::quit_event_loop();
+                return;
             }
             _ => {}
         }
@@ -573,7 +729,7 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let player = app.global::<Player>();
     let (weak, st) = (app.as_weak(), state.clone());
     player.on_toggle(move || {
-        if let Ok(Some(player)) = &st.borrow().player {
+        if let Ok(Some(player)) = &st.borrow().tab().player {
             player.toggle();
         }
         if let Some(app) = weak.upgrade() {
@@ -582,7 +738,7 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     });
     let (weak, st) = (app.as_weak(), state.clone());
     player.on_seek(move |sec| {
-        if let Ok(Some(player)) = &st.borrow().player {
+        if let Ok(Some(player)) = &st.borrow().tab().player {
             player.seek(f64::from(sec));
         }
         if let Some(app) = weak.upgrade() {
@@ -593,7 +749,7 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     player.on_review(move |is_forward| {
         let step = if is_forward { Step::Forward } else { Step::Back };
         let start = with_grid(&weak, &st, |editor, settings| editor.review(step, settings));
-        if let (Some(start), Ok(Some(player))) = (start, &st.borrow().player) {
+        if let (Some(start), Ok(Some(player))) = (start, &st.borrow().tab().player) {
             player.seek(start);
         }
     });
@@ -601,10 +757,13 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let st = state.clone();
     player.on_locate_audio(move || {
         let (st, dialog) = (st.clone(), audio_dialog());
+        let id = st.borrow().tab().id;
         let picking = slint::spawn_local(async move {
             let Some(file) = dialog.pick_file().await else { return };
             let file = file.path().to_path_buf();
-            st.borrow_mut().audio.locating = Some((file.clone(), hash_in_background(file)));
+            if let Some(tab) = st.borrow_mut().tab_by_id(id) {
+                tab.audio.locating = Some((file.clone(), hash_in_background(file)));
+            }
         });
         if let Err(e) = picking {
             eprintln!("can't open the file dialog: {e}");
@@ -613,7 +772,8 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, st) = (app.as_weak(), state.clone());
     player.on_show_song_file(move || {
         with_state(&weak, &st, |state| {
-            if let (Some(path), Some(editor)) = (&state.path, &mut state.editor)
+            let tab = state.tab_mut();
+            if let (Some(path), Some(editor)) = (&tab.path, &mut tab.editor)
                 && let Err(e) = opener::reveal(path)
             {
                 editor.notice = format!("Can't show {}: {e}", path.display());
@@ -638,10 +798,63 @@ fn wire_panels(app: &AppWindow, state: &Rc<RefCell<State>>) {
     });
 }
 
+/// Connects the tab bar, the File menu and the window's close button (F-UI-7).
+fn wire_tabs(app: &AppWindow, state: &Rc<RefCell<State>>) {
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_tab_selected(move |index| {
+        let Some(app) = weak.upgrade() else { return };
+        let mut state = st.borrow_mut();
+        activate(&mut state, index as usize);
+        show_tab(&app, &mut state);
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_tab_closed(move |index| {
+        if let Some(app) = weak.upgrade() {
+            close_tab(&app, &mut st.borrow_mut(), index as usize);
+        }
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.on_file_action(move |action| {
+        let (weak, st) = (weak.clone(), st.clone());
+        // Deferred: macOS native menus break if their structure changes while an item's activation is being handled.
+        slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+            let Some(app) = weak.upgrade() else { return };
+            let mut state = st.borrow_mut();
+            // The menu's shortcuts still fire under the confirmation dialog.
+            if state.pending.is_some() {
+                return;
+            }
+            match action {
+                FileAction::NewTab => {
+                    let index = state.push_tab();
+                    activate(&mut state, index);
+                    show_tab(&app, &mut state);
+                }
+                FileAction::CloseTab => {
+                    let active = state.active;
+                    close_tab(&app, &mut state, active);
+                }
+            }
+        });
+    });
+    let (weak, st) = (app.as_weak(), state.clone());
+    app.window().on_close_requested(move || {
+        let Some(app) = weak.upgrade() else { return slint::CloseRequestResponse::HideWindow };
+        let mut state = st.borrow_mut();
+        if !state.tabs.iter().any(Tab::is_dirty) {
+            return slint::CloseRequestResponse::HideWindow;
+        }
+        state.pending = Some(Pending::CloseWindow);
+        show_question(&app, &state);
+        slint::CloseRequestResponse::KeepWindowShown
+    });
+}
+
 /// Connects the window's callbacks to the editor.
 fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     wire_panels(app, state);
     wire_start(app, state);
+    wire_tabs(app, state);
     let weak = app.as_weak();
     let grid_state = state.clone();
     app.on_grid_key(move |event| {
@@ -675,12 +888,13 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
             Outcome::Ignored => return false,
             Outcome::Handled => return true,
             Outcome::Play => {
-                let is_toggled = matches!(&state.player, Ok(Some(player)) if player.toggle());
-                if !is_toggled && let Some(editor) = &mut state.editor {
+                let tab = state.tab_mut();
+                let is_toggled = matches!(&tab.player, Ok(Some(player)) if player.toggle());
+                if !is_toggled && let Some(editor) = &mut tab.editor {
                     editor.notice = "No audio to play".into();
                 }
             }
-            Outcome::PlayFrom(sec) => play_from(&mut state, sec),
+            Outcome::PlayFrom(sec) => play_from(state.tab_mut(), sec),
         }
         if let Some(app) = weak.upgrade() {
             refresh(&app, &mut state);
@@ -701,7 +915,7 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
             editor.click(at, settings);
             editor.bar_start(at)
         });
-        if let (Some(start), Ok(Some(player))) = (start, &grid_state.borrow().player) {
+        if let (Some(start), Ok(Some(player))) = (start, &grid_state.borrow().tab().player) {
             player.seek(start);
         }
     });
@@ -727,7 +941,7 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, grid_state) = (app.as_weak(), state.clone());
     // Only the editor's text: refreshing would reset the input's caret on every keystroke.
     grid.on_draft_edited(move |text| {
-        if let Some(editor) = &mut grid_state.borrow_mut().editor {
+        if let Some(editor) = &mut grid_state.borrow_mut().tab_mut().editor {
             editor.set_draft_text(&text);
         }
         if let Some(app) = weak.upgrade() {
@@ -742,7 +956,7 @@ fn wire(app: &AppWindow, state: &Rc<RefCell<State>>) {
     let (weak, grid_state) = (app.as_weak(), state.clone());
     grid.on_draft_blurred(move || {
         // An input closed by its own commit or cancel has nothing left to save.
-        if grid_state.borrow().editor.as_ref().is_none_or(|editor| editor.draft.is_none()) {
+        if grid_state.borrow().tab().editor.as_ref().is_none_or(|editor| editor.draft.is_none()) {
             return;
         }
         // Deferred: the input is being removed or another slot was clicked; both settle first. A new input that took the
@@ -785,19 +999,7 @@ fn main() -> Result<(), slint::PlatformError> {
     selector.select()?;
 
     let app = AppWindow::new()?;
-    let state = Rc::new(RefCell::new(State {
-        settings: Settings::load(),
-        editor: None,
-        path: None,
-        audio: AudioFile::default(),
-        shown: None,
-        errors: Errors::default(),
-        pending: None,
-        player: Ok(None),
-        importer: Importer::default(),
-        jobs: Jobs::default(),
-        engine_events: std::sync::mpsc::channel(),
-    }));
+    let state = Rc::new(RefCell::new(State::new(Settings::load())));
     {
         let settings = &state.borrow().settings;
         let font = app.global::<ChartFont>();
@@ -809,8 +1011,9 @@ fn main() -> Result<(), slint::PlatformError> {
         .map(|(keys, what)| Shortcut { keys: keys.replace("Mod", MOD_LABEL).into(), what: (*what).into() })
         .collect();
     app.set_shortcuts(Rc::new(VecModel::from(shortcuts)).into());
-    if let Some(path) = args.first() {
-        open(&app, &mut state.borrow_mut(), Path::new(path));
+    match args.first() {
+        Some(path) => _ = open(&app, &mut state.borrow_mut(), Path::new(path)),
+        None => refresh(&app, &mut state.borrow_mut()),
     }
 
     wire(&app, &state);
@@ -826,9 +1029,9 @@ fn main() -> Result<(), slint::PlatformError> {
         let mut state = drop_state.borrow_mut();
         let is_song = path.to_string_lossy().ends_with(".json");
         // On the start screen, an audio file is for the importer (F-IN-1); a song file opens.
-        if !is_song && state.editor.is_none() {
-            if !state.importer.is_running() {
-                state.importer.select_file(path);
+        if !is_song && state.tab().editor.is_none() {
+            if !state.tab().importer.is_running() {
+                state.tab_mut().importer.select_file(path);
                 show_import(&app, &state);
             }
             return EventResult::Propagate;
