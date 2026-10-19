@@ -1,6 +1,6 @@
 import { ScrollView, Palette, Button } from "std-widgets.slint";
 import { Sheet, ChartView, Size, Grid } from "sheet.slint";
-import { Panels, PanelsView, MetaChoice } from "panels.slint";
+import { Panels, PanelsView, MetaChoice, Rail } from "panels.slint";
 import { Transport, Player } from "transport.slint";
 import { StartScreen, Import } from "start.slint";
 import { AboutDialog, PreferencesDialog, PreferencesView } from "dialogs.slint";
@@ -27,7 +27,7 @@ export struct TabView {
 }
 
 /// What a menu item asks for.
-export enum AppAction { new-tab, open, clear-recent, close-tab, save, save-as, quit, undo, redo, edit-mode, minimize, zoom, preferences, about }
+export enum AppAction { new-tab, open, clear-recent, close-tab, save, save-as, quit, undo, redo, edit-mode, minimize, zoom, preferences, about, sidebar }
 
 /// The dialog open over the window.
 export enum Dialog { none, preferences, about }
@@ -119,6 +119,10 @@ export component AppWindow inherits Window {
     /// The app's version, for About.
     in property <string> version;
     callback open-url(string);
+    /// The sidebar's panels are shown, not just its icon rail (F-UI-4); the Show sidebar menu item checks it.
+    in-out property <bool> is-sidebar-shown: true;
+    /// A rail button: expand the sidebar on the panel at this index.
+    callback panel-shown(int);
     /// The active tab's song is in edit mode; the Edit mode menu item checks it.
     in-out property <bool> is-editing;
     callback export(ExportFormat);
@@ -171,7 +175,16 @@ export component AppWindow inherits Window {
         grid-scope.focus();
     }
 
-    changed width => { transport.is-wide = self.width - sidebar.width > 40rem; }
+    public function reveal-panel(index: int) {
+        sidebar.reveal-panel(index);
+    }
+
+    // Handlers, not a binding: a binding would loop through the layout.
+    function update-wide() {
+        transport.is-wide = self.width - sidebar.width - rail.width > 40rem;
+    }
+    changed width => { update-wide(); }
+    changed is-sidebar-shown => { update-wide(); }
 
     MenuBar {
         Menu {
@@ -274,6 +287,13 @@ export component AppWindow inherits Window {
                 checked <=> root.is-editing;
                 activated => { root.app-action(AppAction.edit-mode); }
             }
+            MenuItem {
+                title: @tr("Show sidebar");
+                enabled: has-song;
+                checkable: true;
+                checked <=> root.is-sidebar-shown;
+                activated => { root.app-action(AppAction.sidebar); }
+            }
         }
         Menu {
             title: @tr("Settings");
@@ -368,8 +388,15 @@ export component AppWindow inherits Window {
                         }
                     }
                 }
+                rail := Rail {
+                    is-collapsed: !is-sidebar-shown;
+                    is-editable: Grid.is-editable;
+                    toggled => { root.app-action(AppAction.sidebar); }
+                    panel-shown(i) => { root.panel-shown(i); }
+                }
                 sidebar := Panels {
-                    width: 20rem;
+                    width: is-sidebar-shown ? 20rem : 0;
+                    visible: is-sidebar-shown;
                     view: panels;
                     is-editable: Grid.is-editable;
                     title-error: title-error;

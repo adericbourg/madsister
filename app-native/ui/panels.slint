@@ -28,6 +28,62 @@ export struct PanelsView {
 /// A Song panel field (editor.rs `MetaField`).
 export enum MetaChoice { title, artist, key, tempo }
 
+/// Which panel the next reveal request is for: the panels inside an `if` watch it, as they can't be reached from outside.
+global Reveal {
+    in-out property <int> panel: -1;
+    in-out property <int> requests;
+}
+
+/// A panel; `index` is its place in the sidebar, as in Rail's buttons.
+component Panel inherits GroupBox {
+    in property <int> index;
+    /// Asks the panels to scroll to this y.
+    callback reveal(length);
+    property <int> requests: Reveal.requests;
+    changed requests => {
+        if (Reveal.panel == index) {
+            root.reveal(self.y);
+        }
+    }
+}
+
+/// The collapsed sidebar's icon rail (F-UI-4): the toggle, then one button per panel; each one expands the sidebar on it.
+export component Rail inherits VerticalLayout {
+    in property <bool> is-collapsed;
+    in property <bool> is-editable;
+    callback toggled();
+    callback panel-shown(int);
+    // As narrow as its buttons: the chart takes the room left.
+    max-width: self.min-width;
+    padding: 4px;
+    spacing: 4px;
+    alignment: start;
+    Button {
+        icon: is-collapsed ? @image-url("icons/panel-right-open.svg") : @image-url("icons/panel-right-close.svg");
+        colorize-icon: true;
+        accessible-label: is-collapsed ? @tr("Show parameters") : @tr("Hide parameters");
+        clicked => { root.toggled(); }
+    }
+    // The panels, in sidebar order; the editing ones (from Section on) only show in edit mode.
+    property <[{ title: string, icon: image }]> panels: [
+        { title: @tr("Song"), icon: @image-url("icons/music.svg") },
+        { title: @tr("Transpose"), icon: @image-url("icons/arrow-up-down.svg") },
+        { title: @tr("Section"), icon: @image-url("icons/rows-3.svg") },
+        { title: @tr("Bar"), icon: @image-url("icons/columns-2.svg") },
+        { title: @tr("Bar lines"), icon: @image-url("icons/separator-vertical.svg") },
+        { title: @tr("Tempo"), icon: @image-url("icons/gauge.svg") },
+    ];
+    if is-collapsed: VerticalLayout {
+        spacing: 4px;
+        for panel[i] in is-editable ? panels : [panels[0], panels[1]]: Button {
+            icon: panel.icon;
+            colorize-icon: true;
+            accessible-label: panel.title;
+            clicked => { root.panel-shown(i); }
+        }
+    }
+}
+
 /// A field committed on Enter or when it loses the focus, with its error under it.
 component Field inherits VerticalLayout {
     in property <string> label;
@@ -98,6 +154,16 @@ export component Panels inherits ScrollView {
         beats-focus-requests += 1;
     }
 
+    /// Scrolls to the panel at this index (Rail's order), once it's laid out.
+    public function reveal-panel(index: int) {
+        Reveal.panel = index;
+        Reveal.requests += 1;
+    }
+
+    function reveal(y: length) {
+        self.content-y = min(0, max(-y, self.visible-height - self.content-height));
+    }
+
     property <bool> is-flat;
     // The Bar panel only exists in edit mode, so it's reached by a counter it watches.
     property <int> beats-focus-requests;
@@ -107,7 +173,9 @@ export component Panels inherits ScrollView {
         width: parent.visible-width;
         padding: 8px;
         spacing: 8px;
-        GroupBox {
+        Panel {
+            index: 0;
+            reveal(y) => { root.reveal(y); }
             title: @tr("Song");
             VerticalLayout {
                 spacing: 6px;
@@ -152,7 +220,9 @@ export component Panels inherits ScrollView {
                 }
             }
         }
-        GroupBox {
+        Panel {
+            index: 1;
+            reveal(y) => { root.reveal(y); }
             title: @tr("Transpose");
             enabled: !view.transpose-locked;
             VerticalLayout {
@@ -189,7 +259,9 @@ export component Panels inherits ScrollView {
                 }
             }
         }
-        if is-editable: GroupBox {
+        if is-editable: Panel {
+            index: 2;
+            reveal(y) => { root.reveal(y); }
             title: @tr("Section");
             VerticalLayout {
                 spacing: 6px;
@@ -239,7 +311,9 @@ export component Panels inherits ScrollView {
                 }
             }
         }
-        if is-editable: GroupBox {
+        if is-editable: Panel {
+            index: 3;
+            reveal(y) => { root.reveal(y); }
             title: @tr("Bar");
             enabled: view.has-bar;
             HorizontalLayout {
@@ -265,7 +339,9 @@ export component Panels inherits ScrollView {
                 }
             }
         }
-        if is-editable: GroupBox {
+        if is-editable: Panel {
+            index: 4;
+            reveal(y) => { root.reveal(y); }
             title: @tr("Bar lines");
             VerticalLayout {
                 spacing: 6px;
@@ -294,7 +370,9 @@ export component Panels inherits ScrollView {
                 }
             }
         }
-        if is-editable: GroupBox {
+        if is-editable: Panel {
+            index: 5;
+            reveal(y) => { root.reveal(y); }
             title: @tr("Tempo");
             VerticalLayout {
                 spacing: 6px;
