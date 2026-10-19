@@ -1011,12 +1011,12 @@ fn the_transport_spans_the_charts_width_with_the_sidebar_collapsed() {
     app.global::<Player>().set_has_audio(true);
     app.global::<Player>().set_has_review(true);
 
-    // Then they start and end with the chart (their frame pads the titled box by 4px)
+    // Then they start and end with the chart (their frame pads the titled box by 12px)
     let sheet = ElementHandle::find_by_element_type_name(&app, "Sheet").next().unwrap();
     let (playback, review) = (find(&app, "Playback").unwrap(), find(&app, "Review").unwrap());
-    assert_eq!(playback.absolute_position().x - 4.0, sheet.absolute_position().x);
+    assert_eq!(playback.absolute_position().x - 12.0, sheet.absolute_position().x);
     assert_eq!(
-        review.absolute_position().x + review.size().width + 4.0,
+        review.absolute_position().x + review.size().width + 12.0,
         sheet.absolute_position().x + sheet.size().width
     );
 }
