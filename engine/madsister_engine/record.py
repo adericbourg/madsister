@@ -1,4 +1,4 @@
-"""F-IN-3: record the default input to a WAV until SIGINT or a `stop` line on stdin (D3: in the engine, not the webview)."""
+"""F-IN-3: record the default input to a WAV until SIGINT or a `stop` line on stdin (D3: in the engine, not the app)."""
 
 import queue
 import signal

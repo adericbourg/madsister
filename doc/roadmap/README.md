@@ -22,14 +22,14 @@ Reader: Claude, running unattended. Spec: [`../product-brief.md`](../product-bri
 - If a step is partially done and the useful part stands alone (e.g. the adapter works but one option fails), commit that part
   and log the rest.
 - Never commit weights, audio, or secrets. Never install system toolchains (brew/rustup/xcode). Package managers
-  (pnpm, cargo, uv, including `uv python install`) and model/dataset downloads are allowed.
+  (cargo, uv, including `uv python install`) and model/dataset downloads are allowed.
 - If M0 downloads stall for more than ~30 min, switch to M1 and come back to M0 later.
 
 ## Conventions
-- Repo layout per spec §3.1: `engine/` (Python, uv), `app/` (Tauri v2 + React + TS + Vite), `bench/`.
+- Repo layout per spec §3.1: `engine/` (Python, uv), `app/` (Rust, Slint), `bench/`.
 - Python 3.11, pinned via `engine/.python-version` + `requires-python`. pytest. Slow tests (models, audio) are marked `@pytest.mark.slow`.
   Default run: `uv run pytest -m "not slow"`.
-- TS: `strict: true`, pnpm, vitest. Boolean variables prefixed with `is/has/should`.
+- Rust: `cargo clippy --all-targets -- -D warnings` clean, `cargo test`. Boolean variables prefixed with `is/has/should`.
 - Tests: Given/When/Then comments; names follow `<method>_(when<cond>|of<input>)_<expected>` (Python: `test_` + same pattern in snake_case,
   e.g. `test_quantize_bars_when_chord_changes_mid_bar_splits_slot`). Enrich existing tests rather than multiplying near-duplicates.
 - Model weights and third-party repos are cached in `${MADSISTER_MODELS_DIR:-~/.cache/madsister/models}`, never in the repo.

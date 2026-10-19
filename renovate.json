@@ -23,21 +23,6 @@
       "matchPackageNames": ["torch", "torchaudio"],
       "groupName": "torch",
       "allowedVersions": "<2.12"
-    },
-    {
-      "description": "Tauri npm packages and Rust crates must stay on the same major.minor.",
-      "matchPackageNames": ["@tauri-apps/**", "tauri", "tauri-build", "tauri-plugin-*"],
-      "groupName": "tauri"
-    },
-    {
-      "description": "gtk must match the version webkit2gtk depends on: both link the native gdk-3 library, which only one crate may do. webkit2gtk 2.0 requires gtk 0.18: lift this when it moves.",
-      "matchPackageNames": ["gtk"],
-      "allowedVersions": "<0.19"
-    },
-    {
-      "description": "React runtime and its type packages move together.",
-      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
-      "groupName": "react"
     }
   ]
 }
