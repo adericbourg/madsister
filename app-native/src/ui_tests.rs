@@ -390,3 +390,103 @@ fn opening_a_file_that_is_open_already_shows_its_tab() {
     assert_eq!((app.get_tabs().row_count(), app.get_active_tab()), (2, 0));
     assert_eq!(app.get_window_title(), "Blues — madsister");
 }
+
+#[test]
+fn saving_writes_the_song_file_and_edits_are_autosaved_after_two_seconds() {
+    // Given a song file opened, switched to edit mode, with a chord typed
+    let (app, state) = start_screen();
+    let dir = temp_dir("save");
+    let path = song_file(&dir, "Blues");
+    assert!(open(&app, &mut state.borrow_mut(), &path));
+    with_ctrl(&app, "e");
+    type_keys(&app, "C\n");
+    assert_eq!(tab_labels(&app), ["•Blues"]);
+
+    // When saving with Ctrl+S
+    with_ctrl(&app, "s");
+    run_deferred();
+
+    // Then the file has the chord and the tab is clean
+    let saved = std::fs::read_to_string(&path).unwrap();
+    assert!(saved.contains("\"C:maj\""));
+    assert_eq!(parse_song(&saved).unwrap(), *state.borrow().tab().editor.as_ref().unwrap().song());
+    assert_eq!(tab_labels(&app), ["Blues"]);
+    assert_eq!(app.get_window_title(), "Blues — madsister");
+
+    // When typing another chord, Then it's written 2 s after the last edit, not before
+    type_keys(&app, "G\n");
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(1990));
+    assert!(!std::fs::read_to_string(&path).unwrap().contains("\"G:maj\""));
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(20));
+    let autosaved = std::fs::read_to_string(&path).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(autosaved.contains("\"G:maj\""));
+    assert_eq!(tab_labels(&app), ["Blues"]);
+}
+
+#[test]
+fn a_failed_save_says_why_and_keeps_the_changes() {
+    // Given an edited song whose folder is gone
+    let (app, state) = window();
+    type_keys(&app, "C\n");
+    let path = std::env::temp_dir().join(format!("madsister-gone-{}", std::process::id())).join("song.madsister.json");
+    state.borrow_mut().tab_mut().path = Some(path.clone());
+
+    // When saving
+    with_ctrl(&app, "s");
+    run_deferred();
+
+    // Then the error is shown and the tab still has unsaved changes
+    assert!(app.get_error().starts_with(&format!("Can't save {}", path.display())));
+    assert!(find(&app, &app.get_error()).is_some());
+    assert_eq!(tab_labels(&app), ["•Untitled"]);
+}
+
+#[test]
+fn saving_a_copy_in_another_folder_keeps_its_audio_file() {
+    // Given a song whose audio is next to it
+    let (app, state) = window();
+    let dir = temp_dir("save-copy");
+    std::fs::create_dir_all(dir.join("copies")).unwrap();
+    {
+        let mut state = state.borrow_mut();
+        let tab = state.tab_mut();
+        let mut song = tab.editor.as_ref().unwrap().song().clone();
+        song.audio = Some(madsister::model::song::Audio { path: "a.mp3".into(), sha256: "abc".into(), extra: Default::default() });
+        tab.editor.as_mut().unwrap().history.apply(song);
+        tab.path = Some(dir.join("song.madsister.json"));
+    }
+
+    // When saving it in a subfolder
+    let copy = dir.join("copies").join("song.madsister.json");
+    save_to(state.borrow_mut().tab_mut(), copy.clone());
+    refresh(&app, &mut state.borrow_mut());
+
+    // Then the copy points to the same audio file
+    let saved = parse_song(&std::fs::read_to_string(&copy).unwrap()).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(saved.audio.unwrap().path, "../a.mp3");
+    assert_eq!(tab_labels(&app), ["Untitled"]);
+}
+
+#[test]
+fn a_failed_save_as_keeps_the_audio_path_of_the_song_file() {
+    // Given a song whose audio is next to it
+    let (_app, state) = window();
+    let dir = temp_dir("failed-copy");
+    let mut state = state.borrow_mut();
+    let tab = state.tab_mut();
+    let mut song = tab.editor.as_ref().unwrap().song().clone();
+    song.audio = Some(madsister::model::song::Audio { path: "a.mp3".into(), sha256: "abc".into(), extra: Default::default() });
+    tab.editor.as_mut().unwrap().history.apply(song);
+    tab.path = Some(dir.join("song.madsister.json"));
+
+    // When saving it in a folder that doesn't exist
+    save_to(tab, dir.join("gone").join("song.madsister.json"));
+
+    // Then the song and its file are unchanged
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(tab.error.starts_with("Can't save"));
+    assert_eq!(tab.editor.as_ref().unwrap().song().audio.as_ref().unwrap().path, "a.mp3");
+    assert_eq!(tab.path, Some(dir.join("song.madsister.json")));
+}
