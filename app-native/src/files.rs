@@ -1,8 +1,11 @@
 //! The app's files (spec F-ED-10): songs written without risking the previous version, and the recent files list
 //! (`recent.json` in the config folder, as the Tauri app kept it).
 
+use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
@@ -36,17 +39,45 @@ pub fn shortest_unique_paths(paths: &[String]) -> Vec<String> {
 }
 
 /// Writes `contents` to a temporary file next to `path`, then renames it over `path`: a crash or a full disk midway
-/// leaves the previous file whole.
+/// leaves the previous file whole. The new file keeps the previous one's permissions.
 pub fn write_atomic(path: &Path, contents: &str) -> std::io::Result<()> {
     let name = path.file_name().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "not a file path"))?;
-    let temp = path.with_file_name(format!(".{}.tmp", name.to_string_lossy()));
-    let written = std::fs::File::create(&temp)
-        .and_then(|mut file| file.write_all(contents.as_bytes()).and_then(|()| file.sync_all()))
-        .and_then(|()| std::fs::rename(&temp, path));
-    if written.is_err() {
-        _ = std::fs::remove_file(&temp);
+    static COUNTER: AtomicU32 = AtomicU32::new(0);
+    let temp_names = (0..100).map(|_| {
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.subsec_nanos());
+        path.with_file_name(format!(".{}.{}-{n}-{nanos}.tmp", name.to_string_lossy(), std::process::id()))
+    });
+    write_through(path, contents, temp_names)
+}
+
+/// `write_atomic` through the first of `temp_names` that doesn't exist yet: created new, so an existing file or
+/// symlink planted at that name is never written through.
+fn write_through(path: &Path, contents: &str, temp_names: impl Iterator<Item = PathBuf>) -> std::io::Result<()> {
+    let mut last_error = std::io::Error::new(std::io::ErrorKind::AlreadyExists, "no free temporary file name");
+    for temp in temp_names {
+        let mut file = match OpenOptions::new().write(true).create_new(true).open(&temp) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                last_error = e;
+                continue;
+            }
+            Err(e) => return Err(e),
+        };
+        let written = file
+            .write_all(contents.as_bytes())
+            .and_then(|()| match std::fs::metadata(path) {
+                Ok(previous) => file.set_permissions(previous.permissions()),
+                Err(_) => Ok(()),
+            })
+            .and_then(|()| file.sync_all())
+            .and_then(|()| std::fs::rename(&temp, path));
+        if written.is_err() {
+            _ = std::fs::remove_file(&temp);
+        }
+        return written;
     }
-    written
+    Err(last_error)
 }
 
 #[cfg(test)]
@@ -107,6 +138,32 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
         assert_eq!(contents, "new");
         assert_eq!(names, ["song.madsister.json"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_through_skips_a_symlink_planted_at_the_temporary_name_and_keeps_the_permissions() {
+        // Given a read-only-for-others song file, and a symlink to another file where the first temporary name would be
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("madsister-write-symlink-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (path, victim) = (dir.join("song.madsister.json"), dir.join("victim"));
+        std::fs::write(&path, "old").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        std::fs::write(&victim, "untouched").unwrap();
+        let (planted, free) = (dir.join(".planted.tmp"), dir.join(".free.tmp"));
+        std::os::unix::fs::symlink(&victim, &planted).unwrap();
+
+        // When writing through those names
+        write_through(&path, "new", [planted.clone(), free.clone()].into_iter()).unwrap();
+
+        // Then the other file is untouched, the song has the new contents and its permissions, through the free name
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        let (contents, victim_contents) = (std::fs::read_to_string(&path).unwrap(), std::fs::read_to_string(&victim).unwrap());
+        let (is_planted_kept, is_free_gone) = (planted.symlink_metadata().is_ok(), !free.exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!((victim_contents.as_str(), contents.as_str(), mode), ("untouched", "new", 0o600));
+        assert!(is_planted_kept && is_free_gone);
     }
 
     #[test]
