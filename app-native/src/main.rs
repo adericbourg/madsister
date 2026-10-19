@@ -6,6 +6,11 @@ use slint::{Model, SharedString, VecModel};
 slint::include_modules!();
 
 fn main() -> Result<(), slint::PlatformError> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(("print", rest)) = args.split_first().map(|(command, rest)| (command.as_str(), rest)) {
+        std::process::exit(madsister::print::run(rest, madsister::settings::Settings::load()));
+    }
+
     // The winit backend gives access to OS file drops (F-IN-1), which Slint's own drag & drop doesn't receive yet.
     let selector = slint::BackendSelector::new().backend_name("winit".into());
     // shortcut: winit has no Wayland drag & drop, so Linux runs under XWayland when it's there (no DISPLAY: native
