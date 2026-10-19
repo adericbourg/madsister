@@ -991,3 +991,12 @@ fn ctrl_tab_and_the_tab_bar_arrows_switch_tabs_but_not_while_a_question_is_open(
     app.invoke_tab_closed(0);
     assert_eq!((app.get_active_tab(), app.get_tabs().row_count()), (0, 3));
 }
+
+#[test]
+fn the_ribbon_keeps_its_height_and_the_chart_takes_the_room_left() {
+    let (app, _state) = window();
+    let height = find(&app, "New").unwrap().size().height;
+    app.window().set_size(slint::LogicalSize::new(1280.0, 800.0));
+    assert_eq!(find(&app, "New").unwrap().size().height, height);
+    assert!(height < 50.0, "the ribbon buttons are {height}px high");
+}
