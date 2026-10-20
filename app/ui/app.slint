@@ -516,21 +516,31 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
-                    rail := Rail {
-                        is-collapsed: !is-sidebar-shown;
-                        is-editable: Grid.is-editable;
-                        toggled => { root.app-action(AppAction.sidebar); }
-                        panel-shown(i) => { root.panel-shown(i); }
-                    }
-                    sidebar := Panels {
-                        width: is-sidebar-shown ? 20rem : 0;
-                        visible: is-sidebar-shown;
-                        view: panels;
-                        is-editable: Grid.is-editable;
-                        title-error: title-error;
-                        key-error: key-error;
-                        tempo-error: tempo-error;
-                        section-error: section-error;
+                    Rectangle {
+                        // The sidebar as one docked panel: the tab strip's tint, Frame's border on its chart side.
+                        background: Palette.color-scheme == ColorScheme.dark ? #141416 : #e6e6ea;
+                        HorizontalLayout {
+                            Rectangle {
+                                width: 1px;
+                                background: Palette.color-scheme == ColorScheme.dark ? #3a3a41 : #d4d4dc;
+                            }
+                            rail := Rail {
+                                is-collapsed: !is-sidebar-shown;
+                                is-editable: Grid.is-editable;
+                                toggled => { root.app-action(AppAction.sidebar); }
+                                panel-shown(i) => { root.panel-shown(i); }
+                            }
+                            sidebar := Panels {
+                                width: is-sidebar-shown ? 20rem : 0;
+                                visible: is-sidebar-shown;
+                                view: panels;
+                                is-editable: Grid.is-editable;
+                                title-error: title-error;
+                                key-error: key-error;
+                                tempo-error: tempo-error;
+                                section-error: section-error;
+                            }
+                        }
                     }
                 }
             }
