@@ -328,6 +328,11 @@ fn run_setup(state: &mut State) {
 
 /// Starts an engine job; its events go to the ticker.
 fn start_job(state: &State, request: Request) -> Result<u32, String> {
+    // A sync is exact: two installs of the same env would each remove what the other adds.
+    let is_other_installing = state.tabs.iter().enumerate().any(|(i, tab)| i != state.active && tab.importer.is_installing());
+    if matches!(request, Request::Setup(_)) && is_other_installing {
+        return Err("Another install is running: wait for it to finish.".into());
+    }
     let mut argv = madsister::engine::engine_command(std::env::var("MADSISTER_ENGINE").ok(), state.engine.as_ref());
     if let Some(hint) = madsister::engine::missing_dev_engine(&argv) {
         return Err(hint);

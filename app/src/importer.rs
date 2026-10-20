@@ -246,6 +246,10 @@ impl Importer {
         self.job.as_ref().and_then(|j| j.id)
     }
 
+    pub fn is_installing(&self) -> bool {
+        self.job.as_ref().is_some_and(|j| j.kind == Kind::Setup)
+    }
+
     pub fn is_recording(&self) -> bool {
         self.job.as_ref().is_some_and(|j| j.kind == Kind::Record)
     }

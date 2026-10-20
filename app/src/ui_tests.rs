@@ -269,6 +269,27 @@ fn the_importer_refuses_a_url_that_isnt_http() {
     assert!(!import.get_is_running());
 }
 
+#[test]
+fn a_feature_install_is_refused_while_another_tab_installs_one() {
+    // Given a tab installing section detection
+    let (_app, state) = start_screen();
+    let mut state = state.borrow_mut();
+    let importer = &mut state.tab_mut().importer;
+    importer.select_file(Path::new("/music/song.mp3"));
+    importer.detect_sections = true;
+    let next = importer.run(Path::new("/sources"), "rec.wav", |_| false, |_| false);
+    assert_eq!(next, Next::Start(Request::Setup(vec!["sections".into()])));
+    importer.started(Ok(1));
+
+    // When a second tab asks to install Demucs
+    let index = state.push_tab();
+    activate(&mut state, index);
+    let started = start_job(&state, Request::Setup(vec!["separate".into()]));
+
+    // Then it's refused: two syncs of the same env would undo each other
+    assert_eq!(started, Err("Another install is running: wait for it to finish.".into()));
+}
+
 /// Reads the engine's events until `is_done`, for 10 s at most.
 #[cfg(unix)] // only the unix-only setup test waits
 fn wait_for(app: &AppWindow, state: &Rc<RefCell<State>>, is_done: impl Fn(&State) -> bool) {
