@@ -911,12 +911,13 @@ fn pick_song(app: &AppWindow, state: &Rc<RefCell<State>>) {
     }
 }
 
-/// Makes the tab at `index` the active one; the one it hides stops playing.
+/// Makes the tab at `index` the active one; the one it hides lets go of its decoded audio, checked and loaded again
+/// when it's shown.
 fn activate(state: &mut State, index: usize) {
-    if let Ok(Some(player)) = &state.tab().player
-        && player.is_playing()
-    {
-        player.toggle();
+    if index != state.active {
+        let hidden = state.tab_mut();
+        hidden.player = Ok(None);
+        hidden.audio.checked = None;
     }
     state.active = index;
 }
