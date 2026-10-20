@@ -52,10 +52,14 @@ def test_validate_when_bar_meter_overrides_song_meter_accepts_it():
     validate(song)
 
 
-def test_write_writes_validated_json(tmp_path):
-    # When
+def test_write_replaces_the_file_with_validated_json_and_leaves_no_temporary_file(tmp_path):
+    # Given a previous song file
     path = tmp_path / "s.madsister.json"
+    path.write_text("old")
+
+    # When
     write(_song(), path)
 
     # Then
     assert json.loads(path.read_text())["meta"]["title"] == "Test"
+    assert [p.name for p in tmp_path.iterdir()] == ["s.madsister.json"]
