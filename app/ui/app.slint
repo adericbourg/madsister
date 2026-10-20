@@ -185,6 +185,28 @@ component Ribbon inherits HorizontalLayout {
     }
 }
 
+/// The shortcuts from `from` on, `count` of them, as rows of keys and what they do.
+component ShortcutColumn inherits VerticalLayout {
+    in property <[Shortcut]> shortcuts;
+    in property <int> from;
+    in property <int> count;
+    spacing: 0.25 * Size.rem;
+    for i in count: HorizontalLayout {
+        spacing: Size.rem;
+        Text {
+            text: shortcuts[from + i].keys;
+            width: 16 * Size.rem;
+            font-family: "monospace";
+            color: Palette.foreground;
+        }
+        Text {
+            text: shortcuts[from + i].what;
+            wrap: word-wrap;
+            color: Palette.foreground;
+        }
+    }
+}
+
 export component AppWindow inherits Window {
     // An out property: Rust can't read the inherited title.
     out property <string> window-title: (tabs[active-tab].is-dirty ? "• " : "") + (has-song ? chart.title : "Untitled") + " — madsister";
@@ -654,21 +676,27 @@ export component AppWindow inherits Window {
                     ScrollView {
                         content-height: list.preferred-height;
                         list := VerticalLayout {
+                            // Room for two columns of keys plus a readable description each.
+                            property <bool> wide: self.width >= 66 * Size.rem;
+                            property <int> half: ceil(shortcuts.length / 2);
                             width: parent.visible-width;
-                            spacing: 0.25 * Size.rem;
-                            for shortcut in shortcuts: HorizontalLayout {
-                                spacing: Size.rem;
-                                Text {
-                                    text: shortcut.keys;
-                                    width: 16 * Size.rem;
-                                    font-family: "monospace";
-                                    color: Palette.foreground;
+                            if wide: HorizontalLayout {
+                                spacing: 2 * Size.rem;
+                                ShortcutColumn {
+                                    width: (list.width - 2 * Size.rem) / 2;
+                                    shortcuts: shortcuts;
+                                    count: half;
                                 }
-                                Text {
-                                    text: shortcut.what;
-                                    wrap: word-wrap;
-                                    color: Palette.foreground;
+                                ShortcutColumn {
+                                    width: (list.width - 2 * Size.rem) / 2;
+                                    shortcuts: shortcuts;
+                                    from: half;
+                                    count: shortcuts.length - half;
                                 }
+                            }
+                            if !wide: ShortcutColumn {
+                                shortcuts: shortcuts;
+                                count: shortcuts.length;
                             }
                         }
                     }
