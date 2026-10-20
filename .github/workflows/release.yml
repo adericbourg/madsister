@@ -451,7 +451,7 @@ jobs:
     needs: publish
     # The implicit success() is false when any ancestor (here the macos jobs of a linux-only run) was skipped.
     if: ${{ !cancelled() && needs.publish.result == 'success' }}
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-slim
     permissions:
       contents: read
       pages: write
@@ -469,7 +469,7 @@ jobs:
     steps:
       - name: Build the repository
         run: |
-          sudo apt-get update && sudo apt-get install -y apt-utils  # apt-ftparchive; not on the ubuntu-26.04 image
+          sudo apt-get update && sudo apt-get install -y apt-utils  # apt-ftparchive; not on the ubuntu-slim image
           gpg --batch --import <<< "$GPG_KEY"
           mkdir -p site/pool site/dists/stable/main/binary-amd64 && cd site
           # The latest release with a deb: a macOS-only one has none.
