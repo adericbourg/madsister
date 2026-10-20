@@ -1151,3 +1151,23 @@ fn the_start_cards_stack_in_a_narrow_window() {
     assert!(top("Importer") >= grid.absolute_position().y + grid.size().height);
     assert!(grid.absolute_position().x + grid.size().width <= 500.0, "the card fits the window");
 }
+
+#[test]
+fn a_hidden_tab_lets_go_of_its_audio_until_it_is_shown_again() {
+    // Given a song tab whose audio was checked and loaded (a failed player stands in for a decoded one)
+    let (app, state) = window();
+    {
+        let mut state = state.borrow_mut();
+        state.tab_mut().player = Err("loaded".into());
+        state.tab_mut().audio.checked = Some(None);
+    }
+
+    // When another tab is shown
+    app.invoke_app_action(AppAction::NewTab);
+    run_deferred();
+
+    // Then the hidden tab's audio is dropped, and checked again when it's shown
+    let state = state.borrow();
+    assert!(matches!(state.tabs[0].player, Ok(None)));
+    assert!(state.tabs[0].audio.checked.is_none());
+}
