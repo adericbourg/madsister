@@ -633,8 +633,9 @@ export component AppWindow inherits Window {
             Rectangle {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
-                width: min(parent.width - 2 * Size.rem, 48 * Size.rem);
-                height: min(parent.height - 2 * Size.rem, card.preferred-height);
+                // Nearly the whole window: the list is long and scrolling through it is tedious.
+                width: parent.width - 24px;
+                height: parent.height - 24px;
                 background: Palette.background;
                 border-radius: 8px;
                 drop-shadow-blur: 16px;
