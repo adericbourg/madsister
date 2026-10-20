@@ -57,6 +57,10 @@ export component Rail inherits VerticalLayout {
     // As narrow as its buttons: the chart takes the room left.
     max-width: self.min-width;
     padding: 4px;
+    // The button sits right under the tab bar; expanded, it lines up with the panels under it (their 8px padding).
+    padding-top: 0;
+    padding-left: is-collapsed ? 4px : 8px;
+    padding-bottom: is-collapsed ? 4px : 0;
     spacing: 4px;
     alignment: start;
     Button {
@@ -175,8 +179,6 @@ export component Panels inherits ScrollView {
     panels := VerticalLayout {
         width: parent.visible-width;
         padding: 8px;
-        // The rail's padding already parts it from the collapse button.
-        padding-left: 0;
         // The scrollbar is drawn over the content: its 14px stay free, scrolling or not.
         padding-right: 14px;
         spacing: 8px;
