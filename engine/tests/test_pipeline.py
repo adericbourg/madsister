@@ -85,7 +85,7 @@ def test_main_of_transcribe_emits_stages_in_order_and_writes_song(fakes, make_wa
     assert {slot["beats"] for s in song["sections"] for bar in s["bars"] for slot in bar["chords"]} == {6}
 
 
-def test_main_of_transcribe_with_separate_add_tau_and_bass_tau_uses_the_stems(fakes, make_wav, tmp_path, capfd, monkeypatch):
+def test_main_of_transcribe_accurate_with_add_tau_and_bass_tau_uses_the_stems(fakes, make_wav, tmp_path, capfd, monkeypatch):
     # Given a fake Demucs that copies its input into both stems, chroma with a strong D everywhere (C → C:add2), and a low
     # chroma with a strong E everywhere (C → C/3, and a bass on every other chord too)
     def stems(wav, out_dir):
@@ -105,7 +105,7 @@ def test_main_of_transcribe_with_separate_add_tau_and_bass_tau_uses_the_stems(fa
     out = tmp_path / "s.json"
 
     # When
-    code = cli.main(["transcribe", str(make_wav()), "--out", str(out), "--separate", "--add-tau", "0.5", "--bass-tau", "1.5"])
+    code = cli.main(["transcribe", str(make_wav()), "--out", str(out), "--mode", "accurate", "--add-tau", "0.5", "--bass-tau", "1.5"])
 
     # Then the harmonic stem feeds the chord model, the bass stem the bass detection, and the C bars become add2 over E
     assert code == 0

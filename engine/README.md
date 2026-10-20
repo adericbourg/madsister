@@ -15,7 +15,7 @@ transcription then runs offline. Idempotent; one progress line per model, then t
 ```
 uv run --no-sync madsister-engine setup              # default models (Chord-CNN-LSTM; madmom ships its weights): 30 MB
 uv run --no-sync madsister-engine setup --sections   # + all-in-one (sections) and htdemucs: + 98 MB
-uv run --no-sync madsister-engine setup --all        # + the bench-only models (BTC, htdemucs for --separate)
+uv run --no-sync madsister-engine setup --all        # + the bench-only models (BTC, htdemucs for --mode accurate)
 ```
 Without `setup`, each model downloads on first use.
 
