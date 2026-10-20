@@ -209,17 +209,53 @@ export component Panels inherits ScrollView {
                     text: @tr("Notation");
                     color: Palette.foreground;
                 }
-                ComboBox {
-                    model: [@tr("Chords"), @tr("Nashville numbers")];
-                    current-index: view.is-nashville ? 1 : 0;
-                    enabled: view.key != "";
-                    accessible-label: @tr("Notation");
-                    selected => { root.notation-picked(self.current-index == 1); }
-                }
-                if view.key == "": Text {
-                    text: view.is-nashville ? @tr("Set a key to see the chords") : @tr("Set a key to switch to Nashville numbers");
-                    color: Palette.foreground;
-                    wrap: word-wrap;
+                HorizontalLayout {
+                    spacing: 6px;
+                    ComboBox {
+                        model: [@tr("Chords"), @tr("Nashville numbers")];
+                        current-index: view.is-nashville ? 1 : 0;
+                        enabled: view.key != "";
+                        accessible-label: @tr("Notation");
+                        selected => { root.notation-picked(self.current-index == 1); }
+                    }
+                    // Why the notation can't change: on hover.
+                    if view.key == "": Rectangle {
+                        property <string> hint: view.is-nashville ? @tr("Set a key to see the chords") : @tr("Set a key to switch to Nashville numbers");
+                        width: 16px;
+                        accessible-role: text;
+                        accessible-label: hint;
+                        Image {
+                            height: 16px;
+                            source: @image-url("icons/circle-help.svg");
+                            colorize: Palette.foreground;
+                        }
+                        // Not Slint's Tooltip: it waits 500ms, and its delay can't be set. Nor a PopupWindow: it takes the
+                        // hover (and the focus) from the icon, which closes it, then opens it again: it flickers.
+                        area := TouchArea { }
+                        if area.has-hover: Rectangle {
+                            // Above the icon, its right edge on the icon's.
+                            width: 200px;
+                            height: tip.preferred-height;
+                            x: parent.width - self.width;
+                            y: -self.height - 4px;
+                            // Slint's tooltip look (ToolTipImpl).
+                            background: Palette.alternate-background;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: Palette.border;
+                            tip := VerticalLayout {
+                                padding-left: 9px;
+                                padding-right: 9px;
+                                padding-top: 6px;
+                                padding-bottom: 6px;
+                                Text {
+                                    text: hint;
+                                    color: Palette.foreground;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
                 }
                 tempo := Field {
                     label: @tr("Tempo (BPM)");
