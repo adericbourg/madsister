@@ -10,7 +10,7 @@ from madsister_engine.models import models_dir
 def _transcribe(args: argparse.Namespace) -> int:
     if not Path(args.audio).is_file():
         raise FileNotFoundError(f"audio file not found: {args.audio}")
-    separate = args.separate or args.mode == "accurate"  # D7: accurate = the default models on the Demucs harmonic stem
+    separate = args.mode == "accurate"  # D7: accurate = the default models on the Demucs harmonic stem
     pipeline.transcribe(
         args.audio, args.out, args.meter, not args.no_sections, args.beats, args.chords, separate, args.add_tau, args.bass_tau
     )
@@ -49,7 +49,6 @@ def _parser() -> argparse.ArgumentParser:
     # Hidden: the bench combinations (M0-13), and `--beats allinone`, which the app passes for section detection.
     transcribe.add_argument("--beats", choices=["auto", "allinone", "madmom"], default="auto", help=argparse.SUPPRESS)
     transcribe.add_argument("--chords", choices=["auto", "btc", "cnnlstm"], default="auto", help=argparse.SUPPRESS)
-    transcribe.add_argument("--separate", action="store_true", help=argparse.SUPPRESS)
     transcribe.add_argument("--add-tau", type=float, help=argparse.SUPPRESS)
     transcribe.add_argument("--bass-tau", type=float, help=argparse.SUPPRESS)
     transcribe.set_defaults(func=_transcribe)
