@@ -561,6 +561,26 @@ fn opening_a_file_that_is_open_already_shows_its_tab() {
 }
 
 #[test]
+fn a_transcription_over_a_song_open_in_another_tab_turns_that_tab_into_an_unsaved_copy() {
+    // Given a song file open in a first tab, and a second tab after it whose transcription wrote over that file
+    let (app, state) = start_screen();
+    let dir = temp_dir("transcribed-over");
+    let blues = song_file(&dir, "Blues");
+    assert!(open(&app, &mut state.borrow_mut(), &blues));
+    app.invoke_app_action(AppAction::NewTab);
+    run_deferred();
+    song_file(&dir, "Blues");
+
+    // When the second tab opens the transcription
+    follow(&app, &mut state.borrow_mut(), Next::Open(blues.clone()));
+
+    // Then it's the only tab on that file: the stale one, unsaved, can't autosave over it
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!((tab_labels(&app), app.get_active_tab()), (vec!["•Blues".to_string(), "Blues".to_string()], 1));
+    assert_eq!(state.borrow().tabs.iter().filter(|tab| tab.path.as_ref() == Some(&blues)).count(), 1);
+}
+
+#[test]
 fn saving_writes_the_song_file_and_edits_are_autosaved_after_two_seconds() {
     // Given a song file opened, switched to edit mode, with a chord typed
     let (app, state) = start_screen();

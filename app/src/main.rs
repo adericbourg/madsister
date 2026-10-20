@@ -372,6 +372,12 @@ fn follow(app: &AppWindow, state: &mut State, next: Next) {
         Next::ConfirmOverwrite(path) => state.pending = Some(Pending::Overwrite(path)),
         Next::Open(path) => match read_song(&path) {
             Ok(song) => {
+                // A tab still on the overwritten file would autosave its old song over the transcription: it becomes an
+                // unsaved copy.
+                for tab in state.tabs.iter_mut().filter(|tab| tab.path.as_deref() == Some(path.as_path())) {
+                    tab.path = None;
+                    tab.saved = None;
+                }
                 load(app, state, viewer(song), Some(path.clone()));
                 remember(app, state, &path);
             }
