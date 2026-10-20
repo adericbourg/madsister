@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -92,4 +93,7 @@ def validate(song: Song) -> None:
 
 def write(song: Song, path: Path) -> None:
     validate(song)
-    Path(path).write_text(json.dumps(to_json(song), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # Written aside then renamed: a cancel (SIGKILL) midway leaves the previous file whole, never a cut-off one.
+    tmp = Path(path).with_name(Path(path).name + ".tmp")
+    tmp.write_text(json.dumps(to_json(song), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
