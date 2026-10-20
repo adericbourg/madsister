@@ -324,15 +324,25 @@ jobs:
       - name: Download the uv and ffmpeg sidecars
         env:
           PACKAGE: ${{ needs.version.outputs.package }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         # ffmpeg ships to users inside the installer: a dated BtbN build, checked against the sha256 recorded here.
+        # BtbN prunes old builds, so the first run with a pin copies it to this repo's `ffmpeg` prerelease, read from then on.
         run: |
           triple=$(rustc -vV | sed -n 's/^host: //p')
           mkdir -p app/binaries
           curl -fsSLo "$RUNNER_TEMP/uv.zip" "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$triple.zip"
           unzip -p "$RUNNER_TEMP/uv.zip" uv.exe > "app/binaries/$PACKAGE-uv-$triple.exe"
-          curl -fsSLo "$RUNNER_TEMP/ffmpeg.zip" "https://github.com/BtbN/FFmpeg-Builds/releases/download/$FFMPEG_BUILD"
-          echo "$FFMPEG_SHA256  $RUNNER_TEMP/ffmpeg.zip" | sha256sum -c -
-          unzip -p "$RUNNER_TEMP/ffmpeg.zip" '*/bin/ffmpeg.exe' > "app/binaries/ffmpeg-$triple.exe"
+          asset=${FFMPEG_BUILD#*/} # BtbN's file name, unique per build
+          if ! gh release download ffmpeg -p "$asset" -D "$RUNNER_TEMP" 2>/dev/null; then
+            curl -fsSLo "$RUNNER_TEMP/$asset" "https://github.com/BtbN/FFmpeg-Builds/releases/download/$FFMPEG_BUILD"
+            echo "$FFMPEG_SHA256  $RUNNER_TEMP/$asset" | sha256sum -c -
+            gh release view ffmpeg >/dev/null 2>&1 ||
+              gh release create ffmpeg --prerelease --title "ffmpeg mirror" --notes "Build dependencies mirrored for the release workflow, not a madsister release."
+            gh release upload ffmpeg "$RUNNER_TEMP/$asset" --clobber
+          fi
+          echo "$FFMPEG_SHA256  $RUNNER_TEMP/$asset" | sha256sum -c -
+          unzip -p "$RUNNER_TEMP/$asset" '*/bin/ffmpeg.exe' > "app/binaries/ffmpeg-$triple.exe"
       - name: Build the installer
         working-directory: app
         env:
