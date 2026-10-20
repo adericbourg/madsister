@@ -104,6 +104,8 @@ def to_song(
     outputs -> Song. `chroma` = `add_heuristic.chroma`, `bass_chroma` = `bass.chroma`."""
     if len(beat_result.beats) < 2:
         raise ValueError("could not find beats in this audio")
+    if not beat_result.downbeats:  # a short clip whose beats never reach position 1: no bar to cut
+        raise ValueError("could not find bars in this audio")
     steps = [
         functools.partial(step, chroma=features[0], chroma_times=features[1], beats=beat_result.beats, tau=tau)
         for step, features, tau in (
