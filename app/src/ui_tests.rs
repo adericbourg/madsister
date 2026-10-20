@@ -191,6 +191,22 @@ fn the_song_panel_sets_the_title_and_shows_errors() {
 }
 
 #[test]
+fn the_notation_hint_shows_until_a_key_is_set() {
+    // Given a song without a key: its notation can't change, and the help icon says why
+    let (app, _state) = window();
+    assert!(find(&app, "Set a key to switch to Nashville numbers").is_some());
+
+    // When a key is set
+    let key = field(&app, "Key");
+    click(&app, &key);
+    key.set_accessible_value("C");
+    press(&app, Key::Return);
+
+    // Then the hint is gone
+    assert!(find(&app, "Set a key to switch to Nashville numbers").is_none());
+}
+
+#[test]
 fn deleting_a_section_with_chords_asks_first() {
     // Given a chord in the only section
     let (app, state) = window();
