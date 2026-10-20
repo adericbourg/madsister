@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import types
 
@@ -205,3 +206,22 @@ def test_transcribe_e2e_of_synthetic_clip_finds_8_bars_of_4_4_and_the_progressio
     assert abs(len(bars) - 8) <= 1
     first = [bar["chords"][0]["chord"] for bar in bars]
     assert sum(a == b for a, b in zip(first, PROGRESSION)) >= 6, first
+
+
+def test_main_of_transcribe_takes_title_and_artist_from_tags_else_the_file_name(fakes, make_wav, tmp_path, capfd):
+    # Given the clip untagged, and a copy tagged with a title and an artist
+    wav = make_wav()
+    tagged = tmp_path / "tagged.flac"
+    cmd = ["ffmpeg", "-v", "error", "-i", str(wav), "-metadata", "title= Blue ", "-metadata", "artist=Joni"]
+    subprocess.run([*cmd, str(tagged)], check=True)
+
+    # When both are transcribed
+    metas = []
+    for audio in (wav, tagged):
+        out = tmp_path / f"{audio.stem}.madsister.json"
+        assert cli.main(["transcribe", str(audio), "--out", str(out)]) == 0
+        metas.append(json.loads(out.read_text())["meta"])
+
+    # Then the untagged one is named after its file, without artist; the tagged one after its tags, trimmed
+    assert (metas[0]["title"], "artist" in metas[0]) == (wav.stem, False)
+    assert (metas[1]["title"], metas[1]["artist"]) == ("Blue", "Joni")

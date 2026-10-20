@@ -210,7 +210,7 @@ Rules:
 ## 5. Functional requirements
 
 ### 5.1 Import & transcription
-- **F-IN-1** MUST import local audio files: mp3, wav, flac, m4a, ogg (drag & drop + file dialog).
+- **F-IN-1** MUST import local audio files: mp3, wav, flac, m4a, ogg (drag & drop + file dialog). Title and artist come from its tags, else the title is the file name.
 - **F-IN-2** MUST accept a URL (YouTube etc.) downloaded via yt-dlp, then transcribe it.
 - **F-IN-3** MUST record from the microphone (start/stop), then transcribe.
 - **F-IN-4** MUST show progress by stage and allow cancelling (kill the engine process).

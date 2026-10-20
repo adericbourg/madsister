@@ -14,7 +14,7 @@ from pathlib import Path
 
 from madsister_engine import add_heuristic, bass, events
 from madsister_engine.beats import BeatResult
-from madsister_engine.decode import decode
+from madsister_engine.decode import decode, tags
 from madsister_engine.quantize import ChordSegment, build_song, downbeat_starts
 from madsister_engine.song import Audio, Song, write
 
@@ -169,6 +169,10 @@ def transcribe(
 
     with open(audio, "rb") as f:
         sha256 = hashlib.file_digest(f, "sha256").hexdigest()
-    song = dataclasses.replace(song, audio=Audio(Path(audio).name, sha256))
+    found = tags(audio)
+    meta = dataclasses.replace(
+        song.meta, title=found.get("title", "").strip() or song.meta.title, artist=found.get("artist", "").strip() or None
+    )
+    song = dataclasses.replace(song, meta=meta, audio=Audio(Path(audio).name, sha256))
     events.progress("write", 100)
     write(song, Path(out))
