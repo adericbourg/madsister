@@ -195,10 +195,10 @@ def run_take(ref_id: str, combos: list[tuple], done: set) -> list[dict]:
         start = time.perf_counter()
         beat_result = BeatResult(**beat_part["value"])
         segments = [ChordSegment(*s) for s in chord_part["value"]]
-        # < 2 beats (all-in-one on one take): no grid, scored as every slot to re-enter
+        # < 2 beats (all-in-one on one take) or no downbeat: no grid, scored as every slot to re-enter
         song = (
             to_json(pipeline.to_song(ref_id, beat_result, segments, None, False, chroma, tau, bass_chroma, bass_tau))
-            if len(beat_result.beats) > 1
+            if len(beat_result.beats) > 1 and beat_result.downbeats
             else None
         )
         sec = sum(p["sec"] for p in parts) + time.perf_counter() - start

@@ -172,6 +172,17 @@ def test_main_when_adapter_fails_finds_no_beats_or_group_missing_emits_error_and
     assert "beats-allinone" in auto_error["message"] and "beats-madmom" in auto_error["message"]
 
 
+def test_to_song_of_beats_without_a_downbeat_fails_with_a_message():
+    # Given a short clip whose beats never reach position 1, with and without sections
+    beats = BeatResult([0.5, 1.0, 1.5], [], [(0.0, 2.0, "intro")])
+    segments = [ChordSegment(0.0, 2.0, "C:maj")]
+
+    # When / Then
+    for has_sections in (False, True):
+        with pytest.raises(ValueError, match="could not find bars in this audio"):
+            pipeline.to_song("clip", beats, segments, None, has_sections)
+
+
 def test_beats_per_bar_is_median_downbeat_spacing_or_4_without_two_downbeats():
     # Then
     assert pipeline.beats_per_bar(BEATS, BEATS[::3]) == 3
