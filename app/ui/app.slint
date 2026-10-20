@@ -280,7 +280,7 @@ export component AppWindow inherits Window {
     property <length> scrollbar-width;
     // Handlers, not a binding: a binding would loop through the layout.
     function update-wide() {
-        transport.is-wide = self.width - sidebar.width - rail.width > 40rem;
+        transport.is-wide = self.width - max(sidebar.width, rail.width) > 40rem;
     }
     changed width => { update-wide(); }
     changed is-sidebar-shown => { update-wide(); }
@@ -524,21 +524,24 @@ export component AppWindow inherits Window {
                                 width: 1px;
                                 background: Palette.color-scheme == ColorScheme.dark ? #3a3a41 : #d4d4dc;
                             }
-                            rail := Rail {
-                                is-collapsed: !is-sidebar-shown;
-                                is-editable: Grid.is-editable;
-                                toggled => { root.app-action(AppAction.sidebar); }
-                                panel-shown(i) => { root.panel-shown(i); }
-                            }
-                            sidebar := Panels {
-                                width: is-sidebar-shown ? 20rem : 0;
-                                visible: is-sidebar-shown;
-                                view: panels;
-                                is-editable: Grid.is-editable;
-                                title-error: title-error;
-                                key-error: key-error;
-                                tempo-error: tempo-error;
-                                section-error: section-error;
+                            // The collapse button on top of the panels.
+                            VerticalLayout {
+                                rail := Rail {
+                                    is-collapsed: !is-sidebar-shown;
+                                    is-editable: Grid.is-editable;
+                                    toggled => { root.app-action(AppAction.sidebar); }
+                                    panel-shown(i) => { root.panel-shown(i); }
+                                }
+                                sidebar := Panels {
+                                    width: is-sidebar-shown ? 20rem : 0;
+                                    visible: is-sidebar-shown;
+                                    view: panels;
+                                    is-editable: Grid.is-editable;
+                                    title-error: title-error;
+                                    key-error: key-error;
+                                    tempo-error: tempo-error;
+                                    section-error: section-error;
+                                }
                             }
                         }
                     }

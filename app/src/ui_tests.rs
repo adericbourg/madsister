@@ -1058,9 +1058,10 @@ fn the_sidebar_sits_by_the_rail_and_keeps_its_place_between_view_and_edit() {
     let song = ElementHandle::find_by_element_type_name(&app, "Panel").next().unwrap();
     assert!(song.absolute_position().x + song.size().width <= 1000.0 - 14.0);
 
-    // And the first panel is the rail's 4px away from the collapse button
+    // And the collapse button sits on top of the first panel, lined up with it
     let toggle = find(&app, "Hide parameters").unwrap();
-    assert_eq!(song.absolute_position().x - (toggle.absolute_position().x + toggle.size().width), 4.0);
+    assert_eq!(toggle.absolute_position().x, song.absolute_position().x);
+    assert_eq!(song.absolute_position().y - (toggle.absolute_position().y + toggle.size().height), 8.0);
 }
 
 #[test]
