@@ -40,7 +40,7 @@ depends = [
 
 [dependencies]
 cpal = "0.18"
-dirs = "6"
+dirs = "7"
 krilla = { version = "0.8.2", default-features = false, features = ["simple-text"] }
 opener = { version = "0.9", features = ["reveal"] }
 rfd = "0.17"
