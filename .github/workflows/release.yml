@@ -98,7 +98,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.1 # no floating major tag upstream
+      - uses: astral-sh/setup-uv@v10.3.2 # no floating major tag upstream
         with:
           version: ${{ env.UV_VERSION }}
       - uses: dtolnay/rust-toolchain@stable
@@ -207,7 +207,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.1 # no floating major tag upstream
+      - uses: astral-sh/setup-uv@v10.3.2 # no floating major tag upstream
         with:
           version: ${{ env.UV_VERSION }}
       - uses: dtolnay/rust-toolchain@stable
@@ -297,7 +297,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.1 # no floating major tag upstream
+      - uses: astral-sh/setup-uv@v10.3.2 # no floating major tag upstream
         with:
           version: ${{ env.UV_VERSION }}
       - uses: dtolnay/rust-toolchain@stable
