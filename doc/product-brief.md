@@ -164,7 +164,11 @@ Exit code 0 on success, non-zero on error (with an `error` line emitted first).
 ```ts
 type Song = {
   version: 1;
-  meta: { title: string; artist?: string; key?: string; tempoBpm?: number; meter: { beats: 3 | 4 | 6; unit: 4 | 8 } };
+  meta: {
+    title: string; artist?: string; key?: string; tempoBpm?: number;
+    notation?: "chords" | "nashville";                // absent = "chords"
+    meter: { beats: number; unit: 2 | 4 | 8 };        // beats: positive integer
+  };
   audio?: { path: string; sha256: string };          // referenced, not embedded
   sections: Section[];
 };
@@ -176,7 +180,7 @@ type Section = {
 };
 type Bar = {
   startSec?: number;                                  // alignment to audio (absent for manually added bars)
-  meter?: { beats: number; unit: 4 | 8 };             // override of song meter for this bar only (UI from M2)
+  meter?: { beats: number; unit: 2 | 4 | 8 };         // override of song meter for this bar only (UI from M2)
   chords: ChordSlot[];                                // 1..N; sum(beats) === (bar.meter ?? song.meta.meter).beats
 };
 type ChordSlot = {
