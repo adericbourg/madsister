@@ -63,3 +63,17 @@ def test_write_replaces_the_file_with_validated_json_and_leaves_no_temporary_fil
     # Then
     assert json.loads(path.read_text())["meta"]["title"] == "Test"
     assert [p.name for p in tmp_path.iterdir()] == ["s.madsister.json"]
+
+
+@pytest.mark.parametrize(
+    "song, where",
+    [
+        (Song(meta=Meta(title="T", meter=Meter(4, 3)), sections=[]), r"meta\.meter"),
+        (_song([Bar(chords=[ChordSlot("C:maj", 4)], meter=Meter(4, 3))]), r"sections\[0\]\.bars\[0\]\.meter"),
+        (_song([Bar(chords=[ChordSlot("C:maj", 4)], meter=Meter(0, 4))]), r"sections\[0\]\.bars\[0\]\.meter"),
+    ],
+)
+def test_validate_when_meter_is_not_readable_by_the_app_raises_with_location(song, where):
+    # When / Then
+    with pytest.raises(ValueError, match=where):
+        validate(song)

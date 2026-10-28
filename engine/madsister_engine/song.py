@@ -74,10 +74,20 @@ def to_json(song: Song) -> dict:
     return {"version": 1, **_clean(dataclasses.asdict(song))}
 
 
+def _validate_meter(meter: Meter, where: str) -> None:
+    if not isinstance(meter.beats, int) or meter.beats <= 0:
+        raise ValueError(f"{where}: meter beats must be a positive integer, got {meter.beats!r}")
+    if meter.unit not in (2, 4, 8):
+        raise ValueError(f"{where}: meter unit must be 2, 4 or 8, got {meter.unit!r}")
+
+
 def validate(song: Song) -> None:
+    _validate_meter(song.meta.meter, "meta.meter")
     for s, section in enumerate(song.sections):
         for b, bar in enumerate(section.bars):
             where = f"sections[{s}].bars[{b}]"
+            if bar.meter:
+                _validate_meter(bar.meter, f"{where}.meter")
             if not bar.chords:
                 raise ValueError(f"{where}: a bar needs at least one chord slot")
             for slot in bar.chords:
