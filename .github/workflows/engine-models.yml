@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         # macOS and Windows runners bill ~10x and 2x Linux: only the weekly cron and manual runs use them
-        os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04","macos-14","windows-latest"]' || '["ubuntu-24.04"]') }}
+        os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["ubuntu-latest","macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90  # cold run: model downloads + madmom build
     env:
