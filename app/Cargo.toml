@@ -72,4 +72,4 @@ strip = true
 libc = "0.2"
 
 [dev-dependencies]
-i-slint-backend-testing = "=1.19.0"
+i-slint-backend-testing = "=1.19.1"
